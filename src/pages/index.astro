@@ -1,0 +1,104 @@
+---
+import Base from '../layouts/Base.astro';
+import { catalog } from '../data/catalog';
+import BeforeAfterDemo from '../components/demos/BeforeAfterDemo.astro';
+import ParticleFieldDemo from '../components/demos/ParticleFieldDemo.astro';
+
+const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-field': ParticleFieldDemo };
+---
+
+<Base title="Gallery" description="The reusable UI elements Superhero Technologies builds client sites from, each with a live demo and the name to ask for it by.">
+  <section class="wrap intro">
+    <p class="eyebrow">Superhero UI library</p>
+    <h1>Elements you can ask for by name</h1>
+    <p class="lead">
+      Each element is a single, dependency-free file that drops into any Superhero-built site and takes its colours
+      from that site's own palette. Refer to one by the name under its demo.
+    </p>
+  </section>
+
+  <section class="wrap gallery" aria-label="Elements">
+    {
+      catalog.map((e) => {
+        const Demo = demos[e.id];
+        return (
+          <article class="card element">
+            <div class="element__demo">{Demo && <Demo />}</div>
+            <div class="element__meta">
+              <p class="element__id"><code>{e.id}</code></p>
+              <h2><a href={`/${e.id}/`}>{e.name}</a></h2>
+              <p>{e.summary}</p>
+              <ul class="chips" aria-label="Also called">
+                {e.aka.slice(0, 4).map((a) => <li>{a}</li>)}
+              </ul>
+            </div>
+          </article>
+        );
+      })
+    }
+  </section>
+
+  <section class="wrap--narrow how" id="how">
+    <h2>How to ask for one</h2>
+    <p>
+      Say the name in the grey box, or the section you want it in and what it should do. "The <code>before-after</code>
+      on our home page, with the old and new kitchen photos" is a complete request. If you know it by another name, from
+      WordPress or from another site, that works too: every element lists the names we have heard for it.
+    </p>
+    <h2>For builders</h2>
+    <p>
+      Copy the element's file from this repo into the site's <code>src/components/</code>, map its theming variables to the
+      site's tokens in <code>global.css</code>, and follow the element's page for stacking or sizing rules. The
+      <code>superhero-ui-library</code> skill in the Ecropolis agent-skills marketplace carries the same instructions for
+      agents, one section per element.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .intro {
+    margin-bottom: 2.5rem;
+  }
+  .lead {
+    font-size: 1.15rem;
+    max-width: 44rem;
+  }
+  .gallery {
+    display: grid;
+    gap: 2rem;
+    margin-bottom: 4rem;
+  }
+  .element {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+  }
+  @media (min-width: 56rem) {
+    .element {
+      grid-template-columns: 3fr 2fr;
+      align-items: start;
+    }
+  }
+  .element__id code {
+    display: inline-block;
+    background: var(--tint);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 0.1rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  .element h2 {
+    margin: 0.4rem 0 0.6rem;
+  }
+  .element h2 a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .element h2 a:hover {
+    color: var(--purple-dark);
+  }
+  .how h2 {
+    margin: 2rem 0 0.75rem;
+  }
+</style>

@@ -1,0 +1,3 @@
+# Draft: no hostname yet. Restore "Allow: /" and add the Sitemap line with the domain.
+User-agent: *
+Disallow: /

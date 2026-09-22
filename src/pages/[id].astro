@@ -1,0 +1,109 @@
+---
+import Base from '../layouts/Base.astro';
+import { catalog, type Element } from '../data/catalog';
+import BeforeAfterDemo from '../components/demos/BeforeAfterDemo.astro';
+import ParticleFieldDemo from '../components/demos/ParticleFieldDemo.astro';
+
+export function getStaticPaths() {
+  return catalog.map((e) => ({ params: { id: e.id }, props: { element: e } }));
+}
+interface Props {
+  element: Element;
+}
+const { element: e } = Astro.props;
+const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-field': ParticleFieldDemo };
+const Demo = demos[e.id];
+---
+
+<Base title={e.name} description={e.summary}>
+  <article class="wrap--narrow">
+    <p class="eyebrow">Element</p>
+    <h1>{e.name} <code class="id">{e.id}</code></h1>
+    <p class="lead">{e.summary}</p>
+
+    <div class="demo">{Demo && <Demo />}</div>
+
+    <h2>How to ask for it</h2>
+    <p>
+      Say "the <code>{e.id}</code>" and where it goes. Also called:{' '}
+      {e.aka.map((a, i) => (<><em>{a}</em>{i < e.aka.length - 1 ? ', ' : '.'}</>))}
+    </p>
+    <p><strong>Good for.</strong> {e.goodFor}</p>
+    <p><strong>Not for.</strong> {e.notFor}</p>
+
+    <h2>What it replaces</h2>
+    <ul>{e.replaces.map((r) => <li>{r}</li>)}</ul>
+
+    <h2>Accessibility</h2>
+    <ul>{e.a11y.map((a) => <li>{a}</li>)}</ul>
+
+    <h2>Used on</h2>
+    <ul>{e.usedOn.map((u) => <li><strong>{u.site}</strong>: {u.where}</li>)}</ul>
+
+    <h2>For builders</h2>
+    <p>Copy <code>{e.file}</code> into the site's <code>src/components/</code>. Added {e.added}.</p>
+    <pre><code>{e.usage}</code></pre>
+
+    <h3>Props</h3>
+    <table>
+      <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Note</th></tr></thead>
+      <tbody>
+        {e.props.map((p) => (
+          <tr><td><code>{p.name}</code></td><td>{p.type}</td><td>{p.default ?? ''}</td><td>{p.note}</td></tr>
+        ))}
+      </tbody>
+    </table>
+
+    <h3>Theming</h3>
+    <p>Set these from the host site's tokens. Each has a fallback so the element works before it is themed.</p>
+    <table>
+      <thead><tr><th>Variable</th><th>Fallback</th><th>Note</th></tr></thead>
+      <tbody>
+        {e.theming.map((t) => (
+          <tr><td><code>{t.name}</code></td><td><code>{t.fallback}</code></td><td>{t.note}</td></tr>
+        ))}
+      </tbody>
+    </table>
+
+    <p class="back"><a href="/">← All elements</a></p>
+  </article>
+</Base>
+
+<style>
+  h1 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+  .id {
+    font-size: 1rem;
+    font-weight: 600;
+    background: var(--tint);
+    border: 1px solid var(--line);
+    padding: 0.15rem 0.6rem;
+    border-radius: 6px;
+    color: var(--ink);
+  }
+  .lead {
+    font-size: 1.15rem;
+  }
+  .demo {
+    margin-block: 2rem 2.5rem;
+  }
+  h2 {
+    margin: 2rem 0 0.75rem;
+  }
+  h3 {
+    margin: 1.5rem 0 0.5rem;
+  }
+  ul {
+    padding-left: 1.2rem;
+  }
+  li {
+    margin-bottom: 0.35rem;
+  }
+  .back {
+    margin-top: 3rem;
+  }
+</style>

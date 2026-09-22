@@ -1,0 +1,59 @@
+/* Superhero Technologies tokens — same values as SuperheroTech/Website. */
+:root {
+  --purple: #5933d8;
+  --purple-dark: #4526ad;
+  --purple-light: #7c5ce8;
+  --purple-50: #f4f1fe;
+  --navy: #1e283c;
+  --navy-deep: #141c2b;
+  --orange: #f08c3c;
+  --orange-dark: #d97522;
+  --ink: #16192a;
+  --body: #565b73;
+  --muted: #868ba3;
+  --line: #e6e6f0;
+  --tint: #f8f8fc;
+  --white: #fff;
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(22, 25, 42, 0.04), 0 12px 32px rgba(22, 25, 42, 0.08);
+  --wrap: 1180px;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+}
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--body);
+  background: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { color: var(--ink); line-height: 1.1; font-weight: 800; letter-spacing: -0.025em; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 4.5vw, 3.2rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); }
+h3 { font-size: 1.2rem; }
+p { margin-block: 0 1rem; }
+a { color: var(--purple-dark); }
+img, svg, canvas { display: block; max-width: 100%; }
+code, pre { font-family: var(--mono); font-size: 0.9em; }
+pre { background: var(--navy-deep); color: var(--tint); padding: 1rem 1.25rem; border-radius: var(--radius); overflow-x: auto; line-height: 1.55; }
+pre code { font-size: 0.85rem; }
+.wrap { width: min(100% - 2 * var(--gutter), var(--wrap)); margin-inline: auto; }
+.wrap--narrow { width: min(100% - 2 * var(--gutter), 52rem); margin-inline: auto; }
+.eyebrow { color: var(--orange-dark); font-weight: 700; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.5rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0; list-style: none; }
+.chips li { background: var(--purple-50); color: var(--purple-dark); border-radius: 999px; padding: 0.15rem 0.7rem; font-size: 0.85rem; }
+.card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; }
+.grid { display: grid; gap: 1.5rem; }
+@media (min-width: 52rem) { .grid--2 { grid-template-columns: 1fr 1fr; } }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--line); }
+th { color: var(--ink); font-weight: 700; }
+td code { color: var(--ink); background: var(--tint); padding: 0.05rem 0.35rem; border-radius: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:focus-visible { outline: 3px solid var(--purple); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

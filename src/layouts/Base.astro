@@ -1,0 +1,84 @@
+---
+import '../styles/global.css';
+interface Props {
+  title: string;
+  description: string;
+}
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · Superhero UI library</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#5933d8" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap top__in">
+        <a class="top__brand" href="/">Superhero <span>UI library</span></a>
+        <nav aria-label="Primary"><a href="/">Gallery</a><a href="/#how">How to ask for one</a></nav>
+      </div>
+    </header>
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="foot">
+      <div class="wrap">
+        <p>Superhero Technologies. Every element here is dependency-free, keyboard operable and themed from the host site's tokens.</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .top {
+    border-bottom: 1px solid var(--line);
+    background: var(--white);
+  }
+  .top__in {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1rem;
+  }
+  .top__brand {
+    color: var(--ink);
+    font-weight: 800;
+    text-decoration: none;
+    letter-spacing: -0.02em;
+  }
+  .top__brand span {
+    color: var(--purple);
+  }
+  nav {
+    display: flex;
+    gap: 1.25rem;
+  }
+  nav a {
+    color: var(--body);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  nav a:hover {
+    color: var(--purple-dark);
+  }
+  main {
+    padding-block: clamp(2rem, 5vw, 4rem);
+  }
+  .foot {
+    border-top: 1px solid var(--line);
+    padding-block: 2rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .foot p {
+    margin: 0;
+  }
+</style>

@@ -1,0 +1,101 @@
+---
+/**
+ * BeforeAfter — drag a handle to reveal one image over another. The WordPress world calls
+ * this TwentyTwenty (the ZURB jQuery plugin behind UABB's "Before After" module and most
+ * comparison-slider plugins). No dependencies: a range input does the work, so it is
+ * keyboard operable and works with the pointer, touch and screen readers alike.
+ *
+ * Both images must share an aspect ratio; `width`/`height` are the shared intrinsic size.
+ * The "before" image is clipped, so a caption baked into the "after" image reads fine.
+ *
+ * Theming, from the host's tokens:
+ *   --ba-handle     handle line and ring colour        (fallback #fff)
+ *   --ba-handle-bg  fill behind the ‹ › glyph          (fallback rgb(0 0 0 / 0.35))
+ *   --ba-focus      keyboard focus ring                (fallback currentColor)
+ */
+interface Props {
+  before: string;
+  after: string;
+  beforeAlt: string;
+  afterAlt: string;
+  width: number;
+  height: number;
+  label?: string;
+}
+const { before, after, beforeAlt, afterAlt, width, height, label = 'Reveal the second image' } = Astro.props;
+---
+
+<div class="ba" style="--split:50%" data-ba>
+  <img src={after} alt={afterAlt} width={width} height={height} loading="lazy" />
+  <img class="ba__before" src={before} alt={beforeAlt} width={width} height={height} loading="lazy" />
+  <span class="ba__handle" aria-hidden="true"></span>
+  <input type="range" min="0" max="100" value="50" aria-label={label} data-ba-range />
+</div>
+
+<script is:inline>
+  document.querySelectorAll('[data-ba]').forEach((el) => {
+    el.querySelector('[data-ba-range]').addEventListener('input', (e) => {
+      el.style.setProperty('--split', e.target.value + '%');
+    });
+  });
+</script>
+
+<style>
+  .ba {
+    position: relative;
+    overflow: hidden;
+    line-height: 0;
+  }
+  .ba img {
+    width: 100%;
+    height: auto;
+  }
+  .ba__before {
+    position: absolute;
+    inset: 0;
+    height: 100% !important;
+    object-fit: cover;
+    clip-path: inset(0 calc(100% - var(--split)) 0 0);
+  }
+  .ba__handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--split);
+    width: 3px;
+    translate: -50% 0;
+    background: var(--ba-handle, #fff);
+    pointer-events: none;
+  }
+  .ba__handle::after {
+    content: '‹ ›';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 3px solid var(--ba-handle, #fff);
+    border-radius: 50%;
+    color: var(--ba-handle, #fff);
+    font-size: 1.1rem;
+    line-height: 1;
+    white-space: nowrap;
+    background: var(--ba-handle-bg, rgb(0 0 0 / 0.35));
+  }
+  .ba input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: ew-resize;
+  }
+  .ba:has(input:focus-visible) {
+    outline: 3px solid var(--ba-focus, currentColor);
+    outline-offset: 2px;
+  }
+</style>

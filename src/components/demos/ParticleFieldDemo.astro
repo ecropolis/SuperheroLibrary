@@ -1,0 +1,37 @@
+---
+import ParticleField from '../../library/particle-field/ParticleField.astro';
+---
+<div class="demo-pf">
+  <ParticleField class="demo-pf__canvas" minWidth={0} />
+  <p class="demo-pf__copy">Copy sits above the field.<br /><span>The dots stay behind it.</span></p>
+</div>
+<style>
+  .demo-pf {
+    position: relative;
+    isolation: isolate;
+    min-height: 20rem;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--navy), var(--purple-dark));
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .demo-pf :global(.demo-pf__canvas) {
+    z-index: 1;
+  }
+  .demo-pf__copy {
+    position: relative;
+    z-index: 2;
+    margin: 0;
+    text-align: center;
+    color: var(--white);
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+  .demo-pf__copy span {
+    font-weight: 400;
+    font-size: 1rem;
+    opacity: 0.8;
+  }
+</style>

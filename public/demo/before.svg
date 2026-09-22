@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <rect width="1200" height="800" fill="#c9ccd6"/>
+  <g fill="#9a9fb0">
+    <rect x="120" y="140" width="420" height="40" rx="6"/><rect x="120" y="210" width="360" height="24" rx="6"/>
+    <rect x="120" y="254" width="400" height="24" rx="6"/><rect x="120" y="298" width="300" height="24" rx="6"/>
+    <rect x="120" y="400" width="960" height="260" rx="10"/>
+  </g>
+  <text x="600" y="760" text-anchor="middle" font-family="system-ui, sans-serif" font-size="44" fill="#565b73">BEFORE</text>
+</svg>

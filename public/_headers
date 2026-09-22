@@ -1,0 +1,17 @@
+# NOINDEX until the gallery has a hostname. Remove the X-Robots-Tag line and
+# restore Allow in robots.txt together, in the commit that attaches the domain.
+#
+# Two CSP headers, on purpose (see the astro-cloudflare-pages skill): the enforced
+# one governs nothing that can break the page; the Report-Only one carries the
+# origin allowlist and is promoted once a production pass shows no violations.
+# 'unsafe-inline' is needed: every element ships its script and style inline so
+# it can be copied into a client site as one file.
+/*
+  X-Robots-Tag: noindex, nofollow
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'

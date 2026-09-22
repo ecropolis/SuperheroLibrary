@@ -1,0 +1,21 @@
+---
+import BeforeAfter from '../../library/before-after/BeforeAfter.astro';
+---
+<div class="demo-ba">
+  <BeforeAfter
+    before="/demo/before.svg"
+    after="/demo/after.svg"
+    beforeAlt="A grey wireframe of a page: the before state"
+    afterAlt="The same page in the Superhero purple and orange: the after state"
+    width={1200}
+    height={800}
+    label="Compare the before and after wireframes"
+  />
+</div>
+<style>
+  .demo-ba {
+    --ba-focus: var(--purple);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+</style>
