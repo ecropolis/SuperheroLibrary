@@ -394,6 +394,79 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'accordion',
+    name: 'Accordion / FAQ',
+    aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible'],
+    summary:
+      'Questions (or any titles) that open to show their answer, on native <details>/<summary>: keyboard, screen readers and find-in-page work with no script. One open at a time or several, numbered, chevron or plus, deep-linkable by #id. With jsonLd on, the same items become the page’s FAQPage structured data, so the FAQ and the accordion are one element.',
+    pitch: 'FAQ page design that gets people their answer fast: each question opens with a tap, every answer is findable with Ctrl+F, and search engines and AI assistants can read them as questions and answers.',
+    // faq page design 320/mo, difficulty 6; wordpress accordion 110/17; accordion design 210/35;
+    // html accordion 320/41 (SE Ranking US, 2026-09-23).
+    search: { query: 'faq page design', alsoRanks: ['wordpress accordion', 'accordion design', 'html accordion'] },
+    replaces: [
+      'PowerPack “FAQ” module (Beaver Builder)',
+      'PowerPack “Advanced Accordions” module',
+      'UABB “Advanced Accordion”',
+      'Elementor Accordion and Toggle widgets',
+      'hand-written FAQ lists',
+      'FAQ schema plugins (Yoast and Rank Math FAQ blocks, Structured Content)',
+    ],
+    goodFor: 'An FAQ page or section; services, policies or specifications that visitors scan for the one they need; any page where most readers want one answer out of many.',
+    notFor:
+      'Content everyone must read (behind a tap, most people never see it), a single paragraph, or navigation. Nor is it a promise of search features: since August 2023 Google shows FAQ rich results only for well-known, authoritative government and health sites. The schema is still correct markup that tells machines these are questions and answers; it does not buy extra space in results.',
+    props: [
+      { name: 'items', type: 'AccordionItem[]', note: '`{ title, body?, slot?, id?, open? }`. `title` is plain text (the summary and the JSON-LD question). `body` is an HTML string; or name a slot in `slot` and pass `<div slot="…">…</div>`. `id` is the deep-link anchor (default: the title, slugified).' },
+      { name: 'exclusive', type: 'boolean', default: 'true', note: 'One open at a time. Uses the `name` attribute, so the browser closes the others itself.' },
+      { name: 'openFirst', type: 'boolean', default: 'false', note: 'Open the first item on load.' },
+      { name: 'numbered', type: 'boolean', default: 'false', note: '“1) 2) 3)” before each title, in the accent colour.' },
+      { name: 'icon', type: '“chevron” | “plus” | “none”', default: '“chevron”', note: 'Chevron turns over; plus becomes a minus.' },
+      { name: 'boxed', type: 'boolean', default: 'false', note: 'Separate bordered boxes with `--ac-gap` between, instead of a ruled list.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Heading level of each title inside its summary, so the page outline stays unbroken.' },
+      { name: 'jsonLd', type: 'boolean', default: 'false', note: 'Emit FAQPage JSON-LD from `items`. One instance per page; delete any hand-written FAQPage on that page.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--ac-fg', fallback: 'inherit', note: 'Question text.' },
+      { name: '--ac-muted', fallback: 'inherit', note: 'Answer text.' },
+      { name: '--ac-accent', fallback: 'currentColor', note: 'Icon and number.' },
+      { name: '--ac-bg', fallback: 'transparent', note: 'Summary fill.' },
+      { name: '--ac-bg-open', fallback: 'var(--ac-bg)', note: 'Summary fill while open.' },
+      { name: '--ac-hover', fallback: 'rgb(0 0 0 / 0.04)', note: 'Summary fill on hover.' },
+      { name: '--ac-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rules between items, or box borders when `boxed`.' },
+      { name: '--ac-radius', fallback: '0', note: 'Corners of each item.' },
+      { name: '--ac-gap', fallback: '0 (0.75rem when boxed)', note: 'Space between items.' },
+      { name: '--ac-pad-y / --ac-pad-x', fallback: '1rem / 1.25rem', note: 'Summary and answer padding.' },
+      { name: '--ac-focus', fallback: 'currentColor', note: 'Keyboard focus ring, drawn inside the summary.' },
+      { name: '--ac-duration', fallback: '250ms', note: 'Open animation and icon turn.' },
+    ],
+    a11y: [
+      'Native <details>/<summary>: Tab reaches each question, Enter or Space opens and closes it, and screen readers announce expanded or collapsed. The browser does this, not a script, so it cannot break.',
+      'Every answer is in the page even when closed: find-in-page (Ctrl/⌘+F) matches it, and current Chrome, Edge and Firefox open the item. This is why the element is <details> and not a JavaScript accordion. It works with JavaScript off.',
+      'Each question is a heading at `headingLevel` inside its summary, so the page outline lists the questions. The icon is decorative (aria-hidden).',
+      '`exclusive` uses the name attribute, so the browser closes the others. A link to #item-id opens that item and scrolls to it (the one script in the element).',
+      'Opening animates its height where ::details-content and interpolate-size exist (Chromium) and is instant elsewhere; under prefers-reduced-motion nothing animates, the icon included.',
+    ],
+    usage: `---
+import Accordion, { type AccordionItem } from '../components/Accordion.astro';
+const faqs: AccordionItem[] = [
+  { id: 'parking', title: 'Is there parking?', body: '<p>Free two-hour parking out front.</p>' },
+  { id: 'dogs', title: 'Can I bring my dog?', body: '<p>On the patio, yes.</p>' },
+];
+---
+<!-- The FAQ page: schema on, first answer open. Delete any hand-written FAQPage. -->
+<Accordion items={faqs} openFirst jsonLd headingLevel={2} />
+
+<!-- A services list: numbered, plus icons, several open at once, no schema -->
+<Accordion items={services} numbered icon="plus" boxed exclusive={false} />
+<!-- .faq { --ac-accent: var(--brand); --ac-border: var(--line); } -->`,
+    usedOn: [
+      { site: 'jwalktours.com', where: '/faqs/ and the tour pages: its own FaqList.astro (<details>, FAQPage JSON-LD from the same array); moves to this element on its next FAQ request' },
+      { site: 'stbeautybar.com', where: '/about-us/ FAQ: its own Faqs.astro (exclusive, first open, rotating icon, FAQPage JSON-LD); moves to this element on its next FAQ request' },
+    ],
+    file: 'src/library/accordion/Accordion.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

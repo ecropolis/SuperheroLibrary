@@ -1,0 +1,296 @@
+---
+/**
+ * Accordion — questions (or any titles) that open to show their answer, built on native
+ * <details>/<summary>. With `jsonLd` it is also the page's FAQPage structured data, so the FAQ
+ * and the accordion are one element: PowerPack sells "FAQ" and "Advanced Accordions" as two
+ * modules, UABB and Elementor have their own; this replaces all of them.
+ *
+ * Why <details> and not a scripted accordion: the browser supplies the keyboard (Tab to a
+ * summary, Enter or Space toggles), the screen-reader semantics (expanded / collapsed), and
+ * every answer stays in the DOM, so find-in-page (Ctrl/⌘+F) matches a closed answer and
+ * current Chrome, Edge and Firefox open it; search engines read every answer too. It works with
+ * JavaScript off. `exclusive` uses the `name` attribute, so the browser itself closes the
+ * others when one opens.
+ *
+ * The only script handles deep links: `#item-id` in the URL (on load and on hashchange) opens
+ * that item, and any closed <details> around an anchor target, then scrolls to it.
+ *
+ * Opening animates its height with `::details-content` and `interpolate-size` where the
+ * browser has both (Chromium 131+); elsewhere it opens instantly. Under prefers-reduced-motion
+ * nothing animates, the icon included.
+ *
+ * FAQ schema: `jsonLd` emits FAQPage with one Question per item, from the same `items` the
+ * page renders, so the markup and the schema cannot drift apart. A host that passes `jsonLd`
+ * must delete any hand-written FAQPage for that page. One FAQPage per page: set it on one
+ * instance only. Answers are HTML strings (links, lists and paragraphs are allowed in
+ * schema.org Answer text); a body filled from a slot is rendered to HTML and used the same way.
+ *
+ * Sizing: it fills its container's width and grows with its content; no positioning, no
+ * z-index. Put it in a column no wider than a comfortable line (~45rem) for reading.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --ac-fg / --ac-muted          question text / answer text      (inherit / inherit)
+ *   --ac-accent                   icon and number                  (currentColor)
+ *   --ac-bg / --ac-bg-open        summary fill / open summary fill (transparent / transparent)
+ *   --ac-hover                    summary fill on hover            (rgb(0 0 0 / 0.04))
+ *   --ac-border / --ac-radius     rules or box borders / corners   (rgb(0 0 0 / 0.14) / 0)
+ *   --ac-gap                      space between items              (0; 0.75rem when `boxed`)
+ *   --ac-pad-y / --ac-pad-x       summary and answer padding       (1rem / 1.25rem)
+ *   --ac-focus                    keyboard focus ring              (currentColor)
+ *   --ac-duration                 open animation length            (250ms)
+ */
+export interface AccordionItem {
+  /** The question or title. Plain text: it is the summary and the JSON-LD Question name. */
+  title: string;
+  /** The answer as an HTML string. Or leave it out and name a slot in `slot`. */
+  body?: string;
+  /** Name of a slot that fills the body: `slot: 'refunds'` plus `<div slot="refunds">…</div>`. */
+  slot?: string;
+  /** Anchor for deep links (`#refunds`). Default: the title, slugified. */
+  id?: string;
+  /** Start open. With `exclusive`, only the first open item stays open. */
+  open?: boolean;
+}
+interface Props {
+  items: AccordionItem[];
+  /** One open at a time (the browser enforces it through `name`). */
+  exclusive?: boolean;
+  /** Open the first item on load. */
+  openFirst?: boolean;
+  /** "1) 2) 3)" before each title. */
+  numbered?: boolean;
+  icon?: 'chevron' | 'plus' | 'none';
+  /** Separate bordered boxes with `--ac-gap` between, instead of a ruled list. */
+  boxed?: boolean;
+  /** Heading level of each title, so the page outline stays unbroken. */
+  headingLevel?: 2 | 3 | 4;
+  /** Emit FAQPage JSON-LD from `items`. One instance per page. */
+  jsonLd?: boolean;
+  class?: string;
+}
+const {
+  items,
+  exclusive = true,
+  openFirst = false,
+  numbered = false,
+  icon = 'chevron',
+  boxed = false,
+  headingLevel = 3,
+  jsonLd = false,
+  class: className,
+} = Astro.props;
+
+const uid = 'ac-' + Math.random().toString(36).slice(2, 8);
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'item';
+const used = new Set<string>();
+const bodies = await Promise.all(
+  items.map((it) => (it.body !== undefined ? Promise.resolve(it.body) : it.slot && Astro.slots.has(it.slot) ? Astro.slots.render(it.slot) : Promise.resolve(''))),
+);
+let anyOpen = false;
+const rows = items.map((it, i) => {
+  let id = it.id ?? slug(it.title);
+  for (let n = 2; used.has(id); n++) id = `${it.id ?? slug(it.title)}-${n}`;
+  used.add(id);
+  // With `exclusive`, two open items in one name group would be closed by the browser anyway;
+  // keep the first so the server render matches what the visitor sees.
+  let open = !!it.open || (openFirst && i === 0);
+  if (exclusive && open && anyOpen) open = false;
+  anyOpen ||= open;
+  return { ...it, id, open, body: bodies[i] };
+});
+
+const ld = jsonLd
+  ? JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: rows.map((r) => ({
+        '@type': 'Question',
+        name: r.title,
+        acceptedAnswer: { '@type': 'Answer', text: r.body.trim() },
+      })),
+    }).replace(/</g, '\\u003c')
+  : '';
+---
+
+<div
+  class:list={['ac', `ac--${icon}`, { 'ac--numbered': numbered, 'ac--boxed': boxed }, className]}
+  data-ac
+  data-ac-jsonld={jsonLd ? '' : undefined}
+>
+  {
+    rows.map((r) => (
+      <details class="ac__item" id={r.id} name={exclusive ? uid : undefined} open={r.open}>
+        <summary class="ac__summary">
+          <H class="ac__title">{r.title}</H>
+          {icon !== 'none' && <span class="ac__icon" aria-hidden="true" />}
+        </summary>
+        <div class="ac__body" set:html={r.body} />
+      </details>
+    ))
+  }
+</div>
+{ld && <script type="application/ld+json" set:html={ld} />}
+
+<script is:inline>
+  (() => {
+    if (window.__accordion) return;
+    window.__accordion = true;
+    // Deep link: #id opens that item (or every closed <details> around the target) and
+    // scrolls to it. A fragment naming a <details> itself does not open it without this.
+    const reveal = () => {
+      let id;
+      try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+      if (!id) return;
+      const target = document.getElementById(id);
+      if (!target || !target.closest('[data-ac]')) return;
+      let opened = false;
+      for (let d = target.closest('details'); d; d = d.parentElement?.closest('details')) {
+        if (!d.open) { d.open = true; opened = true; }
+      }
+      if (opened || target.matches('details')) {
+        const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        requestAnimationFrame(() => target.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' }));
+      }
+    };
+    addEventListener('hashchange', reveal);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', reveal) : reveal();
+  })();
+</script>
+
+<style>
+  .ac {
+    display: grid;
+    gap: var(--ac-gap, 0);
+    counter-reset: ac;
+  }
+  .ac__item {
+    border-bottom: 1px solid var(--ac-border, rgb(0 0 0 / 0.14));
+    border-radius: var(--ac-radius, 0);
+    scroll-margin-top: var(--ac-scroll-margin, 1rem);
+  }
+  .ac__item:first-child {
+    border-top: 1px solid var(--ac-border, rgb(0 0 0 / 0.14));
+  }
+  /* Boxed: separate bordered boxes with space between (the PowerPack look). */
+  .ac--boxed {
+    gap: var(--ac-gap, 0.75rem);
+  }
+  .ac--boxed .ac__item {
+    border: 1px solid var(--ac-border, rgb(0 0 0 / 0.14));
+    overflow: clip;
+  }
+  .ac__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: var(--ac-pad-y, 1rem) var(--ac-pad-x, 1.25rem);
+    background: var(--ac-bg, transparent);
+    color: var(--ac-fg, inherit);
+    cursor: pointer;
+    list-style: none;
+  }
+  .ac__summary::-webkit-details-marker {
+    display: none;
+  }
+  .ac__summary:hover {
+    background: var(--ac-hover, rgb(0 0 0 / 0.04));
+  }
+  .ac__item[open] > .ac__summary {
+    background: var(--ac-bg-open, var(--ac-bg, transparent));
+  }
+  .ac__summary:focus-visible {
+    outline: 3px solid var(--ac-focus, currentColor);
+    outline-offset: -3px;
+  }
+  .ac__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: inherit;
+  }
+  .ac--numbered .ac__title::before {
+    counter-increment: ac;
+    content: counter(ac) ') ';
+    color: var(--ac-accent, currentColor);
+  }
+  .ac__body {
+    padding: 0 var(--ac-pad-x, 1.25rem) var(--ac-pad-y, 1rem);
+    color: var(--ac-muted, inherit);
+    line-height: 1.6;
+  }
+  .ac__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .ac__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  /* Icons: a chevron that turns, or a plus that becomes a minus. */
+  .ac__icon {
+    position: relative;
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    color: var(--ac-accent, currentColor);
+  }
+  .ac--chevron .ac__icon::before {
+    content: '';
+    position: absolute;
+    inset: 0.15rem 0.25rem 0.35rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    rotate: 45deg;
+  }
+  .ac--chevron .ac__item[open] .ac__icon {
+    rotate: 180deg;
+  }
+  .ac--plus .ac__icon::before,
+  .ac--plus .ac__icon::after {
+    content: '';
+    position: absolute;
+    inset: calc(50% - 1px) 0;
+    background: currentColor;
+    border-radius: 1px;
+  }
+  .ac--plus .ac__icon::after {
+    rotate: 90deg;
+  }
+  .ac--plus .ac__item[open] .ac__icon::after {
+    scale: 0 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ac__icon,
+    .ac__icon::after {
+      transition:
+        rotate var(--ac-duration, 250ms) ease,
+        scale var(--ac-duration, 250ms) ease;
+    }
+    /* Height animation where the browser can do it; instant elsewhere. */
+    @supports (interpolate-size: allow-keywords) {
+      .ac {
+        interpolate-size: allow-keywords;
+      }
+      .ac__item::details-content {
+        block-size: 0;
+        overflow-y: clip;
+        transition:
+          block-size var(--ac-duration, 250ms) ease,
+          content-visibility var(--ac-duration, 250ms) allow-discrete;
+      }
+      .ac__item[open]::details-content {
+        block-size: auto;
+      }
+    }
+  }
+</style>
