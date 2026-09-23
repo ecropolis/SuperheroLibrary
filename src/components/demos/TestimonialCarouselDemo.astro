@@ -1,0 +1,77 @@
+---
+/**
+ * Demo for `testimonial-carousel`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. There are no assets.
+ *
+ * The quotes describe the element rather than praise anyone. This page is published on
+ * superherotech.ai, and made-up testimonials there would read as reviews of us. They also
+ * vary in length on purpose, so the reading-time dwell is visible: the long card holds the
+ * row noticeably longer than the short ones.
+ */
+import TestimonialCarousel from '../../library/testimonial-carousel/TestimonialCarousel.astro';
+interface Props {
+  /** Unused: this demo has no assets. Accepted so every demo takes the same props. */
+  assetBase?: string;
+}
+const items = [
+  {
+    quote: 'A short quote. The row waits at least seven seconds on every card, so a short one is never rushed.',
+    name: 'Short quotes',
+    meta: 'The minimum dwell',
+  },
+  {
+    quote:
+      'A long quote holds the row for longer. The wait follows reading time, about two hundred words a minute plus a two-second margin, so someone halfway through a paragraph is not left chasing it off the edge of the screen. This card is the longest in the row, and you can watch it stay put while the short ones move on sooner.',
+    name: 'Long quotes',
+    meta: 'Reading-time dwell',
+  },
+  {
+    quote: 'Rest the mouse on the row and it holds still. Move away and it carries on.',
+    name: 'Hover',
+    meta: 'A pause, not a stop',
+  },
+  {
+    quote: 'Press an arrow, swipe, click in the row or tab into it, and it stops until you press play. Taking hold of it is signal enough.',
+    name: 'Taking hold',
+    meta: 'The WAI-ARIA carousel pattern',
+  },
+  {
+    quote: 'The pause button is there whenever the row can move, because moving content that runs past five seconds must offer a way to stop it.',
+    name: 'The pause button',
+    meta: 'WCAG 2.2.2',
+  },
+  {
+    quote: 'Every card is in the page’s HTML. With no JavaScript this is a plain row you can swipe, and nothing is hidden from search.',
+    name: 'No JavaScript',
+    meta: 'Progressive enhancement',
+  },
+  {
+    quote: 'At the end it fades out and starts again from the first card, instead of rewinding past every one.',
+    name: 'The end of the row',
+    meta: 'Fade, then begin again',
+  },
+];
+---
+<div class="demo-tc">
+  <TestimonialCarousel items={items} label="Seven sample cards, scroll sideways for more">
+    <h3 slot="heading" class="demo-tc__h">What people say</h3>
+  </TestimonialCarousel>
+</div>
+<style>
+  .demo-tc {
+    --tc-ink: var(--ink, #16192a);
+    --tc-accent: var(--purple, #5933d8);
+    --tc-control-hover: var(--purple, #5933d8);
+    --tc-focus: var(--purple, #5933d8);
+    --tc-card-border: var(--line, #e6e6f0);
+    --tc-radius: var(--radius, 14px);
+    padding: 1.5rem;
+    border-radius: var(--radius, 14px);
+    background: var(--tint, #f8f8fc);
+  }
+  .demo-tc__h {
+    margin: 0;
+    color: var(--navy, #16192a);
+    font-size: 1.35rem;
+  }
+</style>

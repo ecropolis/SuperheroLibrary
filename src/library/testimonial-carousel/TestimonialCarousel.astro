@@ -1,0 +1,434 @@
+---
+/**
+ * TestimonialCarousel — a row of quote cards that scrolls and snaps, by swipe, by arrows, or
+ * gently on its own. WordPress and the page builders call it a testimonial slider or rotator
+ * (Elementor Pro's "Testimonial Carousel", Slick and Owl Carousel sliders, Strong
+ * Testimonials). Grown from JWalk Tours' ReviewScroller (2026) and Nicole Lawton's
+ * testimonials band (2026-09-23), which is where the reading-time dwell came from.
+ *
+ * PROGRESSIVE ENHANCEMENT, NOT A JS WIDGET. Every card is in the HTML as a plain list, so the
+ * quotes are indexable and readable with no script: without JavaScript this is a row you can
+ * swipe or shift-scroll, with CSS scroll-snap. The script only adds the arrows, the pause
+ * button and the autoplay. It never renders, moves or removes a card.
+ *
+ * THE AUTOPLAY IS BUILT NOT TO TAKE A QUOTE AWAY FROM SOMEONE READING IT.
+ *   - The row waits on each card for its reading time — `wordsPerMinute` (200) plus two
+ *     seconds — and never less than `minDwell` (7 s). A long quote holds it longer.
+ *   - Hovering holds it; moving away lets it carry on.
+ *   - Taking hold of the row stops it until Play is pressed: an arrow, a swipe or a click in
+ *     the row, a sideways wheel, or keyboard focus arriving anywhere in it except the play /
+ *     pause button (the WAI-ARIA carousel pattern).
+ *   - It moves one card at a time, so the cards still being read stay on screen.
+ *   - At the end it fades out, returns to the first card and fades back in, rather than
+ *     rewinding past every card.
+ *   - It only runs while at least a quarter of it is on screen and the tab is visible.
+ *
+ * WCAG 2.2.2: moving content that lasts more than five seconds needs a way to pause it, so a
+ * visible pause button sits with the arrows whenever the row can move. Its name says what it
+ * will do. Under prefers-reduced-motion (tracked live) there is no autoplay and no button, and
+ * the arrows jump instead of gliding. With `autoplay={false}` it is simply a swipeable row.
+ *
+ * Put the section's heading in the `heading` slot: it shares a row with the controls.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --tc-gap                                   space between cards     (clamp(1rem, …, 1.6rem))
+ *   --tc-card-bg / --tc-card-border            card fill and edge       (#fff / #e4e4e7)
+ *   --tc-card-shadow / --tc-radius             card depth and corners   (soft / 14px)
+ *   --tc-ink / --tc-muted                      quote and byline text    (inherit / #5b6472)
+ *   --tc-quote-font / --tc-accent              quote face and “ mark   (inherit / currentColor)
+ *   --tc-control-bg / --tc-control-fg          button fill and glyph    (#fff / #1d2320)
+ *   --tc-control-border / --tc-control-hover   button ring and hover    (#5b6472 / #1e76aa)
+ *   --tc-focus                                 focus rings              (currentColor)
+ */
+interface Item {
+  quote: string;
+  /** Who said it, as they agreed to be named: "Maria G.", "Anonymous". */
+  name: string;
+  /** A second line under the name: the service, the date, the town. */
+  meta?: string;
+}
+interface Props {
+  items: Item[];
+  /** Accessible name of the row. Say how many and that it scrolls. */
+  label?: string;
+  /** Move on its own. Off leaves a swipeable row with arrows. */
+  autoplay?: boolean;
+  /** The least time (ms) the row waits on a card, however short the quote. */
+  minDwell?: number;
+  /** Reading pace used to hold the row longer on long quotes. */
+  wordsPerMinute?: number;
+  pauseLabel?: string;
+  playLabel?: string;
+  prevLabel?: string;
+  nextLabel?: string;
+  class?: string;
+}
+const {
+  items,
+  label = `${items.length} testimonials, scroll sideways for more`,
+  autoplay = true,
+  minDwell = 7000,
+  wordsPerMinute = 200,
+  pauseLabel = 'Pause the testimonials',
+  playLabel = 'Play the testimonials',
+  prevLabel = 'Previous testimonials',
+  nextLabel = 'Next testimonials',
+  class: className,
+} = Astro.props;
+---
+
+<div
+  class:list={['tc', className]}
+  data-tc
+  data-autoplay={autoplay ? '' : undefined}
+  data-min-dwell={minDwell}
+  data-wpm={wordsPerMinute}
+  data-pause-label={pauseLabel}
+  data-play-label={playLabel}
+>
+  <div class="tc__head">
+    <div class="tc__heading"><slot name="heading" /></div>
+    <div class="tc__controls" data-tc-controls hidden>
+      <button
+        type="button"
+        class="tc__btn"
+        data-tc-pause
+        data-playing="false"
+        aria-label={playLabel}
+        hidden
+      >
+        <span class="tc__glyph" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="tc__btn" data-tc-prev aria-label={prevLabel}>
+        <span aria-hidden="true">‹</span>
+      </button>
+      <button type="button" class="tc__btn" data-tc-next aria-label={nextLabel}>
+        <span aria-hidden="true">›</span>
+      </button>
+    </div>
+  </div>
+  <ul class="tc__track" data-tc-track tabindex="0" aria-label={label}>
+    {
+      items.map((t) => (
+        <li class="tc__card">
+          <figure class="tc__fig">
+            <blockquote class="tc__q">
+              <p>{t.quote}</p>
+            </blockquote>
+            <figcaption class="tc__by">
+              <span class="tc__name">{t.name}</span>
+              {t.meta && <span class="tc__meta">{t.meta}</span>}
+            </figcaption>
+          </figure>
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<style>
+  .tc {
+    --_gap: var(--tc-gap, clamp(1rem, 0.7rem + 1.4vw, 1.6rem));
+    container: tc / inline-size;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .tc__head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .tc__heading:empty {
+    display: none;
+  }
+  .tc__controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  /* `display: flex` would otherwise beat the UA's [hidden] rule and show the buttons before
+   * the script has decided the row needs them. Same for the pause button below. */
+  .tc__controls[hidden],
+  .tc__btn[hidden] {
+    display: none;
+  }
+  .tc__btn {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tc-control-border, #5b6472);
+    border-radius: 50%;
+    background: var(--tc-control-bg, #fff);
+    color: var(--tc-control-fg, #1d2320);
+    font: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .tc__btn:hover:not([aria-disabled='true']) {
+    border-color: var(--tc-control-hover, #1e76aa);
+    color: var(--tc-control-hover, #1e76aa);
+  }
+  .tc__btn[aria-disabled='true'] {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .tc__btn:focus-visible,
+  .tc__track:focus-visible {
+    outline: 2px solid var(--tc-focus, currentColor);
+    outline-offset: 3px;
+  }
+  /* Pause and play, drawn in CSS so there is no icon dependency. */
+  .tc__glyph {
+    width: 12px;
+    height: 13px;
+    border-left: 4px solid currentColor;
+    border-right: 4px solid currentColor;
+  }
+  .tc__btn[data-playing='false'] .tc__glyph {
+    width: 0;
+    height: 0;
+    border: 7px solid transparent;
+    border-left: 12px solid currentColor;
+    margin-left: 5px;
+  }
+
+  /* One row. Flex items stretch to the tallest card, so every card is the same height and
+   * every byline sits on the same line. */
+  .tc__track {
+    display: flex;
+    gap: var(--_gap);
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    /* Room for the card shadows, which the scroll container would otherwise clip. */
+    padding: 0.25rem 0.25rem 2rem;
+    margin: -0.25rem -0.25rem -1.25rem;
+    /* Snap to the padded edge, or the row rests 4px in and "previous" reads as available. */
+    scroll-padding-inline: 0.25rem;
+    transition: opacity 0.35s ease;
+  }
+  .tc__track.is-rewinding {
+    opacity: 0;
+  }
+  .tc__card {
+    flex: 0 0 calc((100% - 2 * var(--_gap)) / 3);
+    scroll-snap-align: start;
+    display: flex;
+  }
+  @container tc (max-width: 56rem) {
+    .tc__card {
+      flex-basis: calc((100% - var(--_gap)) / 2);
+    }
+  }
+  /* On a phone the next card peeks in at the edge, which is what says "swipe". */
+  @container tc (max-width: 36rem) {
+    .tc__card {
+      flex-basis: 86%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tc__track {
+      scroll-behavior: auto;
+      transition: none;
+    }
+  }
+
+  .tc__fig {
+    flex: 1;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.1rem;
+    padding: 1.5rem 1.5rem 1.25rem;
+    background: var(--tc-card-bg, #fff);
+    border: 1px solid var(--tc-card-border, #e4e4e7);
+    border-radius: var(--tc-radius, 14px);
+    box-shadow: var(--tc-card-shadow, 0 1.2rem 2.6rem -1.4rem rgb(0 0 0 / 0.28));
+  }
+  .tc__q {
+    margin: 0;
+    font-family: var(--tc-quote-font, inherit);
+    line-height: 1.6;
+    color: var(--tc-ink, inherit);
+  }
+  .tc__q p {
+    margin: 0;
+  }
+  .tc__q p::before {
+    content: '“';
+    color: var(--tc-accent, currentColor);
+    font-size: 1.6em;
+    line-height: 0;
+    vertical-align: -0.28em;
+    margin-right: 0.06em;
+  }
+  .tc__by {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    border-top: 1px solid var(--tc-card-border, #e4e4e7);
+    padding-top: 0.9rem;
+  }
+  .tc__name {
+    font-weight: 600;
+    color: var(--tc-ink, inherit);
+  }
+  .tc__meta {
+    font-size: 0.875em;
+    color: var(--tc-muted, #5b6472);
+  }
+</style>
+
+<script>
+  // Enhancement only. Without it the row already scrolls and snaps and every quote is in
+  // the HTML; this adds the arrows, the pause button and the autoplay.
+  document.querySelectorAll<HTMLElement>('[data-tc]').forEach((root) => {
+    const track = root.querySelector<HTMLElement>('[data-tc-track]');
+    const controls = root.querySelector<HTMLElement>('[data-tc-controls]');
+    const prev = root.querySelector<HTMLButtonElement>('[data-tc-prev]');
+    const next = root.querySelector<HTMLButtonElement>('[data-tc-next]');
+    const toggle = root.querySelector<HTMLButtonElement>('[data-tc-pause]');
+    if (!track || !controls || !prev || !next || !toggle) return;
+
+    const cards = Array.from(track.querySelectorAll<HTMLElement>('.tc__card'));
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const wantsAutoplay = root.hasAttribute('data-autoplay');
+    const minDwell = Number(root.dataset.minDwell) || 7000;
+    const wpm = Number(root.dataset.wpm) || 200;
+    const pauseLabel = root.dataset.pauseLabel || 'Pause';
+    const playLabel = root.dataset.playLabel || 'Play';
+
+    const step = () => {
+      const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+      return cards[0] ? cards[0].getBoundingClientRect().width + gap : track.clientWidth;
+    };
+    const room = () => track.scrollWidth - track.clientWidth;
+    const atEnd = () => track.scrollLeft >= room() - 2;
+    const firstShown = () =>
+      Math.min(cards.length - 1, Math.max(0, Math.round(track.scrollLeft / step())));
+    const canMove = () => wantsAutoplay && !reduced.matches && room() > 2;
+
+    // aria-disabled rather than disabled: a disabled button drops keyboard focus to the
+    // page the moment the row reaches its end.
+    const setOff = (btn: HTMLButtonElement, off: boolean) =>
+      btn.setAttribute('aria-disabled', String(off));
+    const sync = () => {
+      controls.hidden = room() <= 2; // nothing to scroll, so no controls at all
+      setOff(prev, track.scrollLeft <= 2);
+      setOff(next, atEnd());
+      toggle.hidden = !canMove();
+    };
+
+    /** How long to leave `card` first in the row: its reading time, never under minDwell. */
+    const dwell = (card: HTMLElement | undefined) => {
+      const text = card?.querySelector('.tc__q')?.textContent?.trim() ?? '';
+      const words = text ? text.split(/\s+/).length : 0;
+      return Math.max(minDwell, (words / wpm) * 60_000 + 2000);
+    };
+
+    let playing = false; // the visitor's choice; starts on when it can
+    let held = false; // hovering: a pause, not a choice
+    let onScreen = false;
+    let timer: number | undefined;
+
+    const clear = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+    };
+    // `index` is the card that is (or is about to be) first. Passed in after a move,
+    // because mid-glide the scroll position still says the old one.
+    const schedule = (index = firstShown()) => {
+      clear();
+      if (!playing || held || !onScreen || document.hidden || !canMove()) return;
+      timer = window.setTimeout(advance, dwell(cards[index]));
+    };
+    function advance() {
+      timer = undefined;
+      if (atEnd()) {
+        track.classList.add('is-rewinding');
+        timer = window.setTimeout(() => {
+          track.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior });
+          track.classList.remove('is-rewinding');
+          schedule(0);
+        }, 400);
+        return;
+      }
+      const index = firstShown() + 1;
+      track.scrollBy({ left: step() });
+      schedule(index);
+    }
+
+    const setPlaying = (on: boolean) => {
+      playing = on;
+      toggle.dataset.playing = String(on);
+      toggle.setAttribute('aria-label', on ? pauseLabel : playLabel);
+      if (on) schedule();
+      else clear();
+    };
+
+    toggle.addEventListener('click', () => setPlaying(!playing));
+    prev.addEventListener('click', () => {
+      setPlaying(false);
+      if (prev.getAttribute('aria-disabled') !== 'true') track.scrollBy({ left: -step() });
+    });
+    next.addEventListener('click', () => {
+      setPlaying(false);
+      if (next.getAttribute('aria-disabled') !== 'true') track.scrollBy({ left: step() });
+    });
+
+    // Taking hold of the row stops it. Scroll events cannot tell our moves from theirs, so
+    // this listens for the visitor's own input instead: a press, a sideways wheel, a key.
+    track.addEventListener('pointerdown', () => setPlaying(false), { passive: true });
+    track.addEventListener(
+      'wheel',
+      (e) => {
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) setPlaying(false);
+      },
+      { passive: true },
+    );
+    track.addEventListener('keydown', () => setPlaying(false));
+    // Keyboard focus anywhere inside stops it too, except on the button that restarts it.
+    root.addEventListener('focusin', (e) => {
+      if (e.target !== toggle) setPlaying(false);
+    });
+    // A mouse resting on the row holds it; leaving lets it carry on.
+    root.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      held = true;
+      clear();
+    });
+    root.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      held = false;
+      schedule();
+    });
+
+    new IntersectionObserver(
+      (entries) => {
+        onScreen = entries.some((e) => e.isIntersecting);
+        schedule();
+      },
+      { threshold: 0.25 },
+    ).observe(root);
+    document.addEventListener('visibilitychange', () => schedule());
+    reduced.addEventListener('change', () => {
+      if (reduced.matches) setPlaying(false);
+      sync();
+    });
+
+    track.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    sync();
+    setPlaying(canMove());
+  });
+</script>
