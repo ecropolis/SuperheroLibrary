@@ -14,6 +14,7 @@ import MegaMenuDemo from './MegaMenuDemo.astro';
 import VideoBackgroundDemo from './VideoBackgroundDemo.astro';
 import ParallaxBandDemo from './ParallaxBandDemo.astro';
 import ScrollRevealDemo from './ScrollRevealDemo.astro';
+import BusinessHoursDemo from './BusinessHoursDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,4 +27,5 @@ export const demos: Record<string, AstroComponent> = {
   'video-background': VideoBackgroundDemo,
   'parallax-band': ParallaxBandDemo,
   'scroll-reveal': ScrollRevealDemo,
+  'business-hours': BusinessHoursDemo,
 };

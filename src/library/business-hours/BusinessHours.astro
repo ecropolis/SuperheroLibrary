@@ -1,0 +1,1032 @@
+---
+/**
+ * BusinessHours — "Open · closes at 5:00 PM", the week's hours, holiday hours and the
+ * LocalBusiness `openingHoursSpecification`, from one data object. What WordPress sites used
+ * Mabel's "Business Hours Indicator" or "WP Business Hours" for.
+ *
+ * A static page is cached by definition, so the server render never claims a state: it
+ * renders the table, the note, the dated exceptions and closures, the JSON-LD and BOTH the
+ * `open` and `closed` slots. The browser computes the state on load and then on the minute.
+ *
+ * ONE copy of the logic. `businessHoursEngine()` below is the whole state machine. The
+ * server calls it; the browser gets it through `businessHoursEngine.toString()` in the inline
+ * script (Astro compiles the frontmatter to plain JS, so the serialised function has no types
+ * and no helpers); `scripts/check-business-hours.mjs` extracts the source between the
+ * `<business-hours-engine>` marker comments and runs it in Node. The engine must therefore
+ * reference nothing outside its own body except language globals (Intl, Math, JSON).
+ *
+ * Time zones: every calculation happens on wall-clock parts in the BUSINESS's zone, read with
+ * Intl.DateTimeFormat#formatToParts. No `new Date('YYYY-MM-DD')` (that is UTC midnight) and no
+ * numeric offsets anywhere; calendar days are integers (days since 1970-01-01).
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --bh-open       open state colour               (fallback #1a7f37)
+ *   --bh-closed     closed state colour             (fallback #b42318)
+ *   --bh-badge-bg   fill behind the Open/Closed pill (fallback transparent)
+ *   --bh-today-bg   today's row in the table        (fallback rgb(0 0 0 / 0.05))
+ *   --bh-line       table rules                     (fallback rgb(0 0 0 / 0.15))
+ *   --bh-text       text colour                     (fallback inherit)
+ *
+ * `now` freezes the clock. It is for demos and checks only — never set it on a real site.
+ */
+
+/** 'HH:MM', 24-hour, business-local. '24:00' is allowed as an end. */
+export type Time = string;
+/** [opens, closes]. closes <= opens means the range crosses midnight and belongs to its start day. */
+export type Range = [Time, Time];
+export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+/** A key with an empty array is closed that day; a missing key is closed too (in a season: falls back to `weekly`). */
+export type Weekly = Partial<Record<DayKey, Range[]>>;
+/** One calendar day: `date` ('YYYY-MM-DD'), or `month` + `day` for every year. `hours: []` = closed. */
+export interface Exception {
+  date?: string;
+  month?: number;
+  day?: number;
+  name: string;
+  hours: Range[];
+}
+/** Closed from `from` to `to` inclusive: 'YYYY-MM-DD', or '--MM-DD' for every year. May span the year end. */
+export interface Closure {
+  from: string;
+  to: string;
+  name: string;
+}
+/** A different weekly table between two dates, usually recurring ('--06-01' to '--08-31'). */
+export interface Season {
+  from: string;
+  to: string;
+  name: string;
+  weekly: Weekly;
+}
+/** One location's hours. Priority: closure > exception > season > weekly. */
+export interface BusinessHoursData {
+  /** IANA zone. Every calculation happens here, never in the visitor's zone. */
+  timeZone: string;
+  weekly: Weekly;
+  exceptions?: Exception[];
+  closures?: Closure[];
+  seasons?: Season[];
+  /** "Open 24 hours": skips the state machine. */
+  alwaysOpen?: boolean;
+  /** "By appointment": the table is shown, no open/closed claim. */
+  byAppointment?: boolean;
+  /** Free text under the table. */
+  note?: string;
+}
+/** Every piece of text the element writes. English defaults; override any of them per site. */
+export interface Words {
+  open: string;
+  closed: string;
+  closesAt: string;
+  closesOn: string;
+  closingIn: string;
+  opensAt: string;
+  opensTomorrow: string;
+  opensOn: string;
+  reopens: string;
+  openingIn: string;
+  closedFor: string;
+  closedUntil: string;
+  exceptionHours: string;
+  open24: string;
+  byAppointment: string;
+  hour: string;
+  hours: string;
+  minute: string;
+  minutes: string;
+  separator: string;
+  caption: string;
+  day: string;
+  hoursHeading: string;
+  today: string;
+  closedDay: string;
+  upcoming: string;
+}
+export type ShowZone = 'auto' | 'always' | 'never';
+export type HourCycle = 'h12' | 'h23';
+export interface StateOptions {
+  soonMinutes?: number;
+  showZone?: ShowZone;
+  words?: Partial<Words>;
+  upcomingDays?: number;
+  /** The visitor's zone; defaults to the runtime's. The check pins it. */
+  visitorTimeZone?: string;
+}
+/** A piece of the sentence: text, or a time with its machine-readable instant. */
+export type Segment = string | { text: string; datetime: string };
+export interface Upcoming {
+  key: string;
+  kind: 'closure' | 'exception';
+  name: string;
+  from: string;
+  to: string;
+  hours: Range[];
+}
+export interface HoursState {
+  state: 'open' | 'closed' | 'appointment';
+  sentence: string;
+  lead: string;
+  clause: string;
+  clauseParts: Segment[];
+  closesAt?: number;
+  opensAt?: number;
+  today: { date: string; weekday: DayKey; source: 'closure' | 'exception' | 'season' | 'weekly'; name?: string; season?: number };
+  todayRanges: { opens: Time; closes: Time; start: number; end: number }[];
+  upcoming: Upcoming[];
+}
+
+// <business-hours-engine>
+export function businessHoursEngine() {
+  const DAY = 86400000;
+  const MIN = 60000;
+  /** How far ahead to look for the next opening. */
+  const LOOKAHEAD = 60;
+  /** Relative words ("closing in 40 minutes") only below this, whatever soonMinutes says. */
+  const RELATIVE_LIMIT = 90;
+  const KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const WEEK: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const SCHEMA_DAYS: Record<DayKey, string> = {
+    mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday',
+  };
+  const WORDS: Words = {
+    open: 'Open',
+    closed: 'Closed',
+    closesAt: 'closes at {time}',
+    closesOn: 'closes {day} at {time}',
+    closingIn: 'closing in {duration}',
+    opensAt: 'opens at {time}',
+    opensTomorrow: 'opens tomorrow at {time}',
+    opensOn: 'opens {day} at {time}',
+    reopens: 'opens {date} at {time}',
+    openingIn: 'opening in {duration}',
+    closedFor: 'Closed for {name}',
+    closedUntil: 'Closed until {date} ({name})',
+    exceptionHours: '{name} hours, {clause}',
+    open24: 'Open 24 hours',
+    byAppointment: 'By appointment',
+    hour: '{n} hour',
+    hours: '{n} hours',
+    minute: '{n} minute',
+    minutes: '{n} minutes',
+    separator: ' · ',
+    caption: 'Opening hours',
+    day: 'Day',
+    hoursHeading: 'Hours',
+    today: 'today',
+    closedDay: 'Closed',
+    upcoming: 'Coming up',
+  };
+
+  // ---- calendar days as integers (Howard Hinnant's civil-from-days); no Date parsing
+  const dayNum = (y: number, m: number, d: number): number => {
+    const yy = m <= 2 ? y - 1 : y;
+    const era = Math.floor(yy / 400);
+    const yoe = yy - era * 400;
+    const doy = Math.floor((153 * (m > 2 ? m - 3 : m + 9) + 2) / 5) + d - 1;
+    const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+    return era * 146097 + doe - 719468;
+  };
+  const civil = (n: number) => {
+    const z = n + 719468;
+    const era = Math.floor(z / 146097);
+    const doe = z - era * 146097;
+    const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+    const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+    const mp = Math.floor((5 * doy + 2) / 153);
+    const d = doy - Math.floor((153 * mp + 2) / 5) + 1;
+    const m = mp < 10 ? mp + 3 : mp - 9;
+    return { y: yoe + era * 400 + (m <= 2 ? 1 : 0), m, d };
+  };
+  /** 0 = Sunday. 1970-01-01 was a Thursday. */
+  const weekdayOf = (n: number) => (((n + 4) % 7) + 7) % 7;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (n: number) => {
+    const c = civil(n);
+    return `${c.y}-${pad(c.m)}-${pad(c.d)}`;
+  };
+  const parseDate = (s: string): number | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!m) return null;
+    const n = dayNum(+m[1], +m[2], +m[3]);
+    return iso(n) === s ? n : null;
+  };
+  /** '--MM-DD' as MMDD. */
+  const parseRecurring = (s: string): number | null => {
+    const m = /^--(\d{2})-(\d{2})$/.exec(s || '');
+    return m && +m[1] >= 1 && +m[1] <= 12 && +m[2] >= 1 && +m[2] <= 31 ? +m[1] * 100 + +m[2] : null;
+  };
+  const toMin = (s: string): number => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s || '');
+    if (!m || +m[1] > 24 || +m[2] > 59 || (+m[1] === 24 && +m[2] > 0)) throw new RangeError(`"${s}" is not an HH:MM time`);
+    return +m[1] * 60 + +m[2];
+  };
+  const hhmm = (min: number) => `${pad(Math.floor(min / 60) % 24)}:${pad(min % 60)}`;
+
+  // ---- Intl, cached
+  const fmts = new Map<string, Intl.DateTimeFormat>();
+  const fmt = (locale: string | undefined, o: Intl.DateTimeFormatOptions) => {
+    const k = `${locale || ''}|${JSON.stringify(o)}`;
+    let f = fmts.get(k);
+    if (!f) {
+      f = new Intl.DateTimeFormat(locale, o);
+      fmts.set(k, f);
+    }
+    return f;
+  };
+  /** The wall clock in `tz` at instant `ms`: calendar day and minute of the day. */
+  const wall = (ms: number, tz: string) => {
+    const p: Record<string, number> = {};
+    const f = fmt('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+    for (const x of f.formatToParts(ms)) if (x.type !== 'literal') p[x.type] = +x.value;
+    return { day: dayNum(p.year, p.month, p.day), min: (p.hour % 24) * 60 + p.minute };
+  };
+  const wallKey = (ms: number, tz: string) => {
+    const w = wall(ms, tz);
+    return w.day * DAY + w.min * MIN;
+  };
+  /** How far `tz`'s wall clock is ahead of UTC at `ms`, as Intl reports it (never assumed). */
+  const aheadOf = (ms: number, tz: string) => {
+    const m = Math.floor(ms / MIN) * MIN;
+    return wallKey(m, tz) - m;
+  };
+  /**
+   * The instant at which `tz`'s wall clock reads (day, minutes). Minutes may run past 1440
+   * (a range crossing midnight). A time that does not exist (spring forward) resolves to the
+   * next real instant, i.e. the moment the clock jumps; a time that happens twice (fall back)
+   * takes the first.
+   */
+  const instant = (tz: string, day: number, minutes: number): number => {
+    const d = day + Math.floor(minutes / 1440);
+    const target = d * DAY + (((minutes % 1440) + 1440) % 1440) * MIN;
+    const early = target - aheadOf(target + DAY, tz); // using the later offset
+    const late = target - aheadOf(target - DAY, tz); // using the earlier offset
+    const hits = [early, late].filter((t) => wallKey(t, tz) === target);
+    if (hits.length) return Math.min(...hits);
+    let lo = Math.min(early, late);
+    let hi = Math.max(early, late);
+    while (hi - lo > MIN) {
+      const mid = lo + Math.floor((hi - lo) / 2 / MIN) * MIN;
+      if (wallKey(mid, tz) >= target) hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  };
+
+  // ---- the schedule for one calendar day
+  interface Plan {
+    source: 'closure' | 'exception' | 'season' | 'weekly';
+    name?: string;
+    ref: string;
+    season?: number;
+    ranges: [number, number][];
+  }
+  const covers = (from: string, to: string, day: number) => {
+    const a = parseDate(from);
+    const b = parseDate(to);
+    if (a !== null && b !== null) return day >= a && day <= b;
+    const ra = parseRecurring(from);
+    const rb = parseRecurring(to);
+    if (ra === null || rb === null) return false;
+    const c = civil(day);
+    const md = c.m * 100 + c.d;
+    return ra <= rb ? md >= ra && md <= rb : md >= ra || md <= rb;
+  };
+  const rangesOf = (list: Range[] | undefined): [number, number][] =>
+    (list || [])
+      .map(([a, b]): [number, number] => {
+        const s = toMin(a);
+        const e = toMin(b);
+        return [s, e <= s ? e + 1440 : e];
+      })
+      .sort((x, y) => x[0] - y[0]);
+  const seasonOn = (data: BusinessHoursData, day: number) => (data.seasons || []).findIndex((s) => covers(s.from, s.to, day));
+  const planFor = (data: BusinessHoursData, day: number): Plan => {
+    const closures = data.closures || [];
+    for (let i = 0; i < closures.length; i++) {
+      if (covers(closures[i].from, closures[i].to, day)) return { source: 'closure', name: closures[i].name, ref: `c${i}`, ranges: [] };
+    }
+    const ex = data.exceptions || [];
+    const date = iso(day);
+    const c = civil(day);
+    let i = ex.findIndex((e) => e.date === date);
+    if (i < 0) i = ex.findIndex((e) => !e.date && e.month === c.m && e.day === c.d);
+    if (i >= 0) return { source: 'exception', name: ex[i].name, ref: `e${i}@${date}`, ranges: rangesOf(ex[i].hours) };
+    const key = KEYS[weekdayOf(day)];
+    const s = seasonOn(data, day);
+    if (s >= 0) {
+      const season = (data.seasons || [])[s];
+      return { source: 'season', name: season.name, ref: `s${s}`, season: s, ranges: rangesOf(season.weekly[key] ?? data.weekly[key]) };
+    }
+    return { source: 'weekly', ref: 'w', ranges: rangesOf(data.weekly[key]) };
+  };
+  const isOff = (p: Plan) => p.source === 'closure' || p.source === 'exception';
+
+  /** The open interval containing `now`, or the next one; touching intervals merge. */
+  const findInterval = (data: BusinessHoursData, today: number, now: number) => {
+    const tz = data.timeZone;
+    let cur: { start: number; end: number; plan: Plan } | null = null;
+    for (let d = today - 1; d <= today + LOOKAHEAD; d++) {
+      const plan = planFor(data, d);
+      for (const [s, e] of plan.ranges) {
+        const start = instant(tz, d, s);
+        const end = instant(tz, d, e);
+        if (cur && start <= cur.end) {
+          cur.end = Math.max(cur.end, end);
+          continue;
+        }
+        if (cur && cur.end > now) return cur;
+        cur = { start, end, plan };
+      }
+    }
+    return cur && cur.end > now ? cur : null;
+  };
+
+  /** Closures and exceptions from `from` for `days` days, each with its full extent. */
+  const upcomingFrom = (data: BusinessHoursData, from: number, days: number): Upcoming[] => {
+    const out: { ref: string; kind: 'closure' | 'exception'; name: string; a: number; b: number; ranges: [number, number][] }[] = [];
+    for (let d = from; d < from + days; d++) {
+      const p = planFor(data, d);
+      if (!isOff(p)) continue;
+      const last = out[out.length - 1];
+      if (last && last.ref === p.ref && last.b === d - 1) {
+        last.b = d;
+        continue;
+      }
+      let a = d;
+      while (a > d - 800 && planFor(data, a - 1).ref === p.ref) a--;
+      out.push({ ref: p.ref, kind: p.source as 'closure' | 'exception', name: p.name || '', a, b: d, ranges: p.ranges });
+    }
+    return out.map((u) => {
+      let b = u.b;
+      while (b < u.b + 800 && planFor(data, b + 1).ref === u.ref) b++;
+      return {
+        key: `${u.kind}:${iso(u.a)}`,
+        kind: u.kind,
+        name: u.name,
+        from: iso(u.a),
+        to: iso(b),
+        hours: u.ranges.map(([s, e]): Range => [hhmm(s), hhmm(e)]),
+      };
+    });
+  };
+
+  // ---- words
+  const fill = (tpl: string, vars: Record<string, string | Segment | Segment[]>): Segment[] => {
+    const out: Segment[] = [];
+    for (const piece of tpl.split(/(\{\w+\})/)) {
+      const m = /^\{(\w+)\}$/.exec(piece);
+      const v = m ? vars[m[1]] : undefined;
+      if (v === undefined) {
+        if (piece) out.push(piece);
+      } else if (Array.isArray(v)) out.push(...v);
+      else out.push(v);
+    }
+    return out;
+  };
+  const text = (segs: Segment[]) => segs.map((s) => (typeof s === 'string' ? s : s.text)).join('');
+  const duration = (total: number, w: Words) => {
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    const part = (n: number, one: string, many: string) => (n === 1 ? one : many).replace('{n}', String(n));
+    const bits = [];
+    if (h) bits.push(part(h, w.hour, w.hours));
+    if (m || !h) bits.push(part(m, w.minute, w.minutes));
+    return bits.join(' ');
+  };
+
+  interface Ctx {
+    tz: string;
+    locale?: string;
+    hc?: HourCycle;
+    showZone: ShowZone;
+    visitorTz?: string;
+  }
+  const civilName = (day: number, locale: string | undefined, o: Intl.DateTimeFormatOptions) =>
+    // A calendar day formatted on a neutral calendar: noon UTC of that day, read in UTC.
+    fmt(locale, { timeZone: 'UTC', ...o }).format(day * DAY + DAY / 2);
+  const weekdayName = (day: number, locale?: string) => civilName(day, locale, { weekday: 'long' });
+  const weekdayDate = (day: number, locale?: string) => civilName(day, locale, { weekday: 'long', month: 'long', day: 'numeric' });
+  const monthDay = (day: number, locale?: string) => civilName(day, locale, { month: 'long', day: 'numeric' });
+  const zoneName = (ms: number, ctx: Ctx) =>
+    fmt(ctx.locale, { timeZone: ctx.tz, timeZoneName: 'longGeneric' })
+      .formatToParts(ms)
+      .find((p) => p.type === 'timeZoneName')?.value || ctx.tz;
+  const zoneDiffers = (ms: number, ctx: Ctx) => {
+    if (ctx.showZone === 'always') return true;
+    if (ctx.showZone === 'never' || !ctx.visitorTz) return false;
+    return wallKey(ms, ctx.tz) !== wallKey(ms, ctx.visitorTz);
+  };
+  const timeSeg = (ms: number, ctx: Ctx): Segment => {
+    const t = fmt(ctx.locale, { timeZone: ctx.tz, hour: 'numeric', minute: '2-digit', ...(ctx.hc ? { hourCycle: ctx.hc } : {}) }).format(ms);
+    return { text: zoneDiffers(ms, ctx) ? `${t} ${zoneName(ms, ctx)}` : t, datetime: new Date(ms).toISOString() };
+  };
+  /** A wall-clock 'HH:MM' label in the visitor's locale (no instant involved). */
+  const clock = (min: number, locale?: string, hc?: HourCycle) =>
+    fmt(locale, { timeZone: 'UTC', hour: 'numeric', minute: '2-digit', ...(hc ? { hourCycle: hc } : {}) }).format(min * MIN);
+  const runtimeZone = () => {
+    try {
+      return new Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return undefined;
+    }
+  };
+
+  // ---- the state machine
+  function stateAt(data: BusinessHoursData, nowMs: number, locale?: string, hourCycle?: HourCycle, options: StateOptions = {}): HoursState {
+    const w: Words = { ...WORDS, ...(options.words || {}) };
+    const soon = options.soonMinutes ?? 60;
+    const ctx: Ctx = { tz: data.timeZone, locale, hc: hourCycle, showZone: options.showZone ?? 'auto', visitorTz: options.visitorTimeZone ?? runtimeZone() };
+    const tz = data.timeZone;
+    const today = wall(nowMs, tz).day;
+    const plan = planFor(data, today);
+    const season = seasonOn(data, today);
+    const base = {
+      today: { date: iso(today), weekday: KEYS[weekdayOf(today)], source: plan.source, name: plan.name, season: season >= 0 ? season : undefined },
+      todayRanges: plan.ranges.map(([s, e]) => ({ opens: hhmm(s), closes: hhmm(e), start: instant(tz, today, s), end: instant(tz, today, e) })),
+      upcoming: upcomingFrom(data, today, options.upcomingDays ?? 30),
+    };
+    const done = (state: HoursState['state'], lead: string, clause: Segment[], extra: Partial<HoursState> = {}): HoursState => ({
+      state,
+      lead,
+      clause: text(clause),
+      clauseParts: clause,
+      sentence: clause.length ? lead + w.separator + text(clause) : lead,
+      ...extra,
+      ...base,
+    });
+
+    if (data.alwaysOpen) return done('open', w.open24, []);
+    if (data.byAppointment) return done('appointment', w.byAppointment, []);
+
+    const iv = findInterval(data, today, nowMs);
+    const relative = (minutes: number) => minutes <= soon && minutes < RELATIVE_LIMIT;
+
+    if (iv && iv.start <= nowMs) {
+      const left = Math.ceil((iv.end - nowMs) / MIN);
+      let clause: Segment[];
+      if (relative(left)) clause = fill(w.closingIn, { duration: duration(left, w) });
+      else {
+        const endDay = wall(iv.end, tz).day;
+        const time = timeSeg(iv.end, ctx);
+        clause =
+          endDay === today || (endDay === today + 1 && iv.end - nowMs < DAY)
+            ? fill(w.closesAt, { time })
+            : fill(w.closesOn, { day: endDay - today < 7 ? weekdayName(endDay, locale) : weekdayDate(endDay, locale), time });
+      }
+      if (iv.plan.source === 'exception') clause = fill(w.exceptionHours, { name: iv.plan.name || '', clause });
+      return done('open', w.open, clause, { closesAt: iv.end });
+    }
+
+    let lead = w.closed;
+    if (plan.source === 'closure') {
+      let last = today;
+      while (last < today + 800 && planFor(data, last + 1).ref === plan.ref) last++;
+      lead = text(fill(w.closedUntil, { name: plan.name || '', date: monthDay(last + 1, locale) }));
+    } else if (plan.source === 'exception' && !plan.ranges.length) {
+      lead = text(fill(w.closedFor, { name: plan.name || '' }));
+    }
+    if (!iv) return done('closed', lead, []);
+
+    const until = Math.ceil((iv.start - nowMs) / MIN);
+    let clause: Segment[];
+    if (relative(until)) clause = fill(w.openingIn, { duration: duration(until, w) });
+    else {
+      const openDay = wall(iv.start, tz).day;
+      const diff = openDay - today;
+      const time = timeSeg(iv.start, ctx);
+      if (diff === 0) clause = fill(w.opensAt, { time });
+      else if (diff === 1) clause = fill(w.opensTomorrow, { time });
+      else if (diff < 7) clause = fill(w.opensOn, { day: weekdayName(openDay, locale), time });
+      else clause = fill(w.reopens, { date: weekdayDate(openDay, locale), time });
+    }
+    return done('closed', lead, clause, { opensAt: iv.start });
+  }
+
+  // ---- the static render's model: the week(s), the dated list, the checks
+  const rangeText = (r: Range, w: Words, locale?: string, hc?: HourCycle) => {
+    const [s, e] = rangesOf([r])[0];
+    return s === 0 && e === 1440 ? w.open24 : `${clock(s, locale, hc)} – ${clock(e, locale, hc)}`;
+  };
+  const tables = (data: BusinessHoursData, locale?: string, hc?: HourCycle, words: Partial<Words> = {}) => {
+    const w: Words = { ...WORDS, ...words };
+    const monday = dayNum(2024, 1, 1);
+    const rows = (weekly: Weekly, fallback?: Weekly) =>
+      WEEK.map((key, i) => {
+        const list = data.alwaysOpen ? [['00:00', '00:00'] as Range] : weekly[key] ?? fallback?.[key] ?? [];
+        return { key, day: weekdayName(monday + i, locale), text: list.length ? list.map((r) => rangeText(r, w, locale, hc)).join(', ') : w.closedDay };
+      });
+    const recurringLabel = (s: string) => {
+      const d = parseDate(s);
+      if (d !== null) return monthDay(d, locale);
+      const md = parseRecurring(s) || 101;
+      return monthDay(dayNum(2000, Math.floor(md / 100), md % 100), locale);
+    };
+    return [
+      { key: '', caption: w.caption, rows: rows(data.weekly) },
+      ...(data.alwaysOpen ? [] : data.seasons || []).map((s, i) => ({
+        key: `s${i}`,
+        caption: `${s.name}, ${recurringLabel(s.from)} – ${recurringLabel(s.to)}`,
+        rows: rows(s.weekly, data.weekly),
+      })),
+    ];
+  };
+  const upcoming = (data: BusinessHoursData, nowMs: number, days: number) => upcomingFrom(data, wall(nowMs, data.timeZone).day, days);
+  const upcomingText = (u: Upcoming, locale?: string, hc?: HourCycle, words: Partial<Words> = {}) => {
+    const w: Words = { ...WORDS, ...words };
+    const a = parseDate(u.from) as number;
+    const b = parseDate(u.to) as number;
+    return {
+      from: u.from === u.to ? weekdayDate(a, locale) : monthDay(a, locale),
+      to: u.from === u.to ? '' : monthDay(b, locale),
+      hours: u.hours.length ? u.hours.map((r) => rangeText(r, w, locale, hc)).join(', ') : w.closedDay,
+    };
+  };
+  /** True when the schedule never opens in the next LOOKAHEAD days from `nowMs`. */
+  const neverOpens = (data: BusinessHoursData, nowMs: number) =>
+    !data.alwaysOpen && !data.byAppointment && !findInterval(data, wall(nowMs, data.timeZone).day, nowMs);
+  const validate = (data: BusinessHoursData): string[] => {
+    const errors: string[] = [];
+    try {
+      fmt('en-US', { timeZone: data.timeZone }).format(0);
+    } catch {
+      errors.push(`timeZone "${data.timeZone}" is not an IANA zone this runtime knows.`);
+    }
+    const ranges = (where: string, list: Range[] | undefined) => {
+      for (const r of list || []) {
+        try {
+          if (!Array.isArray(r) || r.length !== 2) throw new RangeError(`${JSON.stringify(r)} is not [opens, closes]`);
+          if (toMin(r[0]) >= 1440) throw new RangeError(`"${r[0]}" cannot start a range`);
+          toMin(r[1]);
+        } catch (e) {
+          errors.push(`${where}: ${(e as Error).message}.`);
+        }
+      }
+    };
+    for (const k of WEEK) ranges(`weekly.${k}`, data.weekly?.[k]);
+    for (const e of data.exceptions || []) {
+      if (e.date ? parseDate(e.date) === null : !(e.month && e.day && e.month <= 12 && e.day <= 31))
+        errors.push(`exception "${e.name}" needs date 'YYYY-MM-DD' or month and day.`);
+      ranges(`exception "${e.name}"`, e.hours);
+    }
+    const span = (kind: string, x: { from: string; to: string; name: string }) => {
+      const dated = parseDate(x.from) !== null && parseDate(x.to) !== null;
+      const recurring = parseRecurring(x.from) !== null && parseRecurring(x.to) !== null;
+      if (!dated && !recurring) errors.push(`${kind} "${x.name}" needs from/to both 'YYYY-MM-DD' or both '--MM-DD'.`);
+      else if (dated && (parseDate(x.to) as number) < (parseDate(x.from) as number)) errors.push(`${kind} "${x.name}" ends before it starts.`);
+    };
+    for (const c of data.closures || []) span('closure', c);
+    for (const s of data.seasons || []) {
+      span('season', s);
+      for (const k of WEEK) ranges(`season "${s.name}".${k}`, s.weekly?.[k]);
+    }
+    return errors;
+  };
+
+  // ---- JSON-LD: openingHoursSpecification in the shape Google documents
+  // https://developers.google.com/search/docs/appearance/structured-data/local-business
+  // (Structured data type definitions > openingHoursSpecification, and the "hours past
+  // midnight", "open 24 hours / closed all day" and "seasonal hours" examples there):
+  //   weekly  { dayOfWeek: ['Monday', …], opens: '08:00', closes: '17:00' }
+  //   past midnight: closes '02:00' on the start day; open all day: '00:00'–'23:59'
+  //   closed day / seasonal closure: { opens: '00:00', closes: '00:00', validFrom, validThrough }
+  const jsonLd = (data: BusinessHoursData, nowMs: number, target: { id: string; type?: string }) => {
+    const baseDay = wall(nowMs, data.timeZone).day;
+    const year = civil(baseDay).y;
+    const spec = (o: Record<string, unknown>) => ({ '@type': 'OpeningHoursSpecification', ...o });
+    const closes = (s: number, e: number) => (e >= 1440 && (e === 1440 || s === 0) ? '23:59' : hhmm(e));
+    const weeklySpecs = (weekly: Weekly, valid: Record<string, string> = {}) => {
+      const groups = new Map<string, { opens: string; closes: string; days: string[] }>();
+      for (const key of WEEK) {
+        for (const [s, e] of rangesOf(weekly[key])) {
+          const o = { opens: hhmm(s), closes: closes(s, e) };
+          const sig = `${o.opens}-${o.closes}`;
+          if (!groups.has(sig)) groups.set(sig, { ...o, days: [] });
+          (groups.get(sig) as { days: string[] }).days.push(SCHEMA_DAYS[key]);
+        }
+      }
+      return [...groups.values()].map((g) => spec({ dayOfWeek: g.days, opens: g.opens, closes: g.closes, ...valid }));
+    };
+    /** Dated spans as written; recurring ones expanded for last/this/next year, dropping the past. */
+    const occurrences = (from: string, to: string) => {
+      const a = parseDate(from);
+      const b = parseDate(to);
+      if (a !== null && b !== null) return b >= baseDay ? [[a, b]] : [];
+      const ra = parseRecurring(from) as number;
+      const rb = parseRecurring(to) as number;
+      const out: number[][] = [];
+      for (const y of [year - 1, year, year + 1]) {
+        const s = dayNum(y, Math.floor(ra / 100), ra % 100);
+        const e = dayNum(ra <= rb ? y : y + 1, Math.floor(rb / 100), rb % 100);
+        if (e >= baseDay && (y >= year || ra > rb)) out.push([s, e]);
+      }
+      return out;
+    };
+    const out: Record<string, unknown>[] = [];
+    if (data.alwaysOpen) out.push(spec({ dayOfWeek: WEEK.map((k) => SCHEMA_DAYS[k]), opens: '00:00', closes: '23:59' }));
+    else if (!data.byAppointment) {
+      out.push(...weeklySpecs(data.weekly));
+      for (const s of data.seasons || []) {
+        const merged: Weekly = {};
+        for (const k of WEEK) merged[k] = s.weekly[k] ?? data.weekly[k] ?? [];
+        for (const [a, b] of occurrences(s.from, s.to)) out.push(...weeklySpecs(merged, { validFrom: iso(a), validThrough: iso(b) }));
+      }
+      for (const e of data.exceptions || []) {
+        const days = e.date
+          ? [parseDate(e.date) as number]
+          : [year, year + 1].map((y) => dayNum(y, e.month as number, e.day as number)).filter((d) => civil(d).m === e.month);
+        for (const d of days) {
+          if (d < baseDay) continue;
+          const valid = { validFrom: iso(d), validThrough: iso(d) };
+          const r = rangesOf(e.hours);
+          if (!r.length) out.push(spec({ opens: '00:00', closes: '00:00', ...valid }));
+          for (const [s, x] of r) out.push(spec({ opens: hhmm(s), closes: closes(s, x), ...valid }));
+        }
+      }
+      for (const c of data.closures || []) {
+        for (const [a, b] of occurrences(c.from, c.to)) out.push(spec({ opens: '00:00', closes: '00:00', validFrom: iso(a), validThrough: iso(b) }));
+      }
+    }
+    return { '@context': 'https://schema.org', '@type': target.type || 'LocalBusiness', '@id': target.id, openingHoursSpecification: out };
+  };
+
+  /** 'YYYY-MM-DDTHH:MM' read as wall-clock time in `tz` (for the demo's time knob). */
+  const instantAt = (tz: string, local: string) => {
+    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(local);
+    const d = m ? parseDate(m[1]) : null;
+    return m && d !== null ? instant(tz, d, toMin(m[2])) : NaN;
+  };
+
+  return { stateAt, tables, upcoming, upcomingText, jsonLd, validate, neverOpens, instantAt, words: WORDS };
+}
+// </business-hours-engine>
+
+/** The pure state function: (data, instant) → the sentence and everything behind it. */
+export const stateAt = businessHoursEngine().stateAt;
+/** The `openingHoursSpecification` node the element emits (exported for demos and checks). */
+export const openingHoursJsonLd = businessHoursEngine().jsonLd;
+
+/**
+ * The browser side: finds every [data-bh] root, computes its state now and on the minute,
+ * writes the sentence into the live region only when it changes, toggles the slots, marks
+ * today. Serialised into the inline script together with the engine.
+ */
+function businessHoursClient(engine: ReturnType<typeof businessHoursEngine>) {
+  interface Root extends HTMLElement {
+    bhLast?: string;
+  }
+  const roots = new Set<Root>();
+  let timer = 0;
+  const nowFor = (root: Root) => {
+    const v = root.getAttribute('data-now');
+    if (!v) return Date.now();
+    const n = /^-?\d+$/.test(v) ? Number(v) : Date.parse(v);
+    return Number.isNaN(n) ? Date.now() : n;
+  };
+  const update = (root: Root) => {
+    let cfg;
+    try {
+      cfg = JSON.parse(root.dataset.bhConfig || '{}');
+    } catch {
+      return;
+    }
+    const locale = cfg.locale || document.documentElement.lang || undefined;
+    const r = engine.stateAt(cfg.hours, nowFor(root), locale, cfg.hourCycle, cfg.options);
+    root.dataset.bhState = r.state;
+
+    const live = root.querySelector<HTMLElement>('[data-bh-live]');
+    if (live && root.bhLast !== r.sentence) {
+      root.bhLast = r.sentence;
+      const badge = root.dataset.bhVariant === 'badge' || root.dataset.bhVariant === 'full';
+      const lead = document.createElement('span');
+      lead.className = 'bh__lead';
+      lead.textContent = r.lead;
+      const parts: Node[] = [lead];
+      if (r.clauseParts.length) {
+        const sep = document.createElement('span');
+        sep.className = badge ? 'bh__sep bh__sr' : 'bh__sep';
+        sep.textContent = badge ? ', ' : cfg.separator;
+        const clause = document.createElement('span');
+        clause.className = 'bh__clause';
+        for (const s of r.clauseParts) {
+          if (typeof s === 'string') clause.append(s);
+          else {
+            const t = document.createElement('time');
+            t.dateTime = s.datetime;
+            t.textContent = s.text;
+            clause.append(t);
+          }
+        }
+        parts.push(sep, clause);
+      }
+      live.replaceChildren(...parts);
+      live.hidden = false;
+    }
+
+    root.querySelectorAll<HTMLElement>('[data-bh-when]').forEach((el) => {
+      el.hidden = r.state !== 'appointment' && el.dataset.bhWhen !== r.state;
+    });
+
+    const table = r.today.season === undefined ? '' : `s${r.today.season}`;
+    root.querySelectorAll<HTMLElement>('[data-bh-row]').forEach((row) => {
+      const on = row.dataset.bhTable === table && row.dataset.bhRow === r.today.weekday;
+      row.classList.toggle('bh__row--today', on);
+      if (on) row.setAttribute('aria-current', 'date');
+      else row.removeAttribute('aria-current');
+      const mark = row.querySelector<HTMLElement>('[data-bh-today]');
+      if (mark) mark.hidden = !on;
+    });
+
+    const keys = new Set(r.upcoming.map((u) => u.key));
+    const list = root.querySelector<HTMLElement>('[data-bh-upcoming-list]');
+    if (list) {
+      let any = false;
+      list.querySelectorAll<HTMLElement>('[data-bh-upcoming]').forEach((li) => {
+        li.hidden = !keys.has(li.dataset.bhUpcoming || '');
+        any = any || !li.hidden;
+      });
+      list.hidden = !any;
+    }
+  };
+  const tick = () => roots.forEach(update);
+  // On the minute: to the next :00, then every 60 s, re-aligned each time so it never drifts.
+  const schedule = () => {
+    clearTimeout(timer);
+    if (document.hidden) return;
+    timer = window.setTimeout(() => {
+      tick();
+      schedule();
+    }, 60000 - (Date.now() % 60000) + 20);
+  };
+  const mountAll = () => {
+    document.querySelectorAll<Root>('[data-bh]').forEach((root) => {
+      if (roots.has(root)) return;
+      roots.add(root);
+      update(root);
+      new MutationObserver(() => update(root)).observe(root, { attributes: true, attributeFilter: ['data-now'] });
+    });
+    schedule();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearTimeout(timer);
+    else {
+      tick();
+      schedule();
+    }
+  });
+  document.addEventListener('astro:page-load', mountAll);
+  return { engine, mountAll };
+}
+
+interface Props {
+  hours: BusinessHoursData;
+  /** line: the sentence · badge: Open/Closed pill + sentence · table: the week · full: all of it. */
+  variant?: 'line' | 'badge' | 'table' | 'full';
+  /** Within this many minutes say "closing in 40 minutes" (always a clock time from 90 up). */
+  soonMinutes?: number;
+  showZone?: ShowZone;
+  /** Default: the locale's own convention (h12 for en-US). */
+  hourCycle?: HourCycle;
+  /** Default: the page's `lang` in the browser; 'en-US' for the server-rendered table. */
+  locale?: string;
+  /** Location name, for a site with several. */
+  label?: string;
+  /** Emit openingHoursSpecification for the page's LocalBusiness node with this `@id`. */
+  jsonLd?: false | { id: string; type?: string };
+  /** Exceptions and closures starting within this many days are listed (full variant). */
+  upcomingDays?: number;
+  words?: Partial<Words>;
+  /** Freeze the clock (epoch ms or an ISO instant). Demos and checks ONLY; never on a real site. */
+  now?: number | string;
+  class?: string;
+}
+
+const {
+  hours,
+  variant = 'full',
+  soonMinutes = 60,
+  showZone = 'auto',
+  hourCycle,
+  locale,
+  label,
+  jsonLd,
+  upcomingDays = 30,
+  words = {},
+  now,
+  class: className,
+} = Astro.props;
+
+const engine = businessHoursEngine();
+const problems = engine.validate(hours);
+if (problems.length) throw new Error(`BusinessHours${label ? ` (${label})` : ''}: ${problems.join(' ')}`);
+
+const frozen = now === undefined ? undefined : typeof now === 'number' ? now : Date.parse(now);
+if (frozen !== undefined && Number.isNaN(frozen)) throw new Error(`BusinessHours: now "${now}" is not an instant.`);
+// The build's clock only bounds which dated items are listed and which recurring dates the
+// JSON-LD expands; no state is ever claimed from it.
+const renderMs = frozen ?? Date.now();
+if (engine.neverOpens(hours, renderMs)) {
+  console.warn(`BusinessHours${label ? ` (${label})` : ''}: no opening in the next 60 days; the sentence will say only "Closed".`);
+}
+const w: Words = { ...engine.words, ...words };
+const tableLocale = locale || 'en-US';
+const showTable = variant === 'table' || variant === 'full';
+const tables = showTable ? engine.tables(hours, tableLocale, hourCycle, words) : [];
+const zone =
+  showZone === 'never'
+    ? ''
+    : (new Intl.DateTimeFormat(tableLocale, { timeZone: hours.timeZone, timeZoneName: 'longGeneric' })
+        .formatToParts(renderMs)
+        .find((p) => p.type === 'timeZoneName')?.value ?? hours.timeZone);
+const captionFor = (c: string) => `${label ? `${label}: ` : ''}${c}${zone ? ` (${zone})` : ''}`;
+const upcoming =
+  variant === 'full'
+    ? engine.upcoming(hours, renderMs, 366).map((u) => ({ ...u, text: engine.upcomingText(u, tableLocale, hourCycle, words) }))
+    : [];
+if (jsonLd !== undefined && jsonLd !== false && !jsonLd.id) throw new Error('BusinessHours: jsonLd needs the page LocalBusiness `id`.');
+const ld = jsonLd ? JSON.stringify(engine.jsonLd(hours, renderMs, jsonLd)).replace(/</g, '\\u003c') : '';
+
+const config = JSON.stringify({
+  hours,
+  locale,
+  hourCycle,
+  separator: w.separator,
+  options: { soonMinutes, showZone, words, upcomingDays },
+});
+const hasOpen = Astro.slots.has('open');
+const hasClosed = Astro.slots.has('closed');
+
+// The engine and the client go out once per page; later instances are mounted by the same script.
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__businessHoursScript;
+locals.__businessHoursScript = true;
+const clientScript = `(function(){var g=window.__superheroBusinessHours;if(!g){g=window.__superheroBusinessHours=(${businessHoursClient.toString()})((${businessHoursEngine.toString()})());}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',g.mountAll);else g.mountAll();})();`;
+---
+
+<div class:list={['bh', `bh--${variant}`, className]} data-bh data-bh-variant={variant} data-bh-config={config} data-now={frozen}>
+  {label && <p class="bh__label">{label}</p>}
+  {variant !== 'table' && <p class="bh__now" aria-live="polite" aria-atomic="true" data-bh-live hidden></p>}
+  {hasOpen && <div class="bh__when" data-bh-when="open"><slot name="open" /></div>}
+  {hasClosed && <div class="bh__when" data-bh-when="closed"><slot name="closed" /></div>}
+  {
+    tables.map((t) => (
+      <table class="bh__table">
+        <caption>{captionFor(t.caption)}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{w.day}</th>
+            <th scope="col">{w.hoursHeading}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {t.rows.map((r) => (
+            <tr data-bh-row={r.key} data-bh-table={t.key}>
+              <th scope="row">
+                {r.day}
+                <span class="bh__today" data-bh-today hidden>
+                  {' '}({w.today})
+                </span>
+              </th>
+              <td>{r.text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ))
+  }
+  {showTable && hours.note && <p class="bh__note">{hours.note}</p>}
+  {
+    upcoming.length > 0 && (
+      <div class="bh__upcoming" data-bh-upcoming-list>
+        <p class="bh__upcoming-title">{w.upcoming}</p>
+        <ul>
+          {upcoming.map((u) => (
+            <li data-bh-upcoming={u.key}>
+              <time datetime={u.from}>{u.text.from}</time>
+              {u.text.to && (
+                <>
+                  {' – '}
+                  <time datetime={u.to}>{u.text.to}</time>
+                </>
+              )}
+              {' · '}
+              {u.name}
+              {' · '}
+              {u.text.hours}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+  {ld && <script type="application/ld+json" set:html={ld} />}
+  {firstOnPage && <script is:inline set:html={clientScript} />}
+</div>
+
+<style>
+  .bh {
+    color: var(--bh-text, inherit);
+  }
+  .bh__label {
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+  }
+  .bh__now {
+    margin: 0 0 0.75rem;
+  }
+  .bh--line .bh__now {
+    margin: 0;
+  }
+  .bh[data-bh-state='open'] {
+    --_state: var(--bh-open, #1a7f37);
+  }
+  .bh[data-bh-state='closed'] {
+    --_state: var(--bh-closed, #b42318);
+  }
+  .bh__now :global(.bh__lead) {
+    font-weight: 700;
+    color: var(--_state, inherit);
+  }
+  .bh--badge .bh__now,
+  .bh--full .bh__now {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.6rem;
+  }
+  .bh--badge .bh__now :global(.bh__lead),
+  .bh--full .bh__now :global(.bh__lead) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.15em 0.7em;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: var(--bh-badge-bg, transparent);
+  }
+  /* The dot is on top of the word, never instead of it. */
+  .bh--badge[data-bh-state] .bh__now :global(.bh__lead)::before,
+  .bh--full[data-bh-state] .bh__now :global(.bh__lead)::before {
+    content: '';
+    width: 0.55em;
+    height: 0.55em;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .bh[data-bh-state='appointment'] .bh__now :global(.bh__lead)::before {
+    display: none;
+  }
+  .bh__now :global(.bh__sr) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .bh__when {
+    margin: 0 0 0.75rem;
+  }
+  .bh__table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 0.75rem;
+  }
+  .bh__table caption {
+    text-align: start;
+    font-weight: 700;
+    padding-bottom: 0.4rem;
+  }
+  .bh__table th,
+  .bh__table td {
+    text-align: start;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--bh-line, rgb(0 0 0 / 0.15));
+    vertical-align: top;
+  }
+  .bh__table thead th {
+    font-size: 0.85em;
+  }
+  .bh__table tbody th {
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .bh__row--today {
+    background: var(--bh-today-bg, rgb(0 0 0 / 0.05));
+  }
+  .bh__row--today th,
+  .bh__row--today td {
+    font-weight: 700;
+  }
+  .bh__note {
+    margin: 0 0 0.75rem;
+    font-style: italic;
+  }
+  .bh__upcoming-title {
+    margin: 0 0 0.3rem;
+    font-weight: 700;
+  }
+  .bh__upcoming ul {
+    margin: 0;
+    padding-inline-start: 1.1rem;
+  }
+</style>

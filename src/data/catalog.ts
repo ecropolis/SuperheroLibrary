@@ -336,6 +336,64 @@ export const catalog: Element[] = [
     file: 'src/library/scroll-reveal/ScrollReveal.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'business-hours',
+    name: 'Business hours',
+    aka: ['Business Hours Indicator', 'opening hours widget', 'open now / closed now', 'store hours', 'hours of operation', 'WP Business Hours'],
+    summary:
+      'Open or closed right now, with the countdown ("closing in 40 minutes", "opens tomorrow at 8:00 AM"), the week’s hours, holiday hours and closures, computed in the business’s own time zone in the browser, on the minute. Also emits the LocalBusiness openingHoursSpecification from the same data.',
+    pitch: 'Open now, closing in 40 minutes, back tomorrow at 8: always right, in the shop’s own time zone.',
+    // 10/mo each (SE Ranking US, 2026-09-23); everything else 0 or no data. The page is for the
+    // catalogue and the sales conversation; the element's search value is the client's JSON-LD.
+    search: { query: 'opening hours widget', alsoRanks: ['business hours wordpress plugin', 'opening hours website'] },
+    replaces: ['Mabel Business Hours Indicator (Pro)', 'WP Business Hours', 'Opening Hours by Wolfgang', 'hand-written hours in the footer'],
+    goodFor: 'Any business with a door: shops, clinics, cafés, salons. Several locations in different time zones on one site, one element per location.',
+    notFor: 'Booking availability or staff calendars; this states when the doors are open, not which slots are free.',
+    props: [
+      { name: 'hours', type: 'BusinessHoursData', note: 'The data: `timeZone` (IANA), `weekly`, and optional `exceptions`, `closures`, `seasons`, `alwaysOpen`, `byAppointment`, `note`. Import the type from the component. Priority: closure > exception > season > weekly.' },
+      { name: 'variant', type: "'line' | 'badge' | 'table' | 'full'", default: "'full'", note: 'line: the sentence. badge: Open/Closed pill and the sentence. table: the week, today marked. full: badge, table, note and the coming exceptions.' },
+      { name: 'soonMinutes', type: 'number', default: '60', note: 'Within this many minutes say "closing in 40 minutes" / "opening in 15 minutes" instead of a clock time. Relative words stop at 90 whatever this says.' },
+      { name: 'showZone', type: "'auto' | 'always' | 'never'", default: "'auto'", note: 'Append the business’s zone ("Central Time") to times. auto: only when the visitor’s clock would read differently.' },
+      { name: 'hourCycle', type: "'h12' | 'h23'", note: 'Default: the locale’s own (h12 for en-US).' },
+      { name: 'locale', type: 'string', note: 'Day and time names. Default: the page’s `lang` in the browser, en-US for the server-rendered table. Set it on a non-English site.' },
+      { name: 'label', type: 'string', note: 'Location name, for a site with several; shown above and in the table caption.' },
+      { name: 'jsonLd', type: 'false | { id: string; type?: string }', note: 'Emit openingHoursSpecification for the page’s LocalBusiness node with this `@id` (and `@type`, default LocalBusiness). Omit or false: none. One instance per location sets it; the layout stops hand-writing hours.' },
+      { name: 'upcomingDays', type: 'number', default: '30', note: 'Exceptions and closures starting within this many days are listed (full).' },
+      { name: 'words', type: 'Partial<Words>', note: 'Override any text: open, closed, closesAt, closingIn, opensAt, opensTomorrow, opensOn, reopens, openingIn, closedFor, closedUntil, exceptionHours, open24, byAppointment, the duration units, table headings. `{time}`, `{day}`, `{date}`, `{duration}`, `{name}` are filled in.' },
+      { name: 'now', type: 'number | string', note: 'Freezes the clock. Demos and checks only; never on a real site.' },
+      { name: 'slot open / slot closed', type: 'slot', note: 'Content shown only in that state (call now / leave a message). Both render server-side; the script hides one, so without JavaScript both show.' },
+    ],
+    theming: [
+      { name: '--bh-open', fallback: '#1a7f37', note: 'Open state word and pill.' },
+      { name: '--bh-closed', fallback: '#b42318', note: 'Closed state word and pill.' },
+      { name: '--bh-badge-bg', fallback: 'transparent', note: 'Fill behind the pill.' },
+      { name: '--bh-today-bg', fallback: 'rgb(0 0 0 / 0.05)', note: 'Today’s row in the table.' },
+      { name: '--bh-line', fallback: 'rgb(0 0 0 / 0.15)', note: 'Table rules.' },
+      { name: '--bh-text', fallback: 'inherit', note: 'Text colour.' },
+    ],
+    a11y: [
+      'The week is a real table with a caption naming the time zone, and scoped column and row headers. Today’s row says "(today)" and carries aria-current="date"; the highlight is on top of the word.',
+      'The sentence is in an aria-live="polite" region, rewritten only when its text changes, not every minute.',
+      'Open and closed are words; colour and the dot are on top. Times are <time datetime> elements.',
+      'The static HTML never claims a state, so a cached page is never wrong; with JavaScript off the table and both slots show.',
+      'No motion, so nothing to reduce.',
+    ],
+    usage: `---
+import BusinessHours, { type BusinessHoursData } from '../components/BusinessHours.astro';
+import { hours } from '../data/hours';   // export const hours: BusinessHoursData = { timeZone: 'America/Chicago', weekly: { … } }
+---
+<!-- Contact page: the whole thing, and the JSON-LD for the layout's LocalBusiness @id -->
+<BusinessHours hours={hours} variant="full" jsonLd={{ id: 'https://example.com/#business' }}>
+  <p slot="open">Call now: …</p>
+  <p slot="closed">Leave a message and we call back.</p>
+</BusinessHours>
+
+<!-- Footer: one line, no second JSON-LD -->
+<BusinessHours hours={hours} variant="line" jsonLd={false} />`,
+    usedOn: [{ site: 'wellnessondemand', where: 'Contact page and footer (H1b)' }],
+    file: 'src/library/business-hours/BusinessHours.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

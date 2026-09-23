@@ -1,0 +1,218 @@
+---
+/**
+ * Demo for `business-hours`: a fictional café, Neutral Grounds, in Chicago, and its Anchorage
+ * counter three time zones away, side by side (the multi-location, multi-zone case).
+ *
+ * The time knob freezes the clock by setting `data-now` on both elements, so a reviewer can
+ * see any moment. `data-now` (the component's `now` prop) is for demos and checks only; a real
+ * site never sets it. The JSON-LD is shown, not emitted: this page is not the café's.
+ */
+import BusinessHours, { openingHoursJsonLd, type BusinessHoursData } from '../../library/business-hours/BusinessHours.astro';
+
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+
+const cafe: BusinessHoursData = {
+  timeZone: 'America/Chicago',
+  weekly: {
+    mon: [['08:00', '12:00'], ['13:00', '17:00']],
+    tue: [['08:00', '17:00']],
+    wed: [['08:00', '17:00']],
+    thu: [['08:00', '17:00']],
+    fri: [['08:00', '17:00']],
+    sat: [['18:00', '02:00']],
+    sun: [],
+  },
+  exceptions: [
+    // "Fourth Thursday of November" is not expressible; the date is.
+    { date: '2026-11-26', name: 'Thanksgiving', hours: [] },
+    { date: '2026-12-24', name: 'Christmas Eve', hours: [['08:00', '13:00']] },
+    { month: 12, day: 25, name: 'Christmas Day', hours: [] },
+  ],
+  closures: [{ from: '2026-07-01', to: '2026-07-14', name: 'Summer break' }],
+  seasons: [
+    {
+      from: '--06-01',
+      to: '--08-31',
+      name: 'Summer hours',
+      weekly: {
+        mon: [['07:00', '15:00']],
+        tue: [['07:00', '15:00']],
+        wed: [['07:00', '15:00']],
+        thu: [['07:00', '15:00']],
+        fri: [['07:00', '15:00']],
+      },
+    },
+  ],
+  note: 'Espresso bar closes 15 minutes before the doors.',
+};
+
+const counter: BusinessHoursData = {
+  timeZone: 'America/Anchorage',
+  weekly: {
+    mon: [['07:00', '15:00']],
+    tue: [['07:00', '15:00']],
+    wed: [['07:00', '15:00']],
+    thu: [['07:00', '15:00']],
+    fri: [['07:00', '15:00']],
+    sat: [['09:00', '13:00']],
+    sun: [],
+  },
+  exceptions: [{ date: '2026-11-26', name: 'Thanksgiving', hours: [] }],
+};
+
+const moments = [
+  ['2026-09-21T10:00', 'Monday 10:00: open, closes at noon'],
+  ['2026-09-21T11:20', 'Monday 11:20: closing in 40 minutes'],
+  ['2026-09-21T12:30', 'Monday 12:30: the split-shift lunch'],
+  ['2026-09-21T18:00', 'Monday 18:00: opens tomorrow'],
+  ['2026-09-26T19:00', 'Saturday 19:00: open past midnight'],
+  ['2026-09-27T01:00', 'Sunday 01:00: still Saturday’s hours'],
+  ['2026-11-25T18:00', 'Wednesday before Thanksgiving'],
+  ['2026-11-26T10:00', 'Thanksgiving'],
+  ['2026-12-24T10:00', 'Christmas Eve hours'],
+  ['2026-07-06T10:00', 'July: summer break'],
+  ['2026-08-10T10:00', 'August: summer hours'],
+];
+
+const ld = JSON.stringify(openingHoursJsonLd(cafe, Date.now(), { id: 'https://neutralgrounds.example/#business', type: 'CafeOrCoffeeShop' }), null, 2);
+---
+<div class="demo-bh" data-bh-demo>
+  <form class="demo-bh__knob" data-bh-knob>
+    <label>
+      <span>Time (Chicago)</span>
+      <select data-bh-moment>
+        <option value="">Live: your clock</option>
+        {moments.map(([v, t]) => <option value={v}>{t}</option>)}
+      </select>
+    </label>
+    <label>
+      <span>or any moment</span>
+      <input type="datetime-local" data-bh-local />
+    </label>
+    <output data-bh-frozen aria-live="polite">Live</output>
+  </form>
+
+  <div class="demo-bh__grid">
+    <section class="demo-bh__card" aria-label="Neutral Grounds, Chicago">
+      <p class="demo-bh__name">Neutral Grounds <span>Chicago</span></p>
+      <BusinessHours hours={cafe} variant="full" upcomingDays={90} jsonLd={false}>
+        <p class="demo-bh__slot" slot="open">Order ahead: (555) 010-0142</p>
+        <p class="demo-bh__slot" slot="closed">Leave a message and we call back when we open.</p>
+      </BusinessHours>
+    </section>
+    <section class="demo-bh__card" aria-label="Neutral Grounds, Anchorage counter">
+      <BusinessHours hours={counter} variant="badge" label="Neutral Grounds, Anchorage counter" jsonLd={false} />
+      <BusinessHours hours={counter} variant="table" jsonLd={false} />
+    </section>
+  </div>
+
+  <details class="demo-bh__ld">
+    <summary>The JSON-LD the café’s page would carry</summary>
+    <pre><code>{ld}</code></pre>
+  </details>
+</div>
+
+<script is:inline>
+  document.querySelectorAll('[data-bh-demo]').forEach((demo) => {
+    const select = demo.querySelector('[data-bh-moment]');
+    const local = demo.querySelector('[data-bh-local]');
+    const out = demo.querySelector('[data-bh-frozen]');
+    const set = (value) => {
+      const engine = window.__superheroBusinessHours && window.__superheroBusinessHours.engine;
+      const ms = value && engine ? engine.instantAt('America/Chicago', value) : NaN;
+      demo.querySelectorAll('[data-bh]').forEach((el) => {
+        if (Number.isNaN(ms)) el.removeAttribute('data-now');
+        else el.setAttribute('data-now', String(ms));
+      });
+      out.textContent = Number.isNaN(ms) ? 'Live' : 'Frozen at ' + value.replace('T', ' ') + ' Chicago';
+    };
+    select.addEventListener('change', () => {
+      local.value = select.value;
+      set(select.value);
+    });
+    local.addEventListener('change', () => {
+      select.value = '';
+      set(local.value);
+    });
+    demo.querySelector('[data-bh-knob]').addEventListener('submit', (e) => e.preventDefault());
+  });
+</script>
+
+<style>
+  .demo-bh {
+    --bh-today-bg: var(--tint, #f4f1fd);
+    --bh-line: var(--line, #e5e1f0);
+    --bh-badge-bg: var(--white, #fff);
+    color: var(--ink, #1d1a2e);
+  }
+  .demo-bh__knob {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border: 1px dashed var(--line, #e5e1f0);
+    border-radius: var(--radius, 14px);
+    font-size: 0.9rem;
+  }
+  .demo-bh__knob label {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .demo-bh__knob span {
+    font-weight: 600;
+  }
+  .demo-bh__knob select,
+  .demo-bh__knob input {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--line, #e5e1f0);
+    border-radius: 8px;
+    background: var(--white, #fff);
+    color: inherit;
+  }
+  .demo-bh__knob output {
+    font-style: italic;
+  }
+  .demo-bh__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .demo-bh__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .demo-bh__card {
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line, #e5e1f0);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-bh__name {
+    margin: 0 0 0.75rem;
+    font-weight: 800;
+  }
+  .demo-bh__name span {
+    display: block;
+    font-weight: 400;
+    font-size: 0.9rem;
+  }
+  .demo-bh__slot {
+    margin: 0;
+  }
+  .demo-bh__ld {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+  }
+  .demo-bh__ld pre {
+    overflow-x: auto;
+    max-height: 22rem;
+  }
+</style>
