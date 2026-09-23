@@ -7,7 +7,8 @@
  * 2. The demos index, read as text: Node cannot import .astro files, so the
  *    `'<id>': Component` lines and the `import Component from './File.astro'` lines are
  *    parsed. Keep one entry per line there.
- * 3. Demo imports and assets: a demo imports only from src/library/; every
+ * 3. Demo imports and assets: a demo imports only from src/library/ (and JSON fixtures
+ *    from public/demo/); every
  *    `asset('<file>')` in it exists in public/demo/, and no demo hard-codes /demo/ (the
  *    website may serve those files from another folder and passes `assetBase`).
  * 4. `astro build`, then one page per entry in dist/.
@@ -152,14 +153,21 @@ finish('demos index');
 
 // ------------------------------------------------- 3. demo imports and assets
 // The website copies src/ without src/pages/ and must not pull in the gallery's layout
-// or global stylesheet, so a demo may import only from src/library/.
+// or global stylesheet, so a demo may import only from src/library/. The one exception is a
+// JSON fixture in public/demo/ (social-grid's feed): the website vendors public/demo/ beside
+// src/, so the relative path resolves there as well.
 const library = join(root, 'src/library') + '/';
+const demoAssets = join(root, 'public/demo') + '/';
 for (const [id, abs] of demoFiles) {
   const src = readFileSync(abs, 'utf8');
   for (const m of src.matchAll(/^\s*import\s*(?:[^'";]*?\bfrom\s*)?['"]([^'"]+)['"]/gm)) {
     const target = m[1].startsWith('.') ? join(dirname(abs), m[1]) : null;
+    if (target && target.startsWith(demoAssets) && target.endsWith('.json')) {
+      if (!existsSync(target)) fail(`Entry "${id}": its demo imports "${m[1]}", which is not in public/demo/.`);
+      continue;
+    }
     if (!target || !target.startsWith(library)) {
-      fail(`Entry "${id}": its demo imports "${m[1]}"; demos may import only from src/library/, so the website never pulls in the gallery's pages, layout or styles.`);
+      fail(`Entry "${id}": its demo imports "${m[1]}"; demos may import only from src/library/ (and JSON fixtures from public/demo/), so the website never pulls in the gallery's pages, layout or styles.`);
     }
   }
   for (const m of src.matchAll(/asset\(\s*['"]([^'"]+)['"]\s*\)/g)) {

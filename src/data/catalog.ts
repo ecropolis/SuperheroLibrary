@@ -551,6 +551,74 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
 <!-- :root { --fb-accent: var(--brand); --fb-radius: var(--radius); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/flip-box/ (demo)' }],
     file: 'src/library/flip-box/FlipBox.astro',
+    id: 'social-grid',
+    name: 'Instagram feed',
+    aka: ['PowerPack Instagram Feed', 'Smash Balloon', 'Instagram feed widget', 'social feed', 'Elfsight Instagram', 'LightWidget'],
+    summary:
+      'A grid of an account’s recent Instagram posts, each tile a link to the post, with the handle and a Follow link above. Renders the SocialFeedHandler feed JSON (our mirrored copies of the images), read at build time. No JavaScript, no call to Instagram from the page.',
+    pitch: 'Your latest posts on your own site, from our copy of the images, so the grid does not go blank when Instagram changes its mind.',
+    // SE Ranking US, 2026-09-23: embed instagram feed 320/mo, difficulty 22; instagram feed
+    // website 260/34; instagram feed wordpress 140/8.
+    search: { query: 'embed instagram feed', alsoRanks: ['instagram feed website', 'instagram feed wordpress'] },
+    replaces: ['PowerPack Instagram Feed', 'Smash Balloon / Elfsight / LightWidget embeds'],
+    goodFor: 'Restaurants, salons, makers, and anyone whose Instagram is their portfolio: the grid keeps the site as fresh as the account.',
+    notFor: 'Accounts that post rarely (a stale grid dates the site), and anything that needs like or comment counts: the API does not return them reliably for the account’s visitors, and they date the moment the page is built.',
+    props: [
+      { name: 'feed', type: 'SocialFeed', note: 'The feed JSON: `{ source: { username, profile_url, connected, last_pulled_at }, posts: [{ id, permalink, media_type, taken_at, image: { url, width, height }, alt, caption }] }`. At build, from `src/data/social.json`. Import the type from the component.' },
+      { name: 'columns', type: 'number | { base?, md?, lg? }', default: '{ base: 3, md: 4, lg: 6 }', note: 'Columns per viewport breakpoint: md from 48rem, lg from 64rem. A missing md takes base; a missing lg takes md.' },
+      { name: 'max', type: 'number', default: '12', note: 'Most tiles shown. The Worker serves the latest 24.' },
+      { name: 'header', type: 'boolean', default: 'true', note: '"@username on Instagram" linking to the profile, and a Follow link. Disconnected: "Recent posts".' },
+      { name: 'captions', type: "'hover' | 'below' | 'none'", default: "'hover'", note: 'hover: an overlay on hover and keyboard focus (aria-hidden: the alt carries the text). below: the caption as text under the tile, three lines. none.' },
+      { name: 'square', type: 'boolean', default: 'true', note: 'Square crops with object-fit: cover. false keeps each image’s own shape.' },
+      { name: 'gap', type: 'string', note: 'Space between tiles, any CSS length. Overrides --sg-gap.' },
+      { name: 'locale', type: 'string', default: "'en-US'", note: 'Date words in the fallback alt ("Instagram post from September 12, 2026").' },
+      { name: 'words', type: 'Partial<SocialGridWords>', note: 'Override any text: live (`{username}`), recent, follow, video, album, untitled (`{date}`), newTab.' },
+      { name: 'id', type: 'string', note: 'Id prefix. Derived from the content by default; set it only when one page repeats the same grid with the same options.' },
+    ],
+    theming: [
+      { name: '--sg-gap', fallback: '0.5rem', note: 'Space between tiles.' },
+      { name: '--sg-radius', fallback: '0', note: 'Tile corner radius.' },
+      { name: '--sg-tile-bg', fallback: 'rgb(0 0 0 / 0.06)', note: 'Behind an image while it loads.' },
+      { name: '--sg-caption-bg', fallback: 'rgb(0 0 0 / 0.72)', note: 'Hover caption overlay. Keep 4.5:1 with --sg-caption-fg over the lightest image.' },
+      { name: '--sg-caption-fg', fallback: '#fff', note: 'Hover caption text.' },
+      { name: '--sg-below-fg', fallback: 'inherit', note: 'Caption text under a tile.' },
+      { name: '--sg-mark-bg', fallback: 'rgb(0 0 0 / 0.55)', note: 'Disc behind the video / album mark.' },
+      { name: '--sg-mark-fg', fallback: '#fff', note: 'The mark.' },
+      { name: '--sg-head-fg', fallback: 'inherit', note: 'Header line.' },
+      { name: '--sg-follow-bg', fallback: '#1d1a2e', note: 'Follow link fill.' },
+      { name: '--sg-follow-fg', fallback: '#fff', note: 'Follow link text.' },
+      { name: '--sg-focus', fallback: '#1d1a2e', note: 'Focus ring on tiles and links.' },
+      { name: '--sg-duration', fallback: '180ms', note: 'Caption fade. Instant under prefers-reduced-motion.' },
+    ],
+    a11y: [
+      'Each tile is one link wrapping the image, so its accessible name is the image’s alt, then "(video)" or "(album)" from a visually hidden word beside the decorative mark. Tabbing through the grid reads a distinct name per tile.',
+      'An empty alt falls back to the caption’s first sentence, then to "Instagram post from <date>"; a name that would repeat gets a number. No tile is nameless.',
+      'Hover captions also show on keyboard focus, and are aria-hidden: the text lives in the alt, never only in the overlay. Captions below are ordinary text after the link.',
+      'Every link opens Instagram in a new tab and says so once, through aria-describedby, rather than in each name.',
+      'The grid is a list labelled by the header line. The caption fade is instant under prefers-reduced-motion. No JavaScript.',
+    ],
+    usage: `// package.json: the site fetches the feed before every build
+"prebuild": "node scripts/fetch-social.mjs"
+
+// scripts/fetch-social.mjs (in the client site, not the library):
+//   GET https://social.compass.st/v1/feeds/<site>.json  →  src/data/social.json
+//   unreachable or malformed, and a previous social.json exists → keep it, warn, exit 0
+//   unreachable or malformed, and no social.json yet            → fail the build, exit 1
+// Commit src/data/social.json: a Pages build starts from a clean clone, so the committed copy
+// is the "previous" one. The Worker fires the site's deploy hook when new posts arrive.
+
+---
+import SocialGrid, { type SocialFeed } from '../components/SocialGrid.astro';
+import social from '../data/social.json';
+const feed = social as SocialFeed;
+---
+{feed.posts.length > 0 && <h2>From our Instagram</h2>}
+<SocialGrid feed={feed} columns={{ base: 3, md: 4, lg: 6 }} max={12} />
+
+<!-- public/_headers: the images come from the Worker's host, so the CSP needs
+     img-src 'self' https://social.compass.st -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/social-grid/ (demo)' }],
+    file: 'src/library/social-grid/SocialGrid.astro',
     added: '2026-09-23',
   },
 ];

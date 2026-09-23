@@ -17,6 +17,7 @@ import ScrollRevealDemo from './ScrollRevealDemo.astro';
 import BusinessHoursDemo from './BusinessHoursDemo.astro';
 import NewsTickerDemo from './NewsTickerDemo.astro';
 import FlipBoxDemo from './FlipBoxDemo.astro';
+import SocialGridDemo from './SocialGridDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,4 +33,5 @@ export const demos: Record<string, AstroComponent> = {
   'business-hours': BusinessHoursDemo,
   'news-ticker': NewsTickerDemo,
   'flip-box': FlipBoxDemo,
+  'social-grid': SocialGridDemo,
 };

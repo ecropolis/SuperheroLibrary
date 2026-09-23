@@ -1,0 +1,409 @@
+---
+/**
+ * SocialGrid — a grid of an account's recent Instagram posts, each tile a link to the post on
+ * Instagram, with a header line naming the account and a Follow link. What PowerPack's
+ * Instagram Feed, Smash Balloon, Elfsight and LightWidget embed, without their failure mode.
+ *
+ * Those plugins show Instagram's own CDN URLs (scontent.cdninstagram.com …&oe=<expiry>), which
+ * die after a few days, and they call an Instagram API that Instagram keeps retiring: every
+ * "blank Instagram feed" on the web is one or the other. This element renders a feed JSON the
+ * host passes in, whose images are OUR copies (SocialFeedHandler mirrors them to R2 on
+ * social.compass.st). The host reads that JSON at build time (the site's
+ * scripts/fetch-social.mjs writes src/data/social.json, keeping the last good copy when the
+ * feed is unreachable), so the page never talks to Instagram and a pull that fails leaves the
+ * last posts up.
+ *
+ * The feed (the SocialFeedHandler contract, `GET /v1/feeds/<site>.json`):
+ *   { source: { username, profile_url, connected, last_pulled_at },
+ *     posts: [{ id, permalink, media_type, taken_at, image: { url, width, height }, alt, caption }] }
+ *   media_type is IMAGE, VIDEO (image is the poster; the video is never mirrored) or
+ *   CAROUSEL_ALBUM (image is the first child). Posts arrive newest first.
+ *
+ * No JavaScript. Each tile is one link with the image inside, so its accessible name is the
+ * image's alt, plus "(video)" or "(album)" from a visually hidden word next to the decorative
+ * mark. An empty alt falls back to the caption's first sentence, then to "Instagram post from
+ * <date>", so no tile is nameless and two tiles never share a name. Captions on hover are
+ * aria-hidden: the alt already carries them, and the overlay is only ever a second copy.
+ *
+ * `connected: false` (the token lapsed and nobody has reconnected) still renders the last
+ * posts, but the header says "Recent posts" instead of "@user on Instagram": the grid is a
+ * record, not a live claim. No posts renders nothing at all, not an empty box: the host's
+ * page decides whether to say anything.
+ *
+ * Columns follow the viewport (md ≥ 48rem, lg ≥ 64rem), the way a page builder's responsive
+ * column control does. Tiles are square crops by default (object-fit: cover).
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --sg-gap                   space between tiles                        (0.5rem)
+ *   --sg-radius                tile corner radius                          (0)
+ *   --sg-tile-bg               behind an image while it loads              (rgb(0 0 0 / 0.06))
+ *   --sg-caption-bg / -fg      hover caption overlay                       (rgb(0 0 0 / 0.72) / #fff)
+ *   --sg-below-fg              caption text under a tile                   (inherit)
+ *   --sg-mark-bg / -fg         video / album mark                          (rgb(0 0 0 / 0.55) / #fff)
+ *   --sg-head-fg               header line                                 (inherit)
+ *   --sg-follow-bg / -fg       Follow link                                 (#1d1a2e / #fff)
+ *   --sg-focus                 focus ring                                  (#1d1a2e)
+ *   --sg-duration              caption fade; 0s under reduced motion       (180ms)
+ */
+export type SocialMediaType = 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+export interface SocialPost {
+  id: string;
+  permalink: string;
+  media_type: SocialMediaType;
+  /** ISO 8601 instant. */
+  taken_at: string;
+  /** Our copy of the image (a video's poster, an album's first child). */
+  image: { url: string; width: number; height: number };
+  /** Written for a screen reader. The Worker seeds it from the caption; staff may edit it. */
+  alt: string;
+  caption: string | null;
+}
+export interface SocialFeed {
+  source: {
+    username: string;
+    profile_url: string;
+    /** false: the token lapsed; the posts are the last ones pulled. */
+    connected: boolean;
+    last_pulled_at: string | null;
+  };
+  posts: SocialPost[];
+}
+export interface SocialGridWords {
+  /** Header when connected. `{username}` is filled in. */
+  live: string;
+  /** Header when disconnected. */
+  recent: string;
+  follow: string;
+  /** Hidden words after a tile's alt. */
+  video: string;
+  album: string;
+  /** Alt for a post with neither alt nor caption. `{date}` is filled in. */
+  untitled: string;
+  /** Described once for every tile (aria-describedby). */
+  newTab: string;
+}
+type Columns = number | { base?: number; md?: number; lg?: number };
+interface Props {
+  feed: SocialFeed;
+  /** Columns per breakpoint (md ≥ 48rem, lg ≥ 64rem), or one number for all. */
+  columns?: Columns;
+  /** Most tiles shown. */
+  max?: number;
+  /** The "@user on Instagram" line and Follow link. */
+  header?: boolean;
+  captions?: 'hover' | 'below' | 'none';
+  /** Square crops (object-fit: cover); false keeps each image's own shape. */
+  square?: boolean;
+  /** Space between tiles, any CSS length. Overrides --sg-gap. */
+  gap?: string;
+  /** Date words in the fallback alt. */
+  locale?: string;
+  words?: Partial<SocialGridWords>;
+  /** Stable id prefix; set it when the same feed and options appear twice on one page. */
+  id?: string;
+  class?: string;
+}
+const {
+  feed,
+  columns = { base: 3, md: 4, lg: 6 },
+  max = 12,
+  header = true,
+  captions = 'hover',
+  square = true,
+  gap,
+  locale = 'en-US',
+  words: wordsIn = {},
+  id: idIn,
+  class: className,
+} = Astro.props;
+
+const words: SocialGridWords = {
+  live: '@{username} on Instagram',
+  recent: 'Recent posts',
+  follow: 'Follow',
+  video: 'video',
+  album: 'album',
+  untitled: 'Instagram post from {date}',
+  newTab: 'Opens Instagram in a new tab.',
+  ...wordsIn,
+};
+
+const source = feed?.source;
+const username = String(source?.username ?? '').replace(/^@/, '');
+// A post without an image or a link cannot be a tile; skip it rather than render a hole.
+const posts = (Array.isArray(feed?.posts) ? feed.posts : [])
+  .filter((p) => p && p.permalink && p.image?.url)
+  .slice(0, Math.max(0, max));
+
+// Instagram's own CDN URLs expire within days; that is the bug this element exists to avoid.
+const EXPIRING = /(^|\.)(cdninstagram\.com|fbcdn\.net|instagram\.com)$/i;
+for (const p of posts) {
+  try {
+    if (EXPIRING.test(new URL(p.image.url, 'https://host.invalid/').hostname)) {
+      console.warn(`social-grid: post ${p.id} shows ${new URL(p.image.url).hostname}, an Instagram CDN URL that expires within days. Serve the mirrored copy from the feed Worker instead.`);
+    }
+  } catch {
+    /* a relative URL is ours */
+  }
+}
+
+const cols = typeof columns === 'number' ? { base: columns } : columns;
+const base = cols.base ?? 3;
+const md = cols.md ?? base;
+const lg = cols.lg ?? md;
+const style = [`--sg-cols:${base}`, `--sg-cols-md:${md}`, `--sg-cols-lg:${lg}`, gap ? `--sg-gap:${gap}` : '']
+  .filter(Boolean)
+  .join(';');
+
+const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
+const firstSentence = (s: string) => {
+  const t = s.replace(/\s+/g, ' ').trim();
+  const m = t.match(/^(.+?[.!?])(\s|$)/);
+  return (m ? m[1] : t).slice(0, 140).trim();
+};
+const dateWords = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'UTC' }).format(d);
+};
+
+// Names: alt, else the caption's first sentence, else the date. Duplicates get a number, so a
+// screen reader tabbing through the grid never hears the same name twice.
+const seen = new Map<string, number>();
+const tiles = posts.map((p) => {
+  let alt = (p.alt ?? '').trim() || (p.caption ? firstSentence(p.caption) : '') || fill(words.untitled, { date: dateWords(p.taken_at) }).trim();
+  const n = (seen.get(alt) ?? 0) + 1;
+  seen.set(alt, n);
+  if (n > 1) alt = `${alt} (${n})`;
+  const kind = p.media_type === 'VIDEO' ? 'video' : p.media_type === 'CAROUSEL_ALBUM' ? 'album' : null;
+  return { p, alt, kind, caption: (p.caption ?? '').trim() };
+});
+
+// Ids for the header label and the shared "opens in a new tab" description: derived from the
+// content so builds are reproducible; `id` overrides when one page repeats a grid exactly.
+const hash = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+};
+const uid = idIn ?? `sg-${hash([username, source?.connected, posts.map((p) => p.id).join(), base, md, lg, captions, header, square].join('|'))}`;
+const titleId = `${uid}-title`;
+const hintId = `${uid}-hint`;
+const label = source?.connected ? fill(words.live, { username }) : words.recent;
+---
+
+{
+  tiles.length > 0 && (
+    <div class:list={['sg', `sg--captions-${captions}`, square && 'sg--square', className]} style={style} data-sg data-connected={source?.connected ? 'true' : 'false'}>
+      {header && (
+        <div class="sg__head">
+          <p class="sg__title" id={titleId}>
+            {source?.connected ? (
+              <a href={source.profile_url} rel="noopener" target="_blank" aria-describedby={hintId}>{label}</a>
+            ) : (
+              label
+            )}
+          </p>
+          {source?.profile_url && (
+            <a class="sg__follow" href={source.profile_url} rel="noopener" target="_blank" aria-describedby={hintId}>
+              {words.follow}<span class="sg-vh"> {fill(words.live, { username })}</span>
+            </a>
+          )}
+        </div>
+      )}
+      <span class="sg-vh" id={hintId}>{words.newTab}</span>
+      <ul class="sg__grid" role="list" {...(header ? { 'aria-labelledby': titleId } : { 'aria-label': label })}>
+        {tiles.map(({ p, alt, kind, caption }) => (
+          <li class="sg__item">
+            <a class="sg__tile" href={p.permalink} rel="noopener" target="_blank" aria-describedby={hintId} data-sg-type={p.media_type}>
+              <img src={p.image.url} width={p.image.width} height={p.image.height} alt={alt} loading="lazy" decoding="async" />
+              {kind && (
+                <span class="sg__mark" data-sg-mark={kind}>
+                  {kind === 'video' ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l11-6.5z" fill="currentColor" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="3" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M3 7v12a2 2 0 0 0 2 2h12" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                  )}
+                  <span class="sg-vh"> ({kind === 'video' ? words.video : words.album})</span>
+                </span>
+              )}
+              {captions === 'hover' && caption && (
+                <span class="sg__overlay" aria-hidden="true"><span class="sg__overlay-text">{caption}</span></span>
+              )}
+            </a>
+            {captions === 'below' && caption && <p class="sg__below">{caption}</p>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+<style>
+  .sg {
+    --_gap: var(--sg-gap, 0.5rem);
+    --_focus: var(--sg-focus, #1d1a2e);
+    --_duration: var(--sg-duration, 180ms);
+  }
+  .sg-vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sg__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+    color: var(--sg-head-fg, inherit);
+  }
+  .sg__title {
+    margin: 0;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .sg__title a {
+    color: inherit;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  .sg__follow {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    background: var(--sg-follow-bg, #1d1a2e);
+    color: var(--sg-follow-fg, #fff);
+    font-weight: 700;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+  .sg__follow:hover {
+    text-decoration: underline;
+  }
+  .sg__title a:focus-visible,
+  .sg__follow:focus-visible {
+    outline: 3px solid var(--_focus);
+    outline-offset: 2px;
+  }
+
+  .sg__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--sg-cols, 3), minmax(0, 1fr));
+    gap: var(--_gap);
+    align-items: start;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 48rem) {
+    .sg__grid {
+      grid-template-columns: repeat(var(--sg-cols-md, 4), minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .sg__grid {
+      grid-template-columns: repeat(var(--sg-cols-lg, 6), minmax(0, 1fr));
+    }
+  }
+  .sg__item {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .sg__tile {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: var(--sg-radius, 0);
+    background: var(--sg-tile-bg, rgb(0 0 0 / 0.06));
+    color: inherit;
+  }
+  .sg__tile:focus-visible {
+    outline: 3px solid var(--_focus);
+    outline-offset: 2px;
+  }
+  .sg__tile img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .sg--square .sg__tile img {
+    aspect-ratio: 1;
+    object-fit: cover;
+  }
+
+  .sg__mark {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    background: var(--sg-mark-bg, rgb(0 0 0 / 0.55));
+    color: var(--sg-mark-fg, #fff);
+    pointer-events: none;
+  }
+  .sg__mark svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .sg__overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 0.6rem;
+    background: var(--sg-caption-bg, rgb(0 0 0 / 0.72));
+    color: var(--sg-caption-fg, #fff);
+    font-size: 0.85rem;
+    line-height: 1.35;
+    opacity: 0;
+    transition: opacity var(--_duration) ease;
+    pointer-events: none;
+  }
+  .sg__overlay-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  .sg__tile:hover .sg__overlay,
+  .sg__item:focus-within .sg__overlay {
+    opacity: 1;
+  }
+
+  .sg__below {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    margin: 0.4rem 0 0;
+    color: var(--sg-below-fg, inherit);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sg__overlay {
+      transition: none;
+    }
+  }
+</style>
