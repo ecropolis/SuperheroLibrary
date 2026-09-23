@@ -245,6 +245,50 @@ export const catalog: Element[] = [
     file: 'src/library/video-background/VideoBackground.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'parallax-band',
+    name: 'Parallax band',
+    aka: ['parallax section', 'parallax background row', 'Elementor motion effects', 'Beaver Builder parallax row', 'scroll-speed background', 'parallax background'],
+    summary: 'A full-width band whose background image scrolls slower than the page, with a tint and content on top. A scroll-driven transform, not background-attachment: fixed, so it works on iOS.',
+    pitch: 'Break up a long page with a wide photo that glides behind your words as visitors scroll.',
+    // 260/mo, difficulty 28 (SE Ranking US, 2026-09-23).
+    search: { query: 'parallax scrolling website', alsoRanks: ['parallax effect website', 'parallax background'] },
+    replaces: ['Elementor “Motion effects → Scrolling effects” on a section background', 'Beaver Builder row background “Parallax”', 'Divi “Use parallax effect”', '`background-attachment: fixed` CSS parallax'],
+    goodFor: 'A break between sections of a long page: a landscape, a workshop, a skyline behind one line of copy and a button.',
+    notFor: 'Images that carry information (it is decorative, with empty alt text), portrait photos (the crop is wide), or more than two or three bands on one page.',
+    props: [
+      { name: 'image', type: 'string', note: 'Background image URL. Decorative, so it gets empty alt text. Use one at least 1.5× the band’s height at the widest viewport.' },
+      { name: 'width', type: 'number', note: 'Intrinsic width of the image.' },
+      { name: 'height', type: 'number', note: 'Intrinsic height of the image.' },
+      { name: 'speed', type: 'number', default: '0.4', note: 'How much the image lags the page, 0–1: 0 scrolls with the page, 1 holds it still. 0.3–0.5 reads as depth.' },
+      { name: 'overlay', type: 'number', note: 'Tint strength, 0–1. Overrides `--pb-overlay-opacity` (fallback 0.35).' },
+      { name: 'minHeight', type: 'string', note: 'Minimum band height, any CSS length. Overrides `--pb-height` (fallback 60vh).' },
+      { name: 'position', type: 'string', default: '“center”', note: 'object-position of the image, e.g. “center 30%”.' },
+      { name: 'loading', type: '“lazy” | “eager”', default: '“lazy”', note: 'Use eager only if the band is in the first screen.' },
+      { name: 'class', type: 'string', note: 'Class on the band, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--pb-bg', fallback: '#222', note: 'Colour behind the image while it loads.' },
+      { name: '--pb-overlay', fallback: '#000', note: 'Tint colour.' },
+      { name: '--pb-overlay-opacity', fallback: '0.35', note: 'Tint strength; the `overlay` prop overrides it.' },
+      { name: '--pb-fg', fallback: '#fff', note: 'Content text colour.' },
+      { name: '--pb-height', fallback: '60vh', note: 'Minimum height; the `minHeight` prop overrides it.' },
+    ],
+    a11y: [
+      'prefers-reduced-motion (tracked live): the image is a static cover background and nothing moves with the scroll.',
+      'The image is decorative (empty alt); the slot content carries the meaning and sits above a tint for contrast.',
+      'Without JavaScript the image is a static background, so the band still looks finished.',
+      'Off screen the scroll handler does no work; on screen it does one transform per animation frame.',
+    ],
+    usage: `<ParallaxBand image="/images/workshop.webp" width={2400} height={1600} speed={0.4} overlay={0.45} minHeight="28rem">
+  <h2>Built by hand in Asheville since 1998</h2>
+  <a class="button" href="/about/">Our story</a>
+</ParallaxBand>
+<!-- :root { --pb-overlay: var(--navy); --pb-fg: var(--white); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/parallax-band/ (demo)' }],
+    file: 'src/library/parallax-band/ParallaxBand.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
