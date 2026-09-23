@@ -700,7 +700,7 @@ const faqs: AccordionItem[] = [
     pitch: 'Show more reviews, team members or posts than fit across the page, and let visitors swipe or click through them.',
     // card slider 210/mo, difficulty 7; card carousel 260/21; testimonial carousel 90/15
     // (SE Ranking US, 2026-09-23).
-    search: { query: 'card slider', alsoRanks: ['card carousel', 'testimonial carousel'] },
+    search: { query: 'card slider', alsoRanks: ['card carousel'] },
     replaces: ['PowerPack Card Slider', 'Slick/Swiper/Owl embeds', 'Elementor Pro carousels'],
     goodFor: 'Testimonials, team members, recent posts, related products: a set of similar cards where seeing three and knowing there are more is enough.',
     notFor:
