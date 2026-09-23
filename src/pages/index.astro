@@ -1,10 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { catalog } from '../data/catalog';
-import BeforeAfterDemo from '../components/demos/BeforeAfterDemo.astro';
-import ParticleFieldDemo from '../components/demos/ParticleFieldDemo.astro';
-
-const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-field': ParticleFieldDemo };
+import { demos } from '../components/demos/index';
 ---
 
 <Base title="Gallery" description="The reusable UI elements Superhero Technologies builds client sites from, each with a live demo and the name to ask for it by.">
@@ -14,6 +11,10 @@ const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-
     <p class="lead">
       Each element is a single, dependency-free file that drops into any Superhero-built site and takes its colours
       from that site's own palette. Refer to one by the name under its demo.
+    </p>
+    <p class="note">
+      This gallery is the development preview. The public pages for each element are on
+      <a href="https://superherotech.ai/elements/">superherotech.ai/elements/</a>.
     </p>
   </section>
 
@@ -62,6 +63,10 @@ const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-
   .lead {
     font-size: 1.15rem;
     max-width: 44rem;
+  }
+  .note {
+    max-width: 44rem;
+    color: var(--muted);
   }
   .gallery {
     display: grid;

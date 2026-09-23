@@ -1,4 +1,8 @@
 ---
+/**
+ * Demo for `particle-field`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ */
 import ParticleField from '../../library/particle-field/ParticleField.astro';
 ---
 <div class="demo-pf">
@@ -12,8 +16,8 @@ import ParticleField from '../../library/particle-field/ParticleField.astro';
     min-height: 20rem;
     display: grid;
     place-items: center;
-    background: linear-gradient(135deg, var(--navy), var(--purple-dark));
-    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--navy, #1e283c), var(--purple-dark, #4526ad));
+    border-radius: var(--radius, 14px);
     overflow: hidden;
   }
   .demo-pf :global(.demo-pf__canvas) {
@@ -24,7 +28,7 @@ import ParticleField from '../../library/particle-field/ParticleField.astro';
     z-index: 2;
     margin: 0;
     text-align: center;
-    color: var(--white);
+    color: var(--white, #fff);
     font-weight: 800;
     font-size: 1.5rem;
     letter-spacing: -0.02em;

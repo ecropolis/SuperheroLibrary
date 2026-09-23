@@ -1,10 +1,20 @@
 ---
+/**
+ * Demo for `before-after`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ */
 import BeforeAfter from '../../library/before-after/BeforeAfter.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
 ---
 <div class="demo-ba">
   <BeforeAfter
-    before="/demo/before.svg"
-    after="/demo/after.svg"
+    before={asset('before.svg')}
+    after={asset('after.svg')}
     beforeAlt="A grey wireframe of a page: the before state"
     afterAlt="The same page in the Superhero purple and orange: the after state"
     width={1200}
@@ -14,8 +24,8 @@ import BeforeAfter from '../../library/before-after/BeforeAfter.astro';
 </div>
 <style>
   .demo-ba {
-    --ba-focus: var(--purple);
-    border-radius: var(--radius);
+    --ba-focus: var(--purple, #5933d8);
+    border-radius: var(--radius, 14px);
     overflow: hidden;
   }
 </style>

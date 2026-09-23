@@ -1,8 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import { catalog, type Element } from '../data/catalog';
-import BeforeAfterDemo from '../components/demos/BeforeAfterDemo.astro';
-import ParticleFieldDemo from '../components/demos/ParticleFieldDemo.astro';
+import { demos } from '../components/demos/index';
 
 export function getStaticPaths() {
   return catalog.map((e) => ({ params: { id: e.id }, props: { element: e } }));
@@ -11,7 +10,6 @@ interface Props {
   element: Element;
 }
 const { element: e } = Astro.props;
-const demos: Record<string, any> = { 'before-after': BeforeAfterDemo, 'particle-field': ParticleFieldDemo };
 const Demo = demos[e.id];
 ---
 

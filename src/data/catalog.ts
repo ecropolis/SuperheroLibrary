@@ -15,11 +15,26 @@ export interface ThemeVar {
   fallback: string;
   note: string;
 }
+/**
+ * The one search the element's page on superherotech.ai/elements/<id>/ targets. The page's
+ * title and h1 are composed from `query`. Two of our pages in one auction is how both lose, so
+ * `npm run check` refuses a query another entry already claims, as its query or in `alsoRanks`.
+ */
+export interface Search {
+  /** The query the page is written for (SE Ranking, US). */
+  query: string;
+  /** Close variants the same page should rank for without targeting them. */
+  alsoRanks?: string[];
+}
 export interface Element {
   id: string;
   name: string;
   aka: string[];
+  /** The gallery's technical line: what it is and how it behaves. */
   summary: string;
+  /** One sentence in the client's words, for the lead of the marketing page. */
+  pitch: string;
+  search: Search;
   /** What it stands in for on a WordPress / page-builder site. */
   replaces: string[];
   goodFor: string;
@@ -40,6 +55,9 @@ export const catalog: Element[] = [
     name: 'Before / After',
     aka: ['TwentyTwenty', 'image comparison slider', 'compare slider', 'UABB Before After', 'reveal slider'],
     summary: 'Two images in one frame. Drag the handle, or use the arrow keys, to reveal one over the other.',
+    pitch: 'Show the old and the new in one frame, and let visitors drag to compare.',
+    // 170/mo, difficulty 10; variants 140/29 and 110/10 (SE Ranking US, 2026-09-23).
+    search: { query: 'before after slider', alsoRanks: ['image comparison slider', 'before and after image slider'] },
     replaces: ['UABB "Before After" module (Beaver Builder)', 'TwentyTwenty jQuery plugin', 'most "image compare" WordPress plugins'],
     goodFor: 'Problem-and-solution illustrations, renovations, retouching, redesigns: anything where the two states share a frame.',
     notFor: 'Two unrelated images. If they do not line up, use a two-column layout instead.',
@@ -80,6 +98,9 @@ export const catalog: Element[] = [
     name: 'Particle field',
     aka: ['particles.js', 'animated particle background', 'constellation background', 'network dots', 'Smart Slider particle effect', 'UABB Particle Background', 'animated material background'],
     summary: 'Slow-drifting dots that join up with fine lines when they come near each other, drawn on a canvas behind a hero or band.',
+    pitch: 'Give your hero quiet, constant movement, like a network coming alive, without the weight of a video.',
+    // 590/mo, difficulty 18; variants 390/15 and 260/23 (SE Ranking US, 2026-09-23).
+    search: { query: 'particles js', alsoRanks: ['constellation background', 'animated background for website'] },
     replaces: ['Smart Slider 3 Pro “Particle” slider effect', 'UABB “Particle Background” row setting (Beaver Builder)', 'particles.js / tsParticles embeds'],
     goodFor: 'Technology, data and network brands; a hero that needs quiet movement without a video.',
     notFor: 'Sitting under body text, or on pages that already have a moving hero. One per page.',
