@@ -43,25 +43,29 @@ const Demo = demos[e.id];
     <pre><code>{e.usage}</code></pre>
 
     <h3>Props</h3>
-    <table>
-      <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Note</th></tr></thead>
-      <tbody>
-        {e.props.map((p) => (
-          <tr><td><code>{p.name}</code></td><td>{p.type}</td><td>{p.default ?? ''}</td><td>{p.note}</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Prop</th><th>Type</th><th>Default</th><th>Note</th></tr></thead>
+        <tbody>
+          {e.props.map((p) => (
+            <tr><td><code>{p.name}</code></td><td>{p.type}</td><td>{p.default ?? ''}</td><td>{p.note}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
 
     <h3>Theming</h3>
     <p>Set these from the host site's tokens. Each has a fallback so the element works before it is themed.</p>
-    <table>
-      <thead><tr><th>Variable</th><th>Fallback</th><th>Note</th></tr></thead>
-      <tbody>
-        {e.theming.map((t) => (
-          <tr><td><code>{t.name}</code></td><td><code>{t.fallback}</code></td><td>{t.note}</td></tr>
-        ))}
-      </tbody>
-    </table>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Variable</th><th>Fallback</th><th>Note</th></tr></thead>
+        <tbody>
+          {e.theming.map((t) => (
+            <tr><td><code>{t.name}</code></td><td><code>{t.fallback}</code></td><td>{t.note}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
 
     <p class="back"><a href="/">← All elements</a></p>
   </article>
@@ -100,6 +104,11 @@ const Demo = demos[e.id];
   }
   li {
     margin-bottom: 0.35rem;
+  }
+  /* Long type strings and variable names make these tables wider than a phone. Scroll
+     them inside themselves rather than widening the page or splitting words. */
+  .table-scroll {
+    overflow-x: auto;
   }
   .back {
     margin-top: 3rem;
