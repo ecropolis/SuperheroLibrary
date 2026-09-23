@@ -1,0 +1,239 @@
+---
+/**
+ * VideoBackground — a muted, looping video behind a hero, with a poster, an optional tint and a
+ * visible pause button. WordPress and the page builders call it a video hero or a background
+ * video (Elementor's section "Background type: Video", Beaver Builder's row video, the
+ * "autoplay muted loop" embed). The slot is the hero's content and sits above the video.
+ *
+ * WCAG 2.2.2 says moving content that lasts more than five seconds needs a way to pause it,
+ * so the pause button is always there while the video plays, bottom right, keyboard
+ * reachable, and its name says what it will do ("Pause background video" / "Play …").
+ *
+ * The video is only fetched when it will play: sources are attached by the script, not in the
+ * HTML, so these get the poster alone and download nothing else —
+ *   - no JavaScript (and then there is no motion, so no pause button either);
+ *   - viewports narrower than `minWidth` (mobile data), tracked live;
+ *   - prefers-reduced-motion: reduce, tracked live.
+ * It also pauses while scrolled out of view and while the tab is hidden, and resumes on return
+ * unless the visitor paused it. If the browser refuses to autoplay, the button offers Play.
+ *
+ * Sizing: the element is the hero. It fills its width, is at least `--vb-min-height` tall
+ * (fallback 60vh) and grows with its content; the video covers it (`object-fit: cover`, framed
+ * by `--vb-position`). Stacking is internal: video, then tint, then content, then the button.
+ * Keep the poster the video's first frame so the swap is invisible.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --vb-bg                     colour behind the poster while it loads   (#111)
+ *   --vb-overlay / --vb-overlay-opacity  tint colour and strength         (#000 / 0.4)
+ *   --vb-fg                     content text colour                        (#fff)
+ *   --vb-control-bg / --vb-control-fg / --vb-focus  the pause button       (rgb(0 0 0 / .55) / #fff / #fff)
+ *   --vb-min-height / --vb-position                                         (60vh / center)
+ */
+interface Source {
+  src: string;
+  /** MIME type, e.g. 'video/webm' or 'video/mp4'. List WebM first: it is usually smaller. */
+  type: string;
+}
+interface Props {
+  src: Source[];
+  /** Still shown before, instead of, and under the video. Ideally the video's first frame. */
+  poster: string;
+  /** Tint strength over the video, 0–1. Overrides --vb-overlay-opacity when set. */
+  overlay?: number;
+  /** Accessible name of the button while the video plays. */
+  label?: string;
+  /** Its name while the video is paused. */
+  playLabel?: string;
+  /** Viewport width (px) below which only the poster is shown. 0 plays everywhere. */
+  minWidth?: number;
+  class?: string;
+}
+const {
+  src,
+  poster,
+  overlay,
+  label = 'Pause background video',
+  playLabel = 'Play background video',
+  minWidth = 768,
+  class: className,
+} = Astro.props;
+const style = overlay === undefined ? undefined : `--vb-overlay-opacity:${overlay}`;
+---
+
+<div class:list={['vb', className]} style={style} data-vb data-min-width={minWidth}>
+  <video
+    class="vb__video"
+    poster={poster}
+    muted
+    loop
+    playsinline
+    preload="none"
+    disablepictureinpicture
+    aria-hidden="true"
+    tabindex="-1"
+    data-vb-video
+  >
+    {src.map((s) => <source data-src={s.src} type={s.type} />)}
+  </video>
+  <div class="vb__tint" aria-hidden="true"></div>
+  <div class="vb__content"><slot /></div>
+  <button
+    class="vb__control"
+    type="button"
+    hidden
+    aria-label={label}
+    data-vb-toggle
+    data-label-pause={label}
+    data-label-play={playLabel}
+  >
+    <span class="vb__icon" aria-hidden="true"></span>
+  </button>
+</div>
+
+<script is:inline>
+  (() => {
+    if (window.__videoBackground) return;
+    window.__videoBackground = true;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const init = (root) => {
+      if (root.dataset.ready) return;
+      root.dataset.ready = '1';
+      const video = root.querySelector('[data-vb-video]');
+      const btn = root.querySelector('[data-vb-toggle]');
+      const minWidth = parseFloat(root.dataset.minWidth) || 0;
+      const small = minWidth ? matchMedia(`(max-width: ${minWidth - 0.02}px)`) : null;
+      let loaded = false;
+      let userPaused = false;
+      let inView = false;
+
+      const allowed = () => !still.matches && !(small && small.matches);
+      const show = (playing) => {
+        btn.dataset.state = playing ? 'playing' : 'paused';
+        btn.setAttribute('aria-label', playing ? btn.dataset.labelPause : btn.dataset.labelPlay);
+      };
+      const load = () => {
+        if (loaded) return;
+        video.querySelectorAll('source').forEach((s) => (s.src = s.dataset.src));
+        video.load();
+        loaded = true;
+      };
+      // Back to the poster: detach the sources so the element shows its poster again.
+      const unload = () => {
+        if (!loaded) return;
+        video.pause();
+        video.querySelectorAll('source').forEach((s) => s.removeAttribute('src'));
+        video.load();
+        loaded = false;
+      };
+      const play = () => {
+        video.muted = true;
+        const p = video.play();
+        if (p) p.then(() => show(true), () => show(false));
+        else show(true);
+      };
+      const update = () => {
+        if (!allowed()) {
+          unload();
+          btn.hidden = true;
+          return;
+        }
+        btn.hidden = false;
+        if (!inView || document.hidden || userPaused) {
+          video.pause();
+          show(false);
+          return;
+        }
+        load();
+        play();
+      };
+
+      btn.addEventListener('click', () => {
+        userPaused = !video.paused;
+        if (userPaused) { video.pause(); show(false); }
+        else { load(); play(); }
+      });
+      new IntersectionObserver(([e]) => { inView = e.isIntersecting; update(); }).observe(root);
+      document.addEventListener('visibilitychange', update);
+      still.addEventListener('change', update);
+      small?.addEventListener('change', update);
+    };
+
+    const boot = () => document.querySelectorAll('[data-vb]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .vb {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    min-height: var(--vb-min-height, 60vh);
+    background: var(--vb-bg, #111);
+    color: var(--vb-fg, #fff);
+  }
+  .vb__video,
+  .vb__tint {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .vb__video {
+    z-index: -2;
+    object-fit: cover;
+    object-position: var(--vb-position, center);
+    pointer-events: none;
+  }
+  .vb__tint {
+    z-index: -1;
+    background: var(--vb-overlay, #000);
+    opacity: var(--vb-overlay-opacity, 0.4);
+  }
+  .vb__content {
+    position: relative;
+    display: grid;
+    align-content: center;
+    padding: clamp(1.5rem, 5vw, 4rem);
+    /* Room for the button so it never covers the last line of copy. */
+    padding-bottom: max(clamp(1.5rem, 5vw, 4rem), 4.5rem);
+  }
+  .vb__control {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 2px solid var(--vb-control-fg, #fff);
+    border-radius: 50%;
+    background: var(--vb-control-bg, rgb(0 0 0 / 0.55));
+    color: var(--vb-control-fg, #fff);
+    cursor: pointer;
+  }
+  .vb__control[hidden] {
+    display: none;
+  }
+  .vb__control:focus-visible {
+    outline: 3px solid var(--vb-focus, #fff);
+    outline-offset: 3px;
+  }
+  /* Two bars while playing (the button pauses), a triangle while paused (it plays). */
+  .vb__icon {
+    width: 0.8rem;
+    height: 0.9rem;
+    border-inline: 0.27rem solid currentColor;
+  }
+  [data-state='paused'] > .vb__icon {
+    width: 0;
+    height: 0;
+    border-inline: 0;
+    border-block: 0.5rem solid transparent;
+    border-left: 0.8rem solid currentColor;
+    translate: 0.12rem 0;
+  }
+</style>

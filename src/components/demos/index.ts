@@ -11,6 +11,7 @@
 import BeforeAfterDemo from './BeforeAfterDemo.astro';
 import ParticleFieldDemo from './ParticleFieldDemo.astro';
 import MegaMenuDemo from './MegaMenuDemo.astro';
+import VideoBackgroundDemo from './VideoBackgroundDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,4 +21,5 @@ export const demos: Record<string, AstroComponent> = {
   'before-after': BeforeAfterDemo,
   'particle-field': ParticleFieldDemo,
   'mega-menu': MegaMenuDemo,
+  'video-background': VideoBackgroundDemo,
 };

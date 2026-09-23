@@ -190,6 +190,61 @@ export const catalog: Element[] = [
     file: 'src/library/mega-menu/MegaMenu.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'video-background',
+    name: 'Video background',
+    aka: ['video hero', 'background video', 'Elementor video background', 'autoplay muted loop video', 'Beaver Builder video row', 'hero video'],
+    summary: 'A muted, looping video behind a hero, over a poster, with an optional tint and a visible pause button. Only the poster loads on small screens, under reduced motion and without JavaScript.',
+    pitch: 'Open your home page with moving footage of your work, without making visitors wait for it or wrestle with it.',
+    // 320/mo, difficulty 21 (SE Ranking US, 2026-09-23).
+    search: { query: 'video background website', alsoRanks: ['background video website', 'hero video background'] },
+    replaces: ['Elementor section “Background type: Video”', 'Beaver Builder row video background', 'Divi video background', 'hand-rolled `<video autoplay muted loop>` embeds'],
+    goodFor: 'A hero where the footage is the argument: a venue, a kitchen at work, a site being built. Short, quiet, loopable clips of 10–20 s.',
+    notFor: 'Footage with a message, speech or captions (use a real player), or anything a visitor must see: on phones and under reduced motion they get the poster alone.',
+    props: [
+      { name: 'src', type: '{ src, type }[]', note: 'Sources in order of preference, WebM first then MP4. Keep each under ~2 MB; no audio track.' },
+      { name: 'poster', type: 'string', note: 'Still shown before, instead of and under the video. Use the video’s first frame so the swap is invisible.' },
+      { name: 'overlay', type: 'number', note: 'Tint strength over the video, 0–1. Overrides `--vb-overlay-opacity` (fallback 0.4).' },
+      { name: 'label', type: 'string', default: '“Pause background video”', note: 'Accessible name of the button while the video plays.' },
+      { name: 'playLabel', type: 'string', default: '“Play background video”', note: 'Its name while the video is paused.' },
+      { name: 'minWidth', type: 'number', default: '768', note: 'Viewport width (px) below which only the poster is shown and no video is downloaded. Tracked live. 0 plays everywhere.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and size it.' },
+    ],
+    theming: [
+      { name: '--vb-bg', fallback: '#111', note: 'Colour behind the poster while it loads.' },
+      { name: '--vb-overlay', fallback: '#000', note: 'Tint colour.' },
+      { name: '--vb-overlay-opacity', fallback: '0.4', note: 'Tint strength; the `overlay` prop overrides it.' },
+      { name: '--vb-fg', fallback: '#fff', note: 'Content text colour.' },
+      { name: '--vb-control-bg', fallback: 'rgb(0 0 0 / 0.55)', note: 'Pause button fill.' },
+      { name: '--vb-control-fg', fallback: '#fff', note: 'Pause button icon and ring.' },
+      { name: '--vb-focus', fallback: '#fff', note: 'Pause button focus ring.' },
+      { name: '--vb-min-height', fallback: '60vh', note: 'Minimum height; content taller than this grows it.' },
+      { name: '--vb-position', fallback: 'center', note: 'object-position of the video and poster.' },
+    ],
+    a11y: [
+      'WCAG 2.2.2: a visible pause button (bottom right, 44 px) is shown whenever the video can play. Its name says what it will do, “Pause background video” or “Play background video”.',
+      'prefers-reduced-motion (tracked live): poster only, nothing downloaded, no button because nothing moves.',
+      'The video is muted, `aria-hidden` and out of the tab order; the slot content is the hero’s real content and carries its meaning.',
+      'Pauses while scrolled out of view and while the tab is hidden, and resumes on return unless the visitor paused it. If autoplay is refused, the button offers Play.',
+      'Without JavaScript the poster shows and no video is fetched, so there is no unpausable motion.',
+    ],
+    usage: `<VideoBackground
+  class="hero"
+  src={[
+    { src: '/video/hero.webm', type: 'video/webm' },
+    { src: '/video/hero.mp4', type: 'video/mp4' },
+  ]}
+  poster="/video/hero-poster.webp"
+  overlay={0.45}
+>
+  <h1>Fresh bread, every morning</h1>
+  <a class="button" href="/visit/">Visit the bakery</a>
+</VideoBackground>
+<!-- .hero { --vb-min-height: 80vh; --vb-overlay: var(--navy); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/video-background/ (demo)' }],
+    file: 'src/library/video-background/VideoBackground.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
