@@ -394,6 +394,77 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'video-player',
+    name: 'Video player',
+    aka: ['PowerPack Video', 'UABB Video', 'Elementor Video', 'YouTube embed', 'Vimeo embed', 'video lightbox', 'lite YouTube embed'],
+    summary:
+      'A YouTube, Vimeo or self-hosted video behind your own poster and play button, in place or in a lightbox. Nothing is requested from YouTube or Vimeo until the button is pressed; then a privacy-enhanced iframe is created and focus moves into it.',
+    pitch: 'Your video, your thumbnail, and nothing loads from YouTube until someone presses play.',
+    // SE Ranking US, 2026-09-23: html5 video player 480/mo, difficulty 27 (appeared this year);
+    // video player website 320/38; video lightbox 140/20; lite youtube embed 40/18.
+    search: { query: 'html5 video player', alsoRanks: ['video lightbox', 'video player website', 'lite youtube embed'] },
+    replaces: ['PowerPack / UABB / Elementor video modules', 'raw YouTube/Vimeo iframes', 'lite-youtube-embed', 'video lightbox plugins'],
+    goodFor: 'A video people choose to watch: an explainer on a service page, a testimonial, a tour of the premises.',
+    notFor: 'Ambient loops behind a hero (that is video-background) and autoplay with sound, which no page of ours ever does.',
+    props: [
+      { name: 'src', type: 'string | { src, type? }[]', note: 'A YouTube URL or id (watch, youtu.be, shorts, embed), a Vimeo URL or id (unlisted `/id/hash` kept), a .mp4/.webm URL, or sources in order of preference. Anything else fails the build with a sentence.' },
+      { name: 'title', type: 'string', note: 'Required. Names the play button ("Play: <title>"), the iframe and the lightbox.' },
+      { name: 'poster', type: 'string', note: 'Your thumbnail, served by your site. Required for YouTube and Vimeo (the build fails without it); for a file it is the <video> poster. Use the video’s aspect ratio.' },
+      { name: 'posterAlt', type: 'string', default: '“Video: <title>”', note: 'Alt text of the poster image: what it shows.' },
+      { name: 'posterFrom', type: "'youtube'", note: 'Only when the site has no image: uses YouTube’s thumbnail from i.ytimg.com, a third-party request at load (no cookie, but the visitor’s IP reaches Google).' },
+      { name: 'caption', type: 'string', note: 'Text under the player (a credit, a transcript link). Makes the element a <figure>.' },
+      { name: 'tracks', type: '{ src, srclang, label, kind?, default? }[]', note: 'Text tracks for a file; `kind` defaults to captions. Same-origin files. The build warns when a file has no captions track.' },
+      { name: 'autoplayOnClick', type: 'boolean', default: 'true', note: 'Start playing when the button is pressed. False only reveals the player, so the visitor presses play twice.' },
+      { name: 'muted', type: 'boolean', default: 'false', note: 'Start muted.' },
+      { name: 'loop', type: 'boolean', default: 'false', note: 'Loop (YouTube as a one-item playlist).' },
+      { name: 'start', type: 'number', default: '0', note: 'Start at this many seconds (YouTube `start`, Vimeo `#t=`, a media fragment on a file).' },
+      { name: 'aspect', type: 'number | string', default: '16/9', note: 'Frame ratio: 1.7778, "16/9", "4 / 3", "9/16" for a Short.' },
+      { name: 'lightbox', type: 'boolean', default: 'false', note: 'Play in a <dialog> over the page; the poster and button stay as the trigger.' },
+      { name: 'playIcon', type: 'string', note: 'Inline SVG markup for the button’s icon (the “custom play button”). Use currentColor and 1em.' },
+      { name: 'playLabel / closeLabel / watchLabel', type: 'string', default: '“Play” / “Close video” / “Watch “<title>””', note: 'Words, for a non-English site. playLabel prefixes the title in the button’s name; watchLabel is the no-JavaScript link.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and size it.' },
+    ],
+    theming: [
+      { name: '--vp-play-bg', fallback: 'rgb(0 0 0 / 0.7)', note: 'Play button circle.' },
+      { name: '--vp-play-fg', fallback: '#fff', note: 'Play icon.' },
+      { name: '--vp-play-size', fallback: '4.5rem', note: 'Diameter of the circle; the icon is 45% of it.' },
+      { name: '--vp-overlay', fallback: 'rgb(0 0 0 / 0.12)', note: 'Tint over the poster (keeps a white icon readable on a light poster).' },
+      { name: '--vp-radius', fallback: '0', note: 'Corner radius of the frame.' },
+      { name: '--vp-bg', fallback: '#000', note: 'Frame colour behind the poster, the video and the letterbox.' },
+      { name: '--vp-focus', fallback: '#fff', note: 'Focus ring on the play and close buttons (a dark halo sits outside it).' },
+      { name: '--vp-caption', fallback: 'inherit', note: 'Caption text colour.' },
+      { name: '--vp-backdrop', fallback: 'rgb(0 0 0 / 0.88)', note: 'Lightbox backdrop.' },
+      { name: '--vp-close-bg', fallback: 'rgb(255 255 255 / 0.15)', note: 'Lightbox close button fill.' },
+      { name: '--vp-close-fg', fallback: '#fff', note: 'Lightbox close icon.' },
+    ],
+    a11y: [
+      'The play button is a real <button> named “Play: <title>”, over the whole poster; Tab reaches it and Enter or Space plays. The poster image has its own alt text.',
+      'In place, focus moves into the player on play: the iframe (titled with the video’s title) or the <video>. The keyboard then drives the player itself.',
+      'Self-hosted video keeps the browser’s native controls: keyboard operable, with a captions menu for `tracks`. A captions track is expected because a video with speech and no captions fails WCAG 1.2.2, and the build warns without one.',
+      'Lightbox: a native modal <dialog> named with the title, so focus is trapped and Escape closes it; the close button is labelled and a backdrop click closes too. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing removes the iframe or pauses the file, so sound never continues behind it, and returns focus to the play button. The page does not scroll underneath.',
+      'Nothing plays until the visitor asks, so there is no autoplay to pause. prefers-reduced-motion only removes the play button’s hover growth.',
+      'Without JavaScript a file plays through its native controls, and YouTube, Vimeo and the lightbox offer a plain link to watch the video where it lives.',
+    ],
+    usage: `<VideoPlayer
+  src="https://www.youtube.com/watch?v=VIDEO_ID"
+  title="How a site visit works"
+  poster="/images/site-visit-poster.webp"
+  caption="Two minutes, with captions."
+/>
+
+<VideoPlayer
+  src={[{ src: '/video/tour.webm', type: 'video/webm' }, { src: '/video/tour.mp4', type: 'video/mp4' }]}
+  title="A tour of the clinic"
+  poster="/video/tour-poster.webp"
+  tracks={[{ src: '/video/tour.en.vtt', srclang: 'en', label: 'English' }]}
+  lightbox
+/>
+<!-- .video { --vp-play-bg: var(--brand); --vp-radius: var(--radius); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/video-player/ (demo)' }],
+    file: 'src/library/video-player/VideoPlayer.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

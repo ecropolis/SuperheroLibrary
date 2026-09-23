@@ -11,7 +11,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-catalog.mjs && node --disable-warning=ExperimentalWarning scripts/check-business-hours.mjs"
+    "check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-catalog.mjs && node --disable-warning=ExperimentalWarning scripts/check-business-hours.mjs && node --disable-warning=ExperimentalWarning scripts/check-video-player.mjs"
   },
   "dependencies": {
     "astro": "^7.2.1"

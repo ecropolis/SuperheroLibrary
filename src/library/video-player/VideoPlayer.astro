@@ -1,0 +1,523 @@
+---
+/**
+ * VideoPlayer — a video people watch: YouTube, Vimeo or a self-hosted file, behind your own
+ * poster and play button, inline or in a lightbox. WordPress calls it PowerPack's or UABB's
+ * "Video" module, Elementor's Video widget, or a lite YouTube embed. (Its sibling,
+ * video-background, is the opposite: a muted ambient loop nobody is meant to watch.)
+ *
+ * The facade contract. At load the page has the poster <img>, a real <button> named
+ * "Play: <title>" and, for a file, a <video preload="none"> with native controls. Nothing is
+ * requested from YouTube or Vimeo until the button is pressed: no iframe, no script, no
+ * preconnect, no thumbnail (unless `posterFrom="youtube"` opts into i.ytimg.com). Then the
+ * iframe is created on youtube-nocookie.com (privacy-enhanced mode) or player.vimeo.com with
+ * dnt=1, with autoplay, the title on the iframe, and focus moved into it. A YouTube iframe at
+ * load time sets cookies before anyone has consented; this never does.
+ *
+ * Lightbox: `lightbox` plays the video in a native <dialog> (focus trap, Escape, backdrop
+ * click) with a labelled close button; the poster and button stay on the page as the trigger.
+ * On open, a YouTube or Vimeo video starts and focus goes to the close button, not into the
+ * iframe: a cross-origin player swallows Escape, so from inside it the dialog would not close.
+ * Tab moves on into the player. A file gets focus itself (same-origin; Escape still works).
+ * Closing removes the iframe (or pauses the file), so no audio carries on behind a closed
+ * dialog, and gives focus back to the button. The page does not scroll while it is open.
+ *
+ * Self-hosted files keep the browser's own controls (keyboard operable, captions menu, free).
+ * Pass `tracks` with a `captions` track: a video with speech and no captions fails WCAG 1.2.2.
+ * Track files must be same-origin (or served with CORS and `crossorigin` set on the video).
+ *
+ * Without JavaScript: a file plays through its native controls; YouTube, Vimeo and the
+ * lightbox offer a plain link to watch the video where it lives.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --vp-play-bg / --vp-play-fg / --vp-play-size   the play button   (rgb(0 0 0 / 0.7) / #fff / 4.5rem)
+ *   --vp-overlay        tint over the poster                         (rgb(0 0 0 / 0.12))
+ *   --vp-radius         corner radius of the frame                   (0)
+ *   --vp-bg             frame colour behind the poster and video     (#000)
+ *   --vp-focus          focus ring                                   (#fff)
+ *   --vp-caption        caption text colour                          (inherit)
+ *   --vp-backdrop       lightbox backdrop                            (rgb(0 0 0 / 0.88))
+ *   --vp-close-bg / --vp-close-fg   lightbox close button            (rgb(255 255 255 / 0.15) / #fff)
+ */
+interface Source {
+  src: string;
+  /** MIME type. Inferred from .mp4 / .m4v / .webm / .ogv when left out. */
+  type?: string;
+}
+interface Track {
+  src: string;
+  srclang: string;
+  label: string;
+  /** 'captions' (speech and sounds, for Deaf viewers) is the one to provide; 'subtitles' translate. */
+  kind?: 'captions' | 'subtitles' | 'descriptions' | 'chapters';
+  default?: boolean;
+}
+interface Props {
+  /** A YouTube URL or id, a Vimeo URL or id, a file URL (.mp4/.webm), or [{ src, type }] sources. */
+  src: string | Source[];
+  /** Accessible name of the play button ("Play: …") and of the iframe. Required. */
+  title: string;
+  /** Your thumbnail, served by your site. Required for YouTube and Vimeo. */
+  poster?: string;
+  /** Alt text of the poster. Default "Video: <title>". */
+  posterAlt?: string;
+  /** 'youtube' uses i.ytimg.com's thumbnail when the site has none. A third-party request at load. */
+  posterFrom?: 'youtube';
+  /** Text under the player (a credit, a transcript link). */
+  caption?: string;
+  /** Text tracks for a self-hosted file. */
+  tracks?: Track[];
+  /** Start playing when the button is pressed. Default true. */
+  autoplayOnClick?: boolean;
+  muted?: boolean;
+  loop?: boolean;
+  /** Start at this many seconds. */
+  start?: number;
+  /** Width / height: a number (1.7778) or a string ('16/9', '4 / 3'). Default 16/9. */
+  aspect?: number | string;
+  /** Play in a dialog over the page instead of in place. */
+  lightbox?: boolean;
+  /** Inline SVG markup for the play button's icon. Default: a triangle. */
+  playIcon?: string;
+  /** Prefix of the button's name. Default "Play". */
+  playLabel?: string;
+  /** Name of the lightbox close button. Default "Close video". */
+  closeLabel?: string;
+  /** Text of the no-JavaScript link. Default "Watch “<title>”". */
+  watchLabel?: string;
+  class?: string;
+}
+
+// <video-player-parse>
+type Parsed =
+  | { kind: 'youtube'; id: string }
+  | { kind: 'vimeo'; id: string; hash?: string }
+  | { kind: 'file'; sources: { src: string; type?: string }[] };
+
+function mimeOf(url: string): string | undefined {
+  const ext = (url.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase();
+  return ext === 'mp4' || ext === 'm4v' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : ext === 'ogv' ? 'video/ogg' : undefined;
+}
+
+function parseVideoSrc(src: string | { src: string; type?: string }[]): Parsed | null {
+  if (Array.isArray(src)) {
+    if (!src.length) return null;
+    return { kind: 'file', sources: src.map((s) => ({ src: s.src, type: s.type ?? mimeOf(s.src) })) };
+  }
+  const s = String(src ?? '').trim();
+  if (!s) return null;
+  if (/\.(mp4|m4v|webm|ogv)(?:[?#].*)?$/i.test(s)) return { kind: 'file', sources: [{ src: s, type: mimeOf(s) }] };
+  if (/^[\w-]{11}$/.test(s) && !/^\d+$/.test(s)) return { kind: 'youtube', id: s };
+  if (/^\d+$/.test(s)) return { kind: 'vimeo', id: s };
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s.replace(/^\/\//, ''));
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^(www|m|music)\./, '');
+  const parts = url.pathname.split('/').filter(Boolean);
+  const ytId = (v: string | null | undefined) => (v && /^[\w-]{11}$/.test(v) ? v : null);
+  if (host === 'youtu.be') {
+    const id = ytId(parts[0]);
+    return id ? { kind: 'youtube', id } : null;
+  }
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const id = ytId(url.searchParams.get('v')) ?? (['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? ytId(parts[1]) : null);
+    return id ? { kind: 'youtube', id } : null;
+  }
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    const i = parts.findIndex((p) => /^\d+$/.test(p));
+    if (i < 0) return null;
+    const next = parts[i + 1];
+    const hash = url.searchParams.get('h') ?? (next && /^[0-9a-f]{6,}$/i.test(next) ? next : undefined);
+    return hash ? { kind: 'vimeo', id: parts[i], hash } : { kind: 'vimeo', id: parts[i] };
+  }
+  return null;
+}
+
+/** The iframe's URL. Built at render time; the iframe itself is only created on play. */
+function embedUrl(p: Parsed, o: { autoplay?: boolean; muted?: boolean; loop?: boolean; start?: number } = {}): string | null {
+  const start = Math.max(0, Math.floor(o.start ?? 0));
+  if (p.kind === 'youtube') {
+    const q = new URLSearchParams({ autoplay: o.autoplay === false ? '0' : '1', rel: '0', playsinline: '1' });
+    if (o.muted) q.set('mute', '1');
+    if (o.loop) {
+      q.set('loop', '1');
+      q.set('playlist', p.id); // YouTube loops a single video only as a one-item playlist.
+    }
+    if (start) q.set('start', String(start));
+    return `https://www.youtube-nocookie.com/embed/${p.id}?${q}`;
+  }
+  if (p.kind === 'vimeo') {
+    const q = new URLSearchParams({ dnt: '1', autoplay: o.autoplay === false ? '0' : '1' });
+    if (p.hash) q.set('h', p.hash);
+    if (o.muted) q.set('muted', '1');
+    if (o.loop) q.set('loop', '1');
+    return `https://player.vimeo.com/video/${p.id}?${q}${start ? `#t=${start}s` : ''}`;
+  }
+  return null;
+}
+
+/** Where the video lives, for the no-JavaScript link. */
+function watchUrl(p: Parsed): string {
+  if (p.kind === 'youtube') return `https://www.youtube.com/watch?v=${p.id}`;
+  if (p.kind === 'vimeo') return `https://vimeo.com/${p.id}${p.hash ? '/' + p.hash : ''}`;
+  return p.sources[0].src;
+}
+
+function aspectRatio(a: number | string | undefined): number {
+  if (typeof a === 'number' && a > 0) return a;
+  const m = String(a ?? '').match(/^\s*([\d.]+)\s*(?:[/:]\s*([\d.]+))?\s*$/);
+  const r = m ? Number(m[1]) / Number(m[2] ?? 1) : NaN;
+  return Number.isFinite(r) && r > 0 ? r : 16 / 9;
+}
+// </video-player-parse>
+
+const {
+  src,
+  title,
+  poster: posterProp,
+  posterAlt,
+  posterFrom,
+  caption,
+  tracks = [],
+  autoplayOnClick = true,
+  muted = false,
+  loop = false,
+  start = 0,
+  aspect = 16 / 9,
+  lightbox = false,
+  playIcon,
+  playLabel = 'Play',
+  closeLabel = 'Close video',
+  watchLabel,
+  class: className,
+} = Astro.props;
+
+if (!title || !String(title).trim()) throw new Error('VideoPlayer: `title` is required; it names the play button and the iframe.');
+const parsed = parseVideoSrc(src);
+if (!parsed) throw new Error(`VideoPlayer "${title}": cannot tell what \`src\` is (${JSON.stringify(src)}). Use a YouTube or Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }].`);
+const isFile = parsed.kind === 'file';
+let poster = posterProp;
+if (!poster && posterFrom === 'youtube' && parsed.kind === 'youtube') poster = `https://i.ytimg.com/vi/${parsed.id}/hqdefault.jpg`;
+if (!poster && !isFile) {
+  throw new Error(`VideoPlayer "${title}": a ${parsed.kind} video needs \`poster\`, your own thumbnail. (For YouTube only, posterFrom="youtube" uses i.ytimg.com instead.)`);
+}
+if (isFile && !tracks.some((t) => (t.kind ?? 'captions') === 'captions')) {
+  console.warn(`VideoPlayer "${title}": self-hosted video without a captions track. If it has speech, add tracks=[{ src, srclang, label, kind: 'captions' }].`);
+}
+const embed = embedUrl(parsed, { autoplay: autoplayOnClick, muted, loop, start });
+const ratio = Math.round(aspectRatio(aspect) * 1e4) / 1e4;
+const Tag = caption ? 'figure' : 'div';
+const Cap = caption ? 'figcaption' : 'p';
+const name = `${playLabel}: ${title}`;
+const fileSources = isFile ? parsed.sources.map((s) => ({ ...s, src: start ? `${s.src}#t=${start}` : s.src })) : [];
+const icon =
+  playIcon ??
+  '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.04-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z"/></svg>';
+// Inline, a file shows the <video> itself (its poster attribute is the thumbnail); everything
+// else shows the poster <img> under the button.
+const showImg = !isFile || lightbox;
+---
+
+<Tag
+  class:list={['vp', className]}
+  style={`--vp-ratio:${ratio}`}
+  data-vp
+  data-vp-kind={parsed.kind}
+  data-vp-embed={embed}
+  data-vp-title={title}
+  data-vp-lightbox={lightbox ? '' : undefined}
+  data-vp-autoplay={autoplayOnClick ? '' : undefined}
+>
+  <div class="vp__frame">
+    {showImg && poster && (
+      <img class="vp__poster" src={poster} alt={posterAlt ?? `Video: ${title}`} loading="lazy" decoding="async" />
+    )}
+    {isFile && !lightbox && (
+      <video class="vp__video" controls preload="none" playsinline poster={poster} muted={muted} loop={loop} aria-label={title} data-vp-video>
+        {fileSources.map((s) => <source src={s.src} type={s.type} />)}
+        {tracks.map((t) => <track kind={t.kind ?? 'captions'} src={t.src} srclang={t.srclang} label={t.label} default={t.default} />)}
+      </video>
+    )}
+    <button
+      class="vp__play"
+      type="button"
+      aria-label={name}
+      aria-haspopup={lightbox ? 'dialog' : undefined}
+      hidden={isFile && !lightbox}
+      data-vp-play
+    >
+      <span class="vp__icon" aria-hidden="true" set:html={icon} />
+    </button>
+  </div>
+  {(!isFile || lightbox) && (
+    <noscript><p class="vp__nojs"><a href={watchUrl(parsed)}>{watchLabel ?? `Watch “${title}”`}</a></p></noscript>
+  )}
+  {caption && <Cap class="vp__caption">{caption}</Cap>}
+  {lightbox && (
+    <dialog class="vp__dialog" aria-label={title} data-vp-dialog>
+      <div class="vp__box">
+        <button class="vp__close" type="button" aria-label={closeLabel} data-vp-close>
+          <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+        </button>
+        <div class="vp__stage" data-vp-stage>
+          {isFile && (
+            <video class="vp__video" controls preload="none" playsinline poster={poster} muted={muted} loop={loop} aria-label={title} data-vp-video>
+              {fileSources.map((s) => <source src={s.src} type={s.type} />)}
+              {tracks.map((t) => <track kind={t.kind ?? 'captions'} src={t.src} srclang={t.srclang} label={t.label} default={t.default} />)}
+            </video>
+          )}
+        </div>
+      </div>
+    </dialog>
+  )}
+</Tag>
+
+<script is:inline>
+  (() => {
+    if (window.__videoPlayer) return;
+    window.__videoPlayer = true;
+
+    const frameFor = (root) => {
+      const f = document.createElement('iframe');
+      f.src = root.dataset.vpEmbed;
+      f.title = root.dataset.vpTitle;
+      f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen; web-share';
+      f.allowFullscreen = true;
+      // YouTube refuses to play embeds that send no referrer (error 153).
+      f.referrerPolicy = 'strict-origin-when-cross-origin';
+      return f;
+    };
+
+    // Scroll lock for the lightbox, keeping the scrollbar's width so nothing shifts.
+    let locked = 0;
+    let saved = null;
+    const lock = (on) => {
+      const html = document.documentElement;
+      if (on) {
+        if (locked++) return;
+        saved = [html.style.overflow, html.style.paddingRight];
+        const bar = window.innerWidth - html.clientWidth;
+        html.style.overflow = 'hidden';
+        if (bar > 0) html.style.paddingRight = bar + 'px';
+      } else if (locked && !--locked) {
+        [html.style.overflow, html.style.paddingRight] = saved;
+      }
+    };
+
+    const init = (root) => {
+      if (root.dataset.vpReady) return;
+      root.dataset.vpReady = '1';
+      const kind = root.dataset.vpKind;
+      const autoplay = 'vpAutoplay' in root.dataset;
+      const btn = root.querySelector('[data-vp-play]');
+      const dialog = root.querySelector('[data-vp-dialog]');
+      const video = root.querySelector('[data-vp-video]');
+      const playFile = () => {
+        if (!autoplay) return;
+        const p = video.play();
+        if (p) p.catch(() => {}); // Refused (e.g. Low Power Mode): the native controls remain.
+      };
+
+      if (!dialog) {
+        if (kind === 'file') {
+          // Inline file: the overlay button is ours only once the script runs; without it the
+          // native controls do the job.
+          btn.hidden = false;
+          video.addEventListener('play', () => btn.remove(), { once: true });
+          btn.addEventListener('click', () => {
+            btn.remove();
+            video.focus();
+            playFile();
+          });
+        } else {
+          btn.addEventListener('click', () => {
+            const f = frameFor(root);
+            root.querySelector('.vp__frame').replaceChildren(f);
+            root.dataset.vpState = 'playing';
+            f.focus();
+          });
+        }
+        return;
+      }
+
+      const stage = dialog.querySelector('[data-vp-stage]');
+      const closeBtn = dialog.querySelector('[data-vp-close]');
+      btn.addEventListener('click', () => {
+        dialog.showModal();
+        lock(true);
+        if (kind === 'file') {
+          video.focus();
+          playFile();
+        } else {
+          stage.replaceChildren(frameFor(root));
+          // Focus stays on the close button, not in the iframe: a cross-origin player keeps
+          // every key it is given, Escape included, so from inside it Escape would not close
+          // the dialog. Tab moves on into the player.
+          closeBtn.focus();
+        }
+      });
+      closeBtn.addEventListener('click', () => dialog.close());
+      // The dialog fills the viewport; a click on it outside the box is a click on the backdrop.
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) dialog.close();
+      });
+      dialog.addEventListener('close', () => {
+        if (kind === 'file') video.pause();
+        else stage.replaceChildren(); // Unload: the only way to be sure the sound stops.
+        lock(false);
+        btn.focus();
+      });
+    };
+
+    const boot = () => document.querySelectorAll('[data-vp]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .vp {
+    margin: 0;
+  }
+  .vp__frame {
+    position: relative;
+    aspect-ratio: var(--vp-ratio, 16 / 9);
+    overflow: hidden;
+    border-radius: var(--vp-radius, 0);
+    background: var(--vp-bg, #000);
+  }
+  .vp__poster,
+  .vp__frame > .vp__video,
+  .vp__frame > :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .vp__poster {
+    object-fit: cover;
+  }
+  .vp__video {
+    display: block;
+    object-fit: contain;
+    background: var(--vp-bg, #000);
+  }
+  .vp__play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: var(--vp-overlay, rgb(0 0 0 / 0.12));
+    color: var(--vp-play-fg, #fff);
+    cursor: pointer;
+  }
+  .vp__play[hidden] {
+    display: none;
+  }
+  .vp__icon {
+    display: grid;
+    place-items: center;
+    width: var(--vp-play-size, 4.5rem);
+    height: var(--vp-play-size, 4.5rem);
+    border-radius: 50%;
+    background: var(--vp-play-bg, rgb(0 0 0 / 0.7));
+    font-size: calc(var(--vp-play-size, 4.5rem) * 0.45);
+    line-height: 0;
+    box-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 0.3);
+  }
+  /* The default triangle sits optically centred. */
+  .vp__icon :global(svg) {
+    translate: 6% 0;
+  }
+  .vp__play:focus-visible {
+    outline: 3px solid var(--vp-focus, #fff);
+    outline-offset: -6px;
+  }
+  .vp__play:focus-visible .vp__icon {
+    box-shadow:
+      0 0 0 3px var(--vp-focus, #fff),
+      0 0 0 6px rgb(0 0 0 / 0.6);
+  }
+  /* Hover growth is the only motion here, so it is the only thing reduced motion removes. */
+  @media (prefers-reduced-motion: no-preference) {
+    .vp__icon {
+      transition: scale 0.18s ease;
+    }
+    .vp__play:hover .vp__icon,
+    .vp__play:focus-visible .vp__icon {
+      scale: 1.08;
+    }
+  }
+  .vp__caption,
+  .vp__nojs {
+    margin: 0.6rem 0 0;
+    color: var(--vp-caption, inherit);
+    font-size: 0.9em;
+  }
+
+  /* Lightbox: the dialog is the backdrop and fills the viewport; the box is centred in it. */
+  .vp__dialog {
+    /* Border-box whatever the host's reset: 100% wide plus padding would overflow. */
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: clamp(0.75rem, 3vw, 2rem);
+    border: 0;
+    background: var(--vp-backdrop, rgb(0 0 0 / 0.88));
+    color: var(--vp-close-fg, #fff);
+    overscroll-behavior: contain;
+  }
+  .vp__dialog[open] {
+    display: grid;
+    place-items: center;
+  }
+  .vp__dialog::backdrop {
+    background: transparent;
+  }
+  .vp__box {
+    display: grid;
+    justify-items: end;
+    gap: 0.5rem;
+    /* As wide as fits, and no taller than the viewport minus the close button's row. */
+    width: min(100%, calc((100dvh - 2 * clamp(0.75rem, 3vw, 2rem) - 3.25rem) * var(--vp-ratio, 1.7778)));
+  }
+  .vp__close {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--vp-close-bg, rgb(255 255 255 / 0.15));
+    color: var(--vp-close-fg, #fff);
+    cursor: pointer;
+  }
+  .vp__close:focus-visible {
+    outline: 3px solid var(--vp-focus, #fff);
+    outline-offset: 2px;
+  }
+  .vp__stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--vp-ratio, 16 / 9);
+    background: var(--vp-bg, #000);
+  }
+  .vp__stage > .vp__video,
+  .vp__stage > :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+</style>
