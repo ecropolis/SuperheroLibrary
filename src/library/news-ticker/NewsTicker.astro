@@ -1,0 +1,724 @@
+---
+/**
+ * NewsTicker — a strip with a label chip ("Trending", "Latest", "Offers") followed by headlines
+ * that take turns: one at a time sliding or fading in, or the whole list scrolling past as a
+ * marquee. Each headline is a link, optionally with a thumbnail and a muted date or tag.
+ * WordPress sells this as PowerPack's Content Ticker, Elementor's post ticker and a shelf of
+ * "news ticker" plugins; this is the part sites use, with no Swiper behind it.
+ *
+ * The host passes the items (a content collection, a data file, the events or reviews JSON the
+ * site already fetches at build); the element never fetches. Without JavaScript every item is
+ * a plain, visible list of links; the script turns it into the moving strip.
+ *
+ * Modes:
+ *   slide    one item shown; the next slides in, `direction` "up" (default) or "left".
+ *   fade     one item shown; the next cross-fades in.
+ *   marquee  the whole list scrolls sideways at `speed` px/s, looping seamlessly (the script
+ *            appends one inert, aria-hidden copy of the list). No arrows.
+ * `interval` ms between items for slide and fade. `autoplay={false}`: slide and fade move only
+ * with the arrows (which are then always shown), and a marquee is a static list.
+ *
+ * WCAG 2.2.2 is the contract. While anything moves on its own there is a visible Pause/Play
+ * button right after the label, named for what it will do. Autoplay also holds while the
+ * pointer is over the strip (`pauseOnHover`) and while keyboard focus is inside it, and picks
+ * up again on leave and blur unless the visitor pressed Pause; pressing Play starts it at once.
+ * It holds in hidden tabs and off screen too. The headlines are not a live region: automatic
+ * turns are never announced. Prev/next write "3 of 7: <headline>" to a polite status line,
+ * so only the visitor's own action speaks. Every link stays in the DOM and in the tab order:
+ * tabbing to a headline that is not showing brings it in at once. Under
+ * prefers-reduced-motion (tracked live) nothing animates: slide and fade swap instantly on the
+ * interval (`reducedMotion="list"` shows the static list instead) and a marquee is a static
+ * list.
+ *
+ * Sizing: a full-width strip, one line high on desktop (`--nt-height`, headlines truncated
+ * with an ellipsis; the full text stays the link's name). The strip is a size container: below
+ * 36rem of its own width the label moves above the headline and headlines may take two lines.
+ * Give it a width (it is a block; in a flex row give it `flex: 1` or `width: 100%`). No z-index.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --nt-bg / --nt-fg              strip background / text                (#f1f2f6 / #1b1c22)
+ *   --nt-accent                    the host's accent: label chip, hover, focus   (#3b2fc9)
+ *   --nt-label-bg / --nt-label-fg  label chip, if not the accent          (var(--nt-accent) / #fff)
+ *   --nt-link / --nt-link-hover    headline colour / on hover and focus   (inherit / var(--nt-accent))
+ *   --nt-muted                     meta text and marquee dots             (#585b6b)
+ *   --nt-focus                     focus ring                             (var(--nt-accent))
+ *   --nt-control-line / --nt-control-hover  button ring / hover fill
+ *   --nt-height / --nt-thumb / --nt-radius / --nt-gap / --nt-duration
+ */
+interface Item {
+  /** The headline. */
+  text: string;
+  /** Where it goes. Without one the item is plain text. */
+  href?: string;
+  /** Thumbnail URL, shown square at --nt-thumb. */
+  image?: string;
+  /** Alt text for the thumbnail. Default empty: the headline already names the link. */
+  imageAlt?: string;
+  /** A short date or tag, shown muted after the headline. */
+  meta?: string;
+}
+interface Props {
+  items: Item[];
+  /** The chip before the headlines, and the strip's accessible name. */
+  label: string;
+  /** Makes the chip a link, e.g. to the blog or the offers page. */
+  labelHref?: string;
+  mode?: 'slide' | 'fade' | 'marquee';
+  /** For `slide`: 'up' rises into place, 'left' comes in from the right. */
+  direction?: 'up' | 'left';
+  /** ms each item shows, for slide and fade. */
+  interval?: number;
+  /** Marquee speed in px/s. It never moves faster. */
+  speed?: number;
+  autoplay?: boolean;
+  /** Prev/next buttons for slide and fade. Always shown when autoplay is off. */
+  arrows?: boolean;
+  pauseOnHover?: boolean;
+  /** Default: true when any item has an image. */
+  showImages?: boolean;
+  /** Show only the first this many items. */
+  maxItems?: number;
+  /** Under prefers-reduced-motion, slide/fade: 'swap' instantly on the interval, or show the static 'list'. */
+  reducedMotion?: 'swap' | 'list';
+  pauseLabel?: string;
+  playLabel?: string;
+  prevLabel?: string;
+  nextLabel?: string;
+  /** What prev/next announce. {n}, {total} and {text} are filled in. */
+  countLabel?: string;
+  class?: string;
+}
+const {
+  items,
+  label,
+  labelHref,
+  mode = 'slide',
+  direction = 'up',
+  interval = 4000,
+  speed = 50,
+  autoplay = true,
+  arrows = true,
+  pauseOnHover = true,
+  showImages,
+  maxItems,
+  reducedMotion = 'swap',
+  pauseLabel = 'Pause ticker',
+  playLabel = 'Play ticker',
+  prevLabel = 'Previous item',
+  nextLabel = 'Next item',
+  countLabel = '{n} of {total}: {text}',
+  class: className,
+} = Astro.props;
+const shown = maxItems && maxItems > 0 ? items.slice(0, maxItems) : items;
+const images = showImages ?? shown.some((i) => i.image);
+const several = shown.length > 1;
+// Something moves on its own only with autoplay and more than one item.
+const pausable = autoplay && several;
+const withArrows = mode !== 'marquee' && several && (arrows || !autoplay);
+const uid = 'nt-' + Math.random().toString(36).slice(2, 8);
+---
+
+<section
+  class:list={['nt', className]}
+  aria-labelledby={`${uid}-label`}
+  aria-roledescription="ticker"
+  data-nt
+  data-mode={mode}
+  data-direction={direction}
+  data-interval={interval}
+  data-speed={speed}
+  data-autoplay={autoplay ? '' : undefined}
+  data-pause-on-hover={pauseOnHover ? '' : undefined}
+  data-reduced-motion={reducedMotion}
+  data-count-label={countLabel}
+>
+  <div class="nt__bar">
+    <div class="nt__label" id={`${uid}-label`}>
+      {labelHref ? <a href={labelHref}>{label}</a> : label}
+    </div>
+    {
+      pausable && (
+        <button
+          class="nt__btn nt__pause"
+          type="button"
+          hidden
+          aria-label={pauseLabel}
+          data-nt-pause
+          data-state="playing"
+          data-label-pause={pauseLabel}
+          data-label-play={playLabel}
+        >
+          <span class="nt__icon" aria-hidden="true" />
+        </button>
+      )
+    }
+    <div class="nt__viewport" data-nt-viewport>
+      <div class="nt__track" data-nt-track>
+        <ul class="nt__list" data-nt-list>
+          {
+            shown.map((item) => {
+              const Tag = item.href ? 'a' : 'span';
+              return (
+                <li class="nt__item">
+                  <Tag class="nt__link" href={item.href}>
+                    {images && item.image && (
+                      <img class="nt__thumb" src={item.image} alt={item.imageAlt ?? ''} width="96" height="96" loading="lazy" decoding="async" />
+                    )}
+                    <span class="nt__text">{item.text}</span>
+                    {item.meta && (
+                      <span class="nt__meta">
+                        <span class="nt__sr">, </span>
+                        {item.meta}
+                      </span>
+                    )}
+                  </Tag>
+                </li>
+              );
+            })
+          }
+        </ul>
+      </div>
+    </div>
+    {
+      withArrows && (
+        <div class="nt__nav" hidden data-nt-nav>
+          <button class="nt__btn" type="button" aria-label={prevLabel} data-nt-prev>
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M10 3 5 8l5 5" /></svg>
+          </button>
+          <button class="nt__btn" type="button" aria-label={nextLabel} data-nt-next>
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
+          </button>
+        </div>
+      )
+    }
+  </div>
+  {withArrows && <span class="nt__sr" aria-live="polite" data-nt-status />}
+</section>
+
+<script is:inline>
+  (() => {
+    if (window.__newsTicker) return;
+    window.__newsTicker = true;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const init = (root) => {
+      if (root.dataset.ready) return;
+      root.dataset.ready = '1';
+      const d = root.dataset;
+      const mode = d.mode;
+      const autoplay = 'autoplay' in d;
+      const interval = Math.max(1000, parseFloat(d.interval) || 4000);
+      const speed = Math.max(1, parseFloat(d.speed) || 50);
+      const q = (s) => root.querySelector(s);
+      const viewport = q('[data-nt-viewport]');
+      const track = q('[data-nt-track]');
+      const list = q('[data-nt-list]');
+      const pauseBtn = q('[data-nt-pause]');
+      const nav = q('[data-nt-nav]');
+      const status = q('[data-nt-status]');
+      const items = [...list.children];
+      const n = items.length;
+      let view = '';
+      let current = 0;
+      let timer = 0;
+      let anim = null;
+      let clone = null;
+      let listW = 0;
+      let dur = 0;
+      let userPaused = false;
+      let hovered = false;
+      let focused = false;
+      let inView = false;
+
+      const viewFor = () => {
+        if (n < 2) return 'list';
+        if (mode === 'marquee') return autoplay && !still.matches ? 'marquee' : 'list';
+        return still.matches && d.reducedMotion === 'list' ? 'list' : 'rotate';
+      };
+      const moving = () => autoplay && (view === 'rotate' || view === 'marquee');
+      const running = () => moving() && !userPaused && !hovered && !focused && inView && !document.hidden;
+      const stop = () => {
+        clearTimeout(timer);
+        timer = 0;
+      };
+      // Apply class changes with no transition (first paint, keyboard focus).
+      const instantly = (fn) => {
+        root.classList.add('nt--instant');
+        fn();
+        void root.offsetWidth;
+        root.classList.remove('nt--instant');
+      };
+
+      // ------------------------------------------------------------ slide / fade
+      const show = (i, dir, instant) => {
+        i = ((i % n) + n) % n;
+        if (i === current) return;
+        const from = items[current];
+        const to = items[i];
+        const go = () => {
+          // Waiting items sit on the side the next one comes from; `data-back` flips it.
+          root.toggleAttribute('data-back', dir < 0);
+          items.forEach((el) => el.classList.remove('is-out'));
+          void to.offsetWidth;
+          from.classList.replace('is-current', 'is-out');
+          to.classList.add('is-current');
+        };
+        instant ? instantly(go) : go();
+        current = i;
+      };
+      const tick = () => {
+        timer = 0;
+        show(current + 1, 1);
+        update();
+      };
+      const step = (dir) => {
+        show(current + dir, dir);
+        stop(); // the next automatic turn is a full interval from now
+        if (status) {
+          status.textContent = d.countLabel
+            .replace('{n}', String(current + 1))
+            .replace('{total}', String(n))
+            .replace('{text}', items[current].textContent.replace(/\s+/g, ' ').trim());
+        }
+        update();
+      };
+
+      // ---------------------------------------------------------------- marquee
+      const measure = () => {
+        track.style.setProperty('--nt-vw', viewport.clientWidth + 'px');
+        const w = list.getBoundingClientRect().width;
+        if (!anim || !w || w === listW) return;
+        const p = dur ? ((anim.currentTime || 0) % dur) / dur : 0;
+        listW = w;
+        dur = (w / speed) * 1000;
+        anim.effect.updateTiming({ duration: dur });
+        anim.currentTime = p * dur;
+      };
+      const startMarquee = () => {
+        if (!clone) {
+          clone = list.cloneNode(true);
+          clone.removeAttribute('data-nt-list');
+          clone.setAttribute('aria-hidden', 'true');
+          clone.inert = true;
+          track.append(clone);
+          const ro = new ResizeObserver(() => view === 'marquee' && measure());
+          ro.observe(viewport);
+          ro.observe(list);
+        }
+        clone.hidden = false;
+        track.style.setProperty('--nt-vw', viewport.clientWidth + 'px');
+        listW = list.getBoundingClientRect().width;
+        dur = (listW / speed) * 1000;
+        // The track is two identical lists, so -50% lands exactly where it started.
+        anim = track.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], {
+          duration: dur,
+          iterations: Infinity,
+        });
+        anim.pause();
+      };
+      // Keyboard focus on a headline that is off to one side: bring it to the start.
+      const reveal = (li) => {
+        if (!anim || !listW) return;
+        const v = viewport.getBoundingClientRect();
+        const r = li.getBoundingClientRect();
+        if (r.left >= v.left && r.right <= v.right) return;
+        anim.currentTime = (li.offsetLeft / listW) * dur;
+      };
+
+      // ------------------------------------------------------------------ state
+      const setView = (v) => {
+        view = v;
+        root.dataset.view = v;
+        stop();
+        if (anim) {
+          anim.cancel();
+          anim = null;
+        }
+        if (clone) clone.hidden = v !== 'marquee';
+        instantly(() => {
+          items.forEach((el) => el.classList.remove('is-current', 'is-out'));
+          if (v === 'rotate') items[current].classList.add('is-current');
+        });
+        if (v === 'marquee') startMarquee();
+      };
+      const update = () => {
+        const v = viewFor();
+        if (v !== view) setView(v);
+        if (pauseBtn) pauseBtn.hidden = !moving();
+        if (nav) nav.hidden = view !== 'rotate';
+        const run = running();
+        root.dataset.running = String(run);
+        if (anim) run ? anim.play() : anim.pause();
+        if (view === 'rotate' && run) {
+          if (!timer) timer = setTimeout(tick, interval);
+        } else stop();
+      };
+
+      pauseBtn?.addEventListener('click', () => {
+        userPaused = !userPaused;
+        // Play means play now, even with the pointer or focus still on the strip.
+        if (!userPaused) hovered = focused = false;
+        pauseBtn.dataset.state = userPaused ? 'paused' : 'playing';
+        pauseBtn.setAttribute('aria-label', userPaused ? pauseBtn.dataset.labelPlay : pauseBtn.dataset.labelPause);
+        update();
+      });
+      q('[data-nt-prev]')?.addEventListener('click', () => step(-1));
+      q('[data-nt-next]')?.addEventListener('click', () => step(1));
+      if ('pauseOnHover' in d) {
+        root.addEventListener('pointerenter', (e) => {
+          if (e.pointerType === 'touch') return;
+          hovered = true;
+          update();
+        });
+        root.addEventListener('pointerleave', () => {
+          hovered = false;
+          update();
+        });
+      }
+      root.addEventListener('focusin', (e) => {
+        // Keyboard focus holds the strip; a mouse click on a button does not.
+        focused = e.target.matches(':focus-visible');
+        const i = items.indexOf(e.target.closest('li'));
+        if (i >= 0 && view === 'rotate' && i !== current) show(i, i > current ? 1 : -1, true);
+        if (i >= 0 && view === 'marquee') reveal(items[i]);
+        update();
+      });
+      root.addEventListener('focusout', (e) => {
+        if (root.contains(e.relatedTarget)) return;
+        focused = false;
+        update();
+      });
+      new IntersectionObserver(([e]) => {
+        inView = e.isIntersecting;
+        update();
+      }).observe(root);
+      document.addEventListener('visibilitychange', update);
+      still.addEventListener('change', update);
+      update();
+    };
+
+    const boot = () => document.querySelectorAll('[data-nt]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .nt {
+    container-type: inline-size;
+    color: var(--nt-fg, #1b1c22);
+    background: var(--nt-bg, #f1f2f6);
+    border-radius: var(--nt-radius, 0.5rem);
+  }
+  .nt__bar {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'label pause view nav';
+    align-items: center;
+    min-height: var(--nt-height, 3rem);
+  }
+  .nt :focus-visible {
+    outline: 2px solid var(--nt-focus, var(--nt-accent, #3b2fc9));
+    outline-offset: 2px;
+  }
+
+  /* The chip, with a notch pointing at the headlines. */
+  .nt__label {
+    grid-area: label;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 1.5rem 0.4rem 1rem;
+    border-radius: var(--nt-radius, 0.5rem) 0 0 var(--nt-radius, 0.5rem);
+    background: var(--nt-label-bg, var(--nt-accent, #3b2fc9));
+    color: var(--nt-label-fg, #fff);
+    font-weight: 700;
+    white-space: nowrap;
+    clip-path: polygon(0 0, calc(100% - 0.6rem) 0, 100% 50%, calc(100% - 0.6rem) 100%, 0 100%);
+  }
+  .nt__label a {
+    color: inherit;
+    text-decoration: underline 1px;
+    text-underline-offset: 0.2em;
+  }
+  .nt__label a:focus-visible {
+    outline-color: currentColor;
+  }
+
+  .nt__btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--nt-control-line, rgb(0 0 0 / 0.25));
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .nt__btn:hover {
+    background: var(--nt-control-hover, rgb(0 0 0 / 0.07));
+  }
+  .nt__btn[hidden],
+  .nt__nav[hidden] {
+    display: none;
+  }
+  .nt__btn svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nt__pause {
+    grid-area: pause;
+    margin-inline-start: 0.6rem;
+  }
+  /* Two bars while playing (the button pauses), a triangle while paused (it plays). */
+  .nt__icon {
+    width: 0.6rem;
+    height: 0.7rem;
+    border-inline: 0.2rem solid currentColor;
+  }
+  .nt__pause[data-state='paused'] .nt__icon {
+    width: 0;
+    height: 0;
+    border-inline: 0;
+    border-block: 0.38rem solid transparent;
+    border-left: 0.62rem solid currentColor;
+    translate: 0.1rem 0;
+  }
+  .nt__nav {
+    grid-area: nav;
+    display: flex;
+    gap: 0.35rem;
+    margin-inline: 0.25rem 0.6rem;
+  }
+
+  .nt__viewport {
+    grid-area: view;
+    align-self: stretch;
+    display: grid;
+    align-items: center;
+    min-width: 0;
+    padding-inline: 0.75rem;
+    overflow: clip;
+  }
+  .nt__track {
+    position: relative;
+  }
+  .nt__list {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0.55rem 0;
+    list-style: none;
+  }
+  .nt__list[hidden] {
+    display: none;
+  }
+  .nt__item {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .nt__link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    color: var(--nt-link, inherit);
+    text-decoration: none;
+  }
+  a.nt__link:hover,
+  a.nt__link:focus-visible {
+    color: var(--nt-link-hover, var(--nt-accent, #3b2fc9));
+  }
+  a.nt__link:hover .nt__text,
+  a.nt__link:focus-visible .nt__text {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .nt__thumb {
+    flex: none;
+    width: var(--nt-thumb, 2.25rem);
+    height: var(--nt-thumb, 2.25rem);
+    object-fit: cover;
+    border-radius: 0.35rem;
+  }
+  .nt__text {
+    min-width: 0;
+  }
+  .nt__meta {
+    flex: none;
+    color: var(--nt-muted, #585b6b);
+    font-size: 0.85em;
+  }
+  .nt__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Static list (no JavaScript, reduced motion, a stopped marquee): a dot before each item. */
+  .nt:not([data-view='rotate'], [data-view='marquee']) .nt__item::before {
+    content: '';
+    flex: none;
+    width: 0.3rem;
+    height: 0.3rem;
+    margin-inline-end: 0.6rem;
+    border-radius: 50%;
+    background: var(--nt-muted, #585b6b);
+  }
+
+  /* Slide and fade: every item in one grid cell, only the current one shown. Items that are
+     not showing are transparent, not hidden, so each link stays in the tab order. */
+  .nt[data-view='rotate'] .nt__viewport {
+    padding-block: 0;
+  }
+  .nt[data-view='rotate'] .nt__track {
+    align-self: stretch;
+    display: grid;
+  }
+  .nt[data-view='rotate'] .nt__list {
+    height: 100%;
+    padding: 0;
+  }
+  .nt[data-view='rotate'] .nt__item {
+    grid-area: 1 / 1;
+    align-self: stretch;
+    opacity: 0;
+    transform: var(--nt-in, none);
+    pointer-events: none;
+  }
+  .nt[data-view='rotate'] .nt__item.is-current,
+  .nt[data-view='rotate'] .nt__item.is-out {
+    transition:
+      opacity var(--nt-duration, 450ms) ease,
+      transform var(--nt-duration, 450ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .nt[data-view='rotate'] .nt__item.is-current {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  .nt[data-view='rotate'] .nt__item.is-out {
+    transform: var(--nt-out, none);
+  }
+  .nt.nt--instant .nt__item {
+    transition: none !important;
+  }
+  .nt[data-view='rotate'] .nt__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nt[data-mode='slide'][data-direction='up'] {
+    --nt-in: translateY(100%);
+    --nt-out: translateY(-100%);
+  }
+  .nt[data-mode='slide'][data-direction='up'][data-back] {
+    --nt-in: translateY(-100%);
+    --nt-out: translateY(100%);
+  }
+  .nt[data-mode='slide'][data-direction='left'] {
+    --nt-in: translateX(100%);
+    --nt-out: translateX(-100%);
+  }
+  .nt[data-mode='slide'][data-direction='left'][data-back] {
+    --nt-in: translateX(-100%);
+    --nt-out: translateX(100%);
+  }
+
+  /* Marquee: the list and its copy side by side, each at least as wide as the viewport. */
+  .nt[data-view='marquee'] .nt__viewport {
+    mask-image: linear-gradient(90deg, transparent, #000 0.75rem, #000 calc(100% - 1.5rem), transparent);
+  }
+  .nt[data-view='marquee'] .nt__track {
+    display: flex;
+    width: max-content;
+  }
+  .nt[data-view='marquee'] .nt__list {
+    display: flex;
+    flex: none;
+    gap: var(--nt-gap, 2.5rem);
+    min-width: var(--nt-vw, 0px);
+    padding-inline-end: var(--nt-gap, 2.5rem);
+  }
+  .nt[data-view='marquee'] .nt__item {
+    position: relative;
+    flex: none;
+    white-space: nowrap;
+  }
+  .nt[data-view='marquee'] .nt__item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: calc(var(--nt-gap, 2.5rem) / -2 - 0.15rem);
+    width: 0.3rem;
+    height: 0.3rem;
+    margin-top: -0.15rem;
+    border-radius: 50%;
+    background: var(--nt-muted, #585b6b);
+  }
+
+  /* Narrow: the chip and the buttons on one row, the headline full width below it. */
+  @container (max-width: 36rem) {
+    .nt__bar {
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        'label . pause nav'
+        'view view view view';
+      row-gap: 0.25rem;
+      padding: 0.4rem 0.6rem 0 0;
+    }
+    .nt__nav {
+      margin-inline: 0.35rem 0;
+    }
+    .nt__label {
+      align-self: center;
+      padding: 0.25rem 1.25rem 0.25rem 0.75rem;
+      margin-inline-start: 0.4rem;
+      border-radius: var(--nt-radius, 0.5rem) 0 0 var(--nt-radius, 0.5rem);
+    }
+    .nt__pause {
+      margin-inline-start: 0;
+    }
+    .nt[data-view='rotate'] .nt__viewport {
+      min-height: max(var(--nt-height, 3rem), 3.25rem);
+    }
+    .nt[data-view='rotate'] .nt__text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      white-space: normal;
+    }
+    .nt[data-view='marquee'] .nt__viewport {
+      min-height: var(--nt-height, 3rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nt .nt__item {
+      transition: none !important;
+    }
+  }
+  @media print {
+    .nt[data-view] .nt__list {
+      display: grid;
+    }
+    .nt[data-view] .nt__item {
+      opacity: 1;
+      transform: none;
+      grid-area: auto;
+    }
+    .nt__btn,
+    .nt__nav,
+    .nt__list + .nt__list {
+      display: none;
+    }
+  }
+</style>

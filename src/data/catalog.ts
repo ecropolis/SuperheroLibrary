@@ -394,6 +394,83 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'news-ticker',
+    name: 'News ticker',
+    aka: ['Content Ticker', 'PowerPack Content Ticker', 'marquee', 'scrolling headlines', 'trending bar', 'announcement bar', 'ticker tape', 'text ticker'],
+    summary:
+      'A one-line strip: a label chip, then headlines that take turns (slide up or left, or cross-fade) or scroll past as a seamless marquee. Links with optional thumbnails and a muted date. A visible pause button; hover and keyboard focus hold it. Without JavaScript, a plain list of links.',
+    pitch: 'Keep your latest news, offers and events turning over in one slim strip, so visitors see what is new without a banner shouting at them.',
+    // 880/mo, difficulty 18 and rising; website ticker 170/7, text ticker 170/15; css marquee
+    // 260/20 is a developer query and stays unclaimed (SE Ranking US, 2026-09-23).
+    search: { query: 'news ticker', alsoRanks: ['website ticker', 'text ticker', 'scrolling news ticker'] },
+    replaces: ['PowerPack Content Ticker (Beaver Builder)', 'Elementor Pro Post Ticker / Nav Menu ticker', 'news ticker WordPress plugins', 'the HTML marquee tag'],
+    goodFor: 'A strip under the header or above the footer: the latest posts, this week’s offers, the next few events, a “Trending” row on a blog. Five to eight short headlines.',
+    notFor: 'A page that already has a moving hero or carousel; more than one per page; body copy, or anything a visitor must read to finish a task (it truncates and moves on).',
+    props: [
+      { name: 'items', type: '{ text, href?, image?, imageAlt?, meta? }[]', note: 'The headlines, passed in by the host (a content collection, a data file, the events or reviews JSON the site already builds from). `meta` is a short date or tag shown muted. `imageAlt` defaults to empty: the headline names the link.' },
+      { name: 'label', type: 'string', note: 'The chip, e.g. “Trending”. Also the strip’s accessible name.' },
+      { name: 'labelHref', type: 'string', note: 'Makes the chip a link, e.g. to the blog or offers page.' },
+      { name: 'mode', type: '“slide” | “fade” | “marquee”', default: '“slide”', note: 'slide and fade show one item at a time; marquee scrolls the whole list sideways and has no arrows.' },
+      { name: 'direction', type: '“up” | “left”', default: '“up”', note: 'For slide: rises into place, or comes in from the right.' },
+      { name: 'interval', type: 'number', default: '4000', note: 'ms each item shows, for slide and fade.' },
+      { name: 'speed', type: 'number', default: '50', note: 'Marquee speed in px/s, measured from the rendered list, so it never runs faster.' },
+      { name: 'autoplay', type: 'boolean', default: 'true', note: '`false`: slide and fade move only with the arrows (always shown then) and there is no pause button; a marquee becomes a static list.' },
+      { name: 'arrows', type: 'boolean', default: 'true', note: 'Prev/next buttons for slide and fade. Ignored for marquee.' },
+      { name: 'pauseOnHover', type: 'boolean', default: 'true', note: 'Hold while the pointer is over the strip. Keyboard focus always holds it.' },
+      { name: 'showImages', type: 'boolean', default: 'true when any item has an image', note: 'Show the thumbnails.' },
+      { name: 'maxItems', type: 'number', note: 'Show only the first this many items.' },
+      { name: 'reducedMotion', type: '“swap” | “list”', default: '“swap”', note: 'Under prefers-reduced-motion, slide and fade swap instantly on the interval, or show the static list. A marquee is always a static list then.' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: '“Pause ticker” / “Play ticker”', note: 'The pause button’s name in each state.' },
+      { name: 'prevLabel / nextLabel', type: 'string', default: '“Previous item” / “Next item”', note: 'The arrows’ names.' },
+      { name: 'countLabel', type: 'string', default: '“{n} of {total}: {text}”', note: 'What the arrows announce. Translate it on a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the strip, for the host to theme and place it.' },
+    ],
+    theming: [
+      { name: '--nt-accent', fallback: '#3b2fc9', note: 'The host’s accent: the label chip, hover colour and focus ring all follow it.' },
+      { name: '--nt-bg', fallback: '#f1f2f6', note: 'Strip background.' },
+      { name: '--nt-fg', fallback: '#1b1c22', note: 'Strip text and button icons.' },
+      { name: '--nt-label-bg', fallback: 'var(--nt-accent)', note: 'Label chip fill, if it should differ from the accent.' },
+      { name: '--nt-label-fg', fallback: '#fff', note: 'Label chip text.' },
+      { name: '--nt-link', fallback: 'inherit', note: 'Headline colour.' },
+      { name: '--nt-link-hover', fallback: 'var(--nt-accent)', note: 'Headline colour on hover and focus.' },
+      { name: '--nt-muted', fallback: '#585b6b', note: 'Meta text and the marquee’s dots. Keep 4.5:1 on --nt-bg.' },
+      { name: '--nt-focus', fallback: 'var(--nt-accent)', note: 'Focus ring.' },
+      { name: '--nt-control-line', fallback: 'rgb(0 0 0 / 0.25)', note: 'Button ring.' },
+      { name: '--nt-control-hover', fallback: 'rgb(0 0 0 / 0.07)', note: 'Button fill on hover.' },
+      { name: '--nt-height', fallback: '3rem', note: 'Strip height on desktop.' },
+      { name: '--nt-thumb', fallback: '2.25rem', note: 'Thumbnail size (square).' },
+      { name: '--nt-radius', fallback: '0.5rem', note: 'Strip and chip corners.' },
+      { name: '--nt-gap', fallback: '2.5rem', note: 'Space between marquee items.' },
+      { name: '--nt-duration', fallback: '450ms', note: 'Slide and fade transition length.' },
+    ],
+    a11y: [
+      'WCAG 2.2.2: while anything moves by itself a visible Pause/Play button sits right after the label, first in the tab order; its name says what it will do. Nothing moves, and there is no button, without JavaScript or with autoplay off.',
+      'Autoplay holds while the pointer is over the strip and while keyboard focus is inside it, and picks up on leave and blur unless the visitor pressed Pause. Pausing holds across hover; pressing Play starts it at once. It also holds in hidden tabs and off screen.',
+      'The strip is a region named by its label, with aria-roledescription “ticker”. The headlines are not a live region, so automatic turns are never announced; the prev/next buttons write “3 of 7: <headline>” to a polite status line.',
+      'Every headline link stays in the DOM and the tab order: tabbing to one that is not showing brings it in at once and holds the strip. The marquee’s second copy is inert and aria-hidden, so each link is reached once.',
+      'prefers-reduced-motion (tracked live): no animation. Slide and fade swap instantly on the interval (or show the static list with reducedMotion="list"); a marquee is a static list.',
+      'Without JavaScript every item is a visible list of links. Headlines are links, not headings, so the page outline stays clean.',
+    ],
+    usage: `---
+import NewsTicker from '../components/NewsTicker.astro';
+import { getCollection } from 'astro:content';
+const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.data.date).slice(0, 6);
+---
+<NewsTicker
+  label="Latest"
+  labelHref="/blog/"
+  items={posts.map((p) => ({
+    text: p.data.title,
+    href: \`/blog/\${p.id}/\`,
+    meta: p.data.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }))}
+/>
+<!-- .nt { --nt-accent: var(--brand); --nt-bg: var(--tint); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/news-ticker/ (demo)' }],
+    file: 'src/library/news-ticker/NewsTicker.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

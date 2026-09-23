@@ -1,0 +1,88 @@
+---
+/**
+ * Demo for `news-ticker`: the three modes and the arrows-only case, each themed a little
+ * differently from the same host tokens. The website renders this too (see README, "Consumed
+ * by superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ * The links go nowhere on purpose; `scripts/check-news-ticker.mjs` reads the `text:` and
+ * `href:` pairs below and checks the built page lists every one as a link without JavaScript.
+ */
+import NewsTicker from '../../library/news-ticker/NewsTicker.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const trending = [
+  { text: 'Spring workshop dates are out', href: '#trending-workshops', image: asset('ticker-leaf.svg'), meta: 'Sep 22' },
+  { text: 'How we cut our energy bill by a third', href: '#trending-energy', image: asset('ticker-bolt.svg'), meta: 'Sep 18' },
+  { text: 'Five questions to ask before a website redesign', href: '#trending-redesign', image: asset('ticker-chat.svg'), meta: 'Sep 12' },
+  { text: 'Meet the team behind the new booking system', href: '#trending-team', image: asset('ticker-people.svg'), meta: 'Sep 5' },
+];
+const offers = [
+  { text: 'Free delivery on orders over $50 this week', href: '#offer-delivery' },
+  { text: '20% off annual plans until October 1', href: '#offer-annual' },
+  { text: 'Bring a friend and you both get a month free', href: '#offer-friend' },
+];
+const latest = [
+  { text: 'New opening hours from October 1', href: '#latest-hours' },
+  { text: 'Car park closed Saturday morning', href: '#latest-car-park' },
+  { text: 'Autumn menu now served', href: '#latest-menu' },
+  { text: 'Volunteers wanted for the fun run', href: '#latest-volunteers' },
+  { text: 'Gift cards now sold online', href: '#latest-gift-cards' },
+];
+const events = [
+  { text: 'Open day, Saturday at 10 am', href: '#event-open-day', meta: 'Oct 4' },
+  { text: 'Evening talk: gardening in small spaces', href: '#event-talk', meta: 'Oct 9' },
+  { text: 'Kids’ craft morning', href: '#event-crafts', meta: 'Oct 18' },
+];
+---
+<div class="demo-nt">
+  <p class="demo-nt__cap">Slide up, with thumbnails and dates</p>
+  <NewsTicker class="demo-nt__trending" label="Trending" items={trending} mode="slide" direction="up" />
+
+  <p class="demo-nt__cap">Fade, plain text, the label links to the offers page</p>
+  <NewsTicker class="demo-nt__offers" label="Offers" labelHref="#offers" items={offers} mode="fade" interval={5000} />
+
+  <p class="demo-nt__cap">Marquee at 50 px/s</p>
+  <NewsTicker class="demo-nt__latest" label="Latest" items={latest} mode="marquee" speed={50} />
+
+  <p class="demo-nt__cap">Autoplay off: arrows only, no pause button because nothing moves by itself</p>
+  <NewsTicker class="demo-nt__events" label="Events" items={events} mode="slide" direction="left" autoplay={false} />
+</div>
+<style>
+  .demo-nt {
+    display: grid;
+    gap: 0.5rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-nt__cap {
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .demo-nt__cap:first-child {
+    margin-top: 0;
+  }
+  .demo-nt :global(.nt) {
+    --nt-accent: var(--purple, #5933d8);
+    --nt-bg: var(--tint, #f8f8fc);
+    --nt-fg: var(--ink, #16192a);
+    --nt-radius: var(--radius, 14px);
+    border: 1px solid var(--line, #e6e6f0);
+  }
+  .demo-nt :global(.demo-nt__offers) {
+    --nt-label-bg: var(--navy, #1e283c);
+  }
+  .demo-nt :global(.demo-nt__latest) {
+    --nt-bg: var(--navy, #1e283c);
+    --nt-fg: var(--white, #fff);
+    --nt-muted: rgb(255 255 255 / 0.72);
+    --nt-link-hover: var(--white, #fff);
+    --nt-focus: var(--white, #fff);
+    --nt-control-line: rgb(255 255 255 / 0.45);
+    --nt-control-hover: rgb(255 255 255 / 0.12);
+    border-color: var(--navy, #1e283c);
+  }
+</style>
