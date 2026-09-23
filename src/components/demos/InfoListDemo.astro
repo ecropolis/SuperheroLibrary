@@ -1,0 +1,89 @@
+---
+/**
+ * Demo for `info-list`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets; the icons are
+ * inline SVG.
+ *
+ * Three lists: stacked with icons (two items linked), inline four-across numbered steps with
+ * the connector ("how it works"), and a stacked numbered timeline with the connector.
+ */
+import InfoList from '../../library/info-list/InfoList.astro';
+
+const svg = (d: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+
+const services = [
+  {
+    title: 'Garden design',
+    text: 'A plan drawn to scale, with planting that suits your soil and the time you have.',
+    href: '#garden-design',
+    icon: svg('<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19l7-7"/>'),
+  },
+  {
+    title: 'Lawn care',
+    text: 'Mowing, edging and feeding on a schedule, from March to November.',
+    href: '#lawn-care',
+    icon: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  },
+  {
+    title: 'Tree and hedge work',
+    text: 'Pruning, shaping and safe removal, with the green waste taken away.',
+    icon: svg('<path d="M12 22v-6"/><path d="M12 2l6 9h-3l4 5H5l4-5H6z"/>'),
+  },
+  {
+    title: 'Watering systems',
+    text: 'Drip lines and timers that keep beds alive while you are away.',
+    icon: svg('<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'),
+  },
+];
+const steps = [
+  { title: 'Get in touch', text: 'Call, or book a visit online at a time that suits you.' },
+  { title: 'We visit and quote', text: 'A walk round the garden and a written price within two days.' },
+  { title: 'We do the work', text: 'On the agreed day, with the site left tidy every evening.' },
+  { title: 'You pay when happy', text: 'One invoice at the end, once you have seen the result.' },
+];
+const history = [
+  { meta: '2014', title: 'One van, one mower', text: 'The business starts with weekend lawn care for neighbours.' },
+  { meta: '2017', title: 'The first design job', text: 'A courtyard garden, and the start of the design side.' },
+  { meta: '2021', title: 'A team of six', text: 'Two crews, a designer and an office that answers the phone.' },
+  { meta: '2025', title: 'Water-wise gardens', text: 'Drip irrigation and drought-tolerant planting become a service of their own.' },
+];
+---
+<div class="demo-il">
+  <section>
+    <h2 class="demo-il__h">What we do</h2>
+    <InfoList items={services} class="demo-il__services" />
+  </section>
+
+  <section>
+    <h2 class="demo-il__h">How it works</h2>
+    <InfoList items={steps} layout="inline" marker="number" connector columns={{ base: 1, md: 2, lg: 4 }} class="demo-il__steps" />
+  </section>
+
+  <section>
+    <h2 class="demo-il__h">Our story</h2>
+    <InfoList items={history} marker="number" connector size="sm" class="demo-il__story" />
+  </section>
+</div>
+<style>
+  .demo-il {
+    display: grid;
+    gap: 2.75rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-il__h {
+    margin: 0 0 1.25rem;
+    font-size: 1.35rem;
+  }
+  .demo-il :global(.demo-il__services) {
+    --il-marker-bg: color-mix(in srgb, var(--purple, #5933d8) 10%, transparent);
+    --il-marker-fg: var(--purple, #5933d8);
+    --il-focus: var(--purple, #5933d8);
+  }
+  .demo-il :global(.demo-il__steps),
+  .demo-il :global(.demo-il__story) {
+    --il-accent: var(--purple, #5933d8);
+    --il-connector: color-mix(in srgb, var(--purple, #5933d8) 35%, transparent);
+    --il-meta: var(--purple-dark, #4526ad);
+  }
+</style>

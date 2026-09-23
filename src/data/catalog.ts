@@ -586,6 +586,65 @@ const faqs: AccordionItem[] = [
     file: 'src/library/tabs/Tabs.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'info-list',
+    name: 'Info list',
+    aka: ['PowerPack Info List', 'UABB Info List', 'Elementor Icon List', 'icon list', 'steps list', 'process steps', 'vertical timeline', 'feature list'],
+    summary:
+      'Items with a marker (icon, image, number or dot), a title, a line of text and an optional link, stacked or inline in columns. With the connector the markers are joined by a line: a steps list or a vertical timeline. HTML and CSS only; there is no script.',
+    pitch: 'Lay out your services, how you work step by step, or your story year by year, each with an icon or a number, in a list that reads on any screen.',
+    // vertical timeline 500/mo, difficulty 21 (rising); icon list 660/45; timeline design website
+    // 170/25 (SE Ranking US, 2026-09-23).
+    search: { query: 'vertical timeline', alsoRanks: ['icon list', 'timeline design website'] },
+    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists'],
+    goodFor: 'Services, “how it works”, process steps, milestones and feature lists.',
+    notFor: 'Navigation (that is a menu) and long prose (write paragraphs).',
+    props: [
+      { name: 'items', type: 'InfoItem[]', note: '`{ title, text?, href?, icon?, iconLabel?, image?, imageAlt?, number?, meta? }`. `icon` is an inline SVG string; `number` overrides the position (“01”); `meta` is a small line above the title (a year, a duration).' },
+      { name: 'layout', type: '“stack” | “inline”', default: '“stack”', note: 'Stack is one column, marker at the left. Inline is a grid of `columns`; where it has one column it is laid out as the stack.' },
+      { name: 'marker', type: '“icon” | “image” | “number” | “dot” | “none”', default: '“icon”', note: 'What sits beside (or above) each title.' },
+      { name: 'connector', type: 'boolean', default: 'false', note: 'A line between markers: vertical at the left, horizontal along a row when markers are on top. Makes the list an <ol>.' },
+      { name: 'columns', type: 'number | { base?, md?, lg? }', default: '{ base: 1, md: 2, lg: 4 }', note: 'Inline only. 1–6 per breakpoint; md ≥ 48rem, lg ≥ 64rem (viewport). A missing breakpoint inherits the one below.' },
+      { name: 'markerPosition', type: '“left” | “top”', default: 'left for stack, top for inline', note: 'Top applies where inline has more than one column.' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5', default: '3', note: 'Level of each title.' },
+      { name: 'size', type: '“sm” | “md” | “lg”', default: '“md”', note: 'Marker size: 2.25, 3 or 4rem. A dot is 1rem.' },
+      { name: 'class', type: 'string', note: 'Class on the list, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--il-accent', fallback: '#3451b2', note: 'Default marker fill and dot ring. Map it to the host accent.' },
+      { name: '--il-marker-bg', fallback: 'var(--il-accent)', note: 'Marker fill (for outline icons: a tint or transparent).' },
+      { name: '--il-marker-fg', fallback: '#fff', note: 'Icon or number colour.' },
+      { name: '--il-marker-size', fallback: 'by `size`', note: 'Marker box, any length.' },
+      { name: '--il-marker-radius', fallback: '50%', note: 'Marker corners; 8px for rounded squares.' },
+      { name: '--il-connector', fallback: 'rgb(0 0 0 / 0.18)', note: 'Connector colour.' },
+      { name: '--il-connector-width', fallback: '2px', note: 'Connector thickness.' },
+      { name: '--il-title / --il-text / --il-meta', fallback: 'inherit', note: 'Text colours.' },
+      { name: '--il-gap / --il-col-gap', fallback: '1.75rem / 1.5rem', note: 'Space between rows / columns. The connector spans the row gap.' },
+      { name: '--il-focus', fallback: 'currentColor', note: 'Focus ring around a linked item.' },
+    ],
+    a11y: [
+      'A real list: <ol> when the order matters (connector or numbers), <ul> otherwise, with role="list" so Safari keeps announcing it with list-style removed.',
+      'Each title is a heading at `headingLevel`. Numbers are real text, not generated content.',
+      'A linked item is ONE link, the title, whose hit area is stretched over the item by a pseudo-element: a screen reader hears one link named by its title, and the focus ring outlines the whole item.',
+      'Icons are decorative (aria-hidden) unless an item gives `iconLabel`; images take `imageAlt` (empty by default). The connector is CSS, not markup, so nothing extra is read.',
+      'No script and no motion, so nothing to reduce and nothing to fail.',
+    ],
+    usage: `<!-- Services, stacked, icons -->
+<InfoList items={[
+  { title: 'Garden design', text: 'A plan drawn to scale.', href: '/design/', icon: leafSvg },
+  { title: 'Lawn care', text: 'Mowing and feeding, March to November.', icon: sunSvg },
+]} />
+
+<!-- How it works: four across on desktop, a vertical steps list on a phone -->
+<InfoList items={steps} layout="inline" marker="number" connector columns={{ base: 1, md: 2, lg: 4 }} />
+
+<!-- A vertical timeline -->
+<InfoList items={history.map((h) => ({ meta: h.year, title: h.title, text: h.text }))} marker="dot" connector />
+<!-- .steps { --il-accent: var(--brand); --il-connector: var(--line); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/info-list/ (demo)' }],
+    file: 'src/library/info-list/InfoList.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
