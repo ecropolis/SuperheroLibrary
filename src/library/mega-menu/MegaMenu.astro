@@ -1,0 +1,462 @@
+---
+/**
+ * MegaMenu — a header nav where a top-level item opens a full-width panel of grouped links:
+ * columns with headings, an optional promo slot. WordPress sells this as Max Mega Menu,
+ * UberMenu, WP Mega Menu or Elementor's mega menu widget; this is the part of them sites
+ * actually use, with no library behind it.
+ *
+ * The contract is click, not hover. A top item with a panel becomes a button with
+ * aria-expanded: click, Enter or Space toggle it. A mouse resting on it opens it after a short
+ * delay too, as a courtesy, and a click on a panel that hover opened keeps it open rather than
+ * shutting it. Escape closes and returns focus to the button; focus leaving the panel closes
+ * it; ← → (↑ ↓ in the mobile list) move across the top items, Home and End jump, ↓ on an open
+ * button enters its panel. One panel is open at a time.
+ *
+ * Without JavaScript every top item is a plain link to its `href`, and a panel shows on hover
+ * or when focus is inside it, so the whole menu still works. With JavaScript, below
+ * `breakpoint` the menu collapses behind a "Menu" disclosure button and panels become an
+ * accordion. Each panel starts with a link to the top item's own `href`, so that page stays
+ * reachable once the item has become a button.
+ *
+ * Sizing: the panel (and the mobile list) spans the nav's nearest positioned ancestor. By
+ * default that is the nav itself; to span the whole header, give the header
+ * `position: relative` and set `--mm-anchor: static` on the nav. Nothing above it may clip it
+ * (`overflow: hidden` on the header cuts the panel off), and it stacks at `--mm-z`.
+ *
+ * Promo: give an item `promo: 'promo-products'` and pass `<div slot="promo-products">…</div>`.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --mm-fg / --mm-accent          top bar text / hover, open and current colour
+ *   --mm-panel-bg / --mm-panel-fg  panel background / text
+ *   --mm-muted / --mm-border       link notes and headings / panel rules
+ *   --mm-focus / --mm-shadow       focus ring / panel shadow
+ *   --mm-z / --mm-max / --mm-anchor  stacking, panel content width, what the panel spans
+ */
+interface Link {
+  label: string;
+  href: string;
+  /** One line under the link, e.g. what the page is for. */
+  note?: string;
+}
+interface Column {
+  heading: string;
+  links: Link[];
+}
+interface Item {
+  label: string;
+  href: string;
+  columns?: Column[];
+  /** Name of the slot that fills this item's promo area. */
+  promo?: string;
+  /** Text of the panel's link to `href`. Defaults to "<label> overview". */
+  overview?: string;
+}
+interface Props {
+  items: Item[];
+  /** Viewport width (px) below which the menu collapses behind the Menu button. */
+  breakpoint?: number;
+  /** Accessible name of the nav landmark. */
+  label?: string;
+  /** Text of the mobile disclosure button. */
+  menuLabel?: string;
+  /** The current page's href; the matching link gets aria-current="page". */
+  current?: string;
+  class?: string;
+}
+const { items, breakpoint = 960, label = 'Main', menuLabel = 'Menu', current, class: className } = Astro.props;
+const uid = 'mm-' + Math.random().toString(36).slice(2, 8);
+const promos = await Promise.all(
+  items.map((i) => (i.promo && Astro.slots.has(i.promo) ? Astro.slots.render(i.promo) : Promise.resolve(''))),
+);
+const cur = (href: string) => (current && href === current ? 'page' : undefined);
+---
+
+<nav class:list={['mm', className]} aria-label={label} data-mm data-breakpoint={breakpoint}>
+  <button class="mm__toggle" type="button" aria-expanded="false" aria-controls={`${uid}-list`} hidden data-mm-toggle>
+    <span class="mm__burger" aria-hidden="true"></span>{menuLabel}
+  </button>
+  <ul class="mm__bar" id={`${uid}-list`} data-mm-list>
+    {
+      items.map((item, i) => {
+        const hasPanel = !!item.columns?.length || !!promos[i];
+        const pid = `${uid}-p${i}`;
+        return (
+          <li class="mm__item">
+            <a class="mm__top" href={item.href} aria-current={cur(item.href)} data-mm-link>
+              {item.label}
+            </a>
+            {hasPanel && (
+              <button class="mm__top" type="button" aria-expanded="false" aria-controls={pid} hidden data-mm-button>
+                {item.label}
+                <span class="mm__caret" aria-hidden="true" />
+              </button>
+            )}
+            {hasPanel && (
+              <div class="mm__panel" id={pid}>
+                <div class:list={['mm__inner', { 'mm__inner--promo': !!promos[i] }]}>
+                  <div class="mm__main">
+                    <a class="mm__overview" href={item.href} aria-current={cur(item.href)}>
+                      {item.overview ?? `${item.label} overview`}
+                    </a>
+                    <div class="mm__cols">
+                      {item.columns?.map((col, c) => (
+                        <div class="mm__col">
+                          <p class="mm__heading" id={`${pid}-h${c}`}>
+                            {col.heading}
+                          </p>
+                          <ul aria-labelledby={`${pid}-h${c}`}>
+                            {col.links.map((l) => (
+                              <li>
+                                <a href={l.href} aria-current={cur(l.href)}>
+                                  <span class="mm__label">{l.label}</span>
+                                  {l.note && <span class="mm__note">{l.note}</span>}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {promos[i] && <div class="mm__promo" set:html={promos[i]} />}
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })
+    }
+  </ul>
+</nav>
+
+<script is:inline>
+  (() => {
+    if (window.__megaMenu) return;
+    window.__megaMenu = true;
+    const HOVER_OPEN = 150;
+    const HOVER_CLOSE = 300;
+
+    const init = (nav) => {
+      if (nav.dataset.ready) return;
+      nav.dataset.ready = '1';
+      nav.classList.add('mm--js');
+      const bp = parseFloat(nav.dataset.breakpoint) || 0;
+      const narrow = matchMedia(`(max-width: ${bp - 0.02}px)`);
+      const compact = () => bp > 0 && narrow.matches;
+      const toggle = nav.querySelector('[data-mm-toggle]');
+      const items = [...nav.querySelector('[data-mm-list]').children];
+      const buttons = [];
+      for (const li of items) {
+        const btn = li.querySelector(':scope > [data-mm-button]');
+        if (!btn) continue;
+        li.querySelector(':scope > [data-mm-link]').hidden = true;
+        btn.hidden = false;
+        buttons.push(btn);
+      }
+      const tops = () => items.map((li) => li.querySelector(':scope > .mm__top:not([hidden])'));
+      const panelOf = (btn) => document.getElementById(btn.getAttribute('aria-controls'));
+
+      let openBtn = null;
+      let byHover = false;
+      let timer = 0;
+      const close = (btn, refocus) => {
+        btn.setAttribute('aria-expanded', 'false');
+        if (openBtn === btn) { openBtn = null; byHover = false; }
+        if (refocus) btn.focus();
+      };
+      const open = (btn, hover = false) => {
+        if (openBtn && openBtn !== btn) close(openBtn);
+        btn.setAttribute('aria-expanded', 'true');
+        openBtn = btn;
+        byHover = hover;
+      };
+      const setMenu = (on) => {
+        toggle.setAttribute('aria-expanded', String(on));
+        if (!on && openBtn) close(openBtn);
+      };
+
+      for (const btn of buttons) {
+        const li = btn.parentElement;
+        btn.addEventListener('click', () => {
+          clearTimeout(timer);
+          // A click on a panel that hover opened keeps it open: the user meant "this one".
+          if (openBtn === btn && byHover) { byHover = false; return; }
+          openBtn === btn ? close(btn) : open(btn);
+        });
+        li.addEventListener('pointerenter', (e) => {
+          if (e.pointerType !== 'mouse' || compact()) return;
+          clearTimeout(timer);
+          if (openBtn === btn) return;
+          timer = setTimeout(() => open(btn, true), HOVER_OPEN);
+        });
+        li.addEventListener('pointerleave', (e) => {
+          if (e.pointerType !== 'mouse' || compact()) return;
+          clearTimeout(timer);
+          if (openBtn === btn && byHover) timer = setTimeout(() => openBtn === btn && byHover && close(btn), HOVER_CLOSE);
+        });
+        // Focus leaving the item (button + panel) closes it. A null relatedTarget is a click
+        // on something unfocusable, which the outside-click handler judges instead.
+        li.addEventListener('focusout', (e) => {
+          if (compact() || openBtn !== btn || !e.relatedTarget) return;
+          if (!li.contains(e.relatedTarget)) close(btn);
+        });
+      }
+
+      toggle.addEventListener('click', () => setMenu(toggle.getAttribute('aria-expanded') !== 'true'));
+
+      document.addEventListener('pointerdown', (e) => {
+        if (nav.contains(e.target)) return;
+        if (openBtn && !compact()) close(openBtn);
+        if (compact() && toggle.getAttribute('aria-expanded') === 'true') setMenu(false);
+      });
+
+      nav.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (openBtn) { e.preventDefault(); close(openBtn, true); }
+          else if (compact() && toggle.getAttribute('aria-expanded') === 'true') { e.preventDefault(); setMenu(false); toggle.focus(); }
+          return;
+        }
+        const t = tops();
+        const i = t.indexOf(document.activeElement);
+        if (i < 0) return;
+        const across = !compact();
+        let n = -1;
+        if (e.key === (across ? 'ArrowRight' : 'ArrowDown')) n = (i + 1) % t.length;
+        else if (e.key === (across ? 'ArrowLeft' : 'ArrowUp')) n = (i - 1 + t.length) % t.length;
+        else if (e.key === 'Home') n = 0;
+        else if (e.key === 'End') n = t.length - 1;
+        else if (across && e.key === 'ArrowDown' && buttons.includes(t[i])) {
+          e.preventDefault();
+          open(t[i]);
+          panelOf(t[i]).querySelector('a')?.focus();
+          return;
+        }
+        if (n < 0) return;
+        e.preventDefault();
+        t[n].focus();
+      });
+
+      const apply = () => {
+        nav.classList.toggle('mm--compact', compact());
+        toggle.hidden = !compact();
+        setMenu(false);
+      };
+      narrow.addEventListener('change', apply);
+      apply();
+    };
+
+    const boot = () => document.querySelectorAll('[data-mm]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .mm {
+    position: var(--mm-anchor, relative);
+    color: var(--mm-fg, currentColor);
+  }
+  .mm [hidden] {
+    display: none !important;
+  }
+  .mm ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .mm__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .mm__top,
+  .mm__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.85rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .mm__top:hover,
+  .mm__top[aria-expanded='true'],
+  .mm__top[aria-current='page'] {
+    color: var(--mm-accent, currentColor);
+  }
+  .mm__top[aria-expanded='true'] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.4em;
+  }
+  .mm :focus-visible {
+    outline: 3px solid var(--mm-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .mm__caret {
+    width: 0.45em;
+    height: 0.45em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    rotate: 45deg;
+    translate: 0 -0.15em;
+  }
+  [aria-expanded='true'] > .mm__caret {
+    rotate: 225deg;
+    translate: 0 0.1em;
+  }
+
+  /* The panel. */
+  .mm__panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    inset-inline: 0;
+    z-index: var(--mm-z, 50);
+    background: var(--mm-panel-bg, #fff);
+    color: var(--mm-panel-fg, #1b1c22);
+    border-top: 1px solid var(--mm-border, #e2e3ea);
+    box-shadow: var(--mm-shadow, 0 18px 40px rgb(0 0 0 / 0.14));
+  }
+  /* JavaScript off: hover or focus inside shows it, so every link is reachable. */
+  .mm:not(.mm--js) .mm__item:is(:hover, :focus-within) > .mm__panel,
+  .mm__top[aria-expanded='true'] + .mm__panel {
+    display: block;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .mm__top[aria-expanded='true'] + .mm__panel {
+      animation: mm-in 160ms ease-out;
+    }
+    .mm__caret {
+      transition: rotate 160ms ease-out;
+    }
+  }
+  @keyframes mm-in {
+    from {
+      opacity: 0;
+      translate: 0 -6px;
+    }
+  }
+  .mm__inner {
+    display: grid;
+    gap: 2rem;
+    width: min(100% - 2.5rem, var(--mm-max, 72rem));
+    margin-inline: auto;
+    padding-block: 1.5rem 1.75rem;
+  }
+  @media (min-width: 48rem) {
+    .mm__inner--promo {
+      grid-template-columns: 1fr minmax(12rem, 18rem);
+    }
+  }
+  .mm__overview {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--mm-accent, currentColor);
+    font-weight: 700;
+  }
+  .mm__cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1.5rem 2rem;
+  }
+  .mm__heading {
+    margin: 0 0 0.5rem;
+    color: var(--mm-muted, #5d6072);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .mm__col a {
+    display: block;
+    padding: 0.35rem 0;
+    color: inherit;
+    text-decoration: none;
+  }
+  .mm__col a:hover .mm__label,
+  .mm__col a[aria-current='page'] .mm__label {
+    color: var(--mm-accent, currentColor);
+    text-decoration: underline;
+  }
+  .mm__label {
+    font-weight: 600;
+  }
+  .mm__note {
+    display: block;
+    color: var(--mm-muted, #5d6072);
+    font-size: 0.875em;
+    line-height: 1.4;
+  }
+
+  /* Collapsed: a Menu disclosure, the list drops under the nav, panels become an accordion. */
+  .mm__burger,
+  .mm__burger::before,
+  .mm__burger::after {
+    display: block;
+    width: 1.1rem;
+    height: 2px;
+    background: currentColor;
+  }
+  .mm__burger {
+    position: relative;
+  }
+  .mm__burger::before,
+  .mm__burger::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+  .mm__burger::before {
+    top: -6px;
+  }
+  .mm__burger::after {
+    top: 6px;
+  }
+  .mm--compact .mm__bar {
+    display: none;
+    position: absolute;
+    top: 100%;
+    inset-inline: 0;
+    z-index: var(--mm-z, 50);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: var(--mm-panel-bg, #fff);
+    color: var(--mm-panel-fg, #1b1c22);
+    border-top: 1px solid var(--mm-border, #e2e3ea);
+    box-shadow: var(--mm-shadow, 0 18px 40px rgb(0 0 0 / 0.14));
+  }
+  .mm--compact .mm__toggle[aria-expanded='true'] + .mm__bar {
+    display: flex;
+  }
+  .mm--compact .mm__top {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .mm--compact .mm__panel,
+  .mm--compact .mm__top[aria-expanded='true'] + .mm__panel {
+    position: static;
+    border: 0;
+    box-shadow: none;
+    animation: none;
+  }
+  .mm--compact .mm__inner {
+    width: auto;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    padding: 0.25rem 0.85rem 1rem;
+  }
+  .mm--compact .mm__cols {
+    grid-template-columns: 1fr;
+  }
+</style>

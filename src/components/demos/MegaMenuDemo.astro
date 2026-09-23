@@ -1,0 +1,149 @@
+---
+/**
+ * Demo for `mega-menu`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ */
+import MegaMenu from '../../library/mega-menu/MegaMenu.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const items = [
+  {
+    label: 'Products',
+    href: '#products',
+    promo: 'promo-products',
+    columns: [
+      {
+        heading: 'Measure',
+        links: [
+          { label: 'Analytics', href: '#analytics', note: 'Every visit, counted once' },
+          { label: 'Reports', href: '#reports', note: 'Weekly, in plain words' },
+        ],
+      },
+      {
+        heading: 'Act',
+        links: [
+          { label: 'Forms', href: '#forms', note: 'Enquiries straight to your inbox' },
+          { label: 'Bookings', href: '#bookings' },
+          { label: 'Reviews', href: '#reviews' },
+        ],
+      },
+      {
+        heading: 'Connect',
+        links: [
+          { label: 'Email', href: '#email' },
+          { label: 'Calendar', href: '#calendar' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Solutions',
+    href: '#solutions',
+    columns: [
+      {
+        heading: 'By industry',
+        links: [
+          { label: 'Trades', href: '#trades' },
+          { label: 'Clinics', href: '#clinics' },
+          { label: 'Nonprofits', href: '#nonprofits' },
+        ],
+      },
+      {
+        heading: 'By size',
+        links: [
+          { label: 'Just me', href: '#solo' },
+          { label: 'A small team', href: '#team' },
+        ],
+      },
+    ],
+  },
+  { label: 'Pricing', href: '#pricing' },
+  { label: 'Contact', href: '#contact' },
+];
+---
+<div class="demo-mm">
+  <header class="demo-mm__bar">
+    <span class="demo-mm__logo">Acme</span>
+    <MegaMenu items={items} breakpoint={720} label="Demo" current="#pricing" class="demo-mm__nav">
+      <div slot="promo-products" class="demo-mm__promo">
+        <img src={asset('promo.svg')} alt="" width="480" height="270" />
+        <p><strong>New this month</strong><br />Reports now arrive as a one-page summary.</p>
+        <a href="#reports">See a sample report</a>
+      </div>
+    </MegaMenu>
+  </header>
+  <div class="demo-mm__page" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+</div>
+<style>
+  .demo-mm {
+    position: relative;
+    min-height: 26rem;
+    border: 1px solid var(--line, #e6e6f0);
+    border-radius: var(--radius, 14px);
+    background: var(--tint, #f8f8fc);
+  }
+  .demo-mm__bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--white, #fff);
+    border-bottom: 1px solid var(--line, #e6e6f0);
+    border-radius: var(--radius, 14px) var(--radius, 14px) 0 0;
+    color: var(--ink, #16192a);
+  }
+  .demo-mm__bar :global(.demo-mm__nav) {
+    --mm-anchor: static;
+    --mm-accent: var(--purple-dark, #4526ad);
+    --mm-focus: var(--purple, #5933d8);
+    --mm-panel-fg: var(--ink, #16192a);
+    --mm-muted: var(--ink, #16192a);
+    --mm-border: var(--line, #e6e6f0);
+  }
+  .demo-mm__logo {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .demo-mm__promo img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+  }
+  .demo-mm__promo p {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+  .demo-mm__promo a {
+    color: var(--purple-dark, #4526ad);
+    font-weight: 600;
+  }
+  .demo-mm__page {
+    display: grid;
+    gap: 0.75rem;
+    padding: 2rem 1.5rem;
+  }
+  .demo-mm__page span {
+    display: block;
+    height: 0.8rem;
+    border-radius: 4px;
+    background: var(--line, #e6e6f0);
+  }
+  .demo-mm__page span:first-child {
+    width: 50%;
+    height: 1.4rem;
+  }
+  .demo-mm__page span:last-child {
+    width: 70%;
+  }
+</style>

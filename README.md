@@ -31,6 +31,9 @@ elements rebuilt for contexture.ai.
    `aka` carries the WordPress, page-builder and plugin names so the old vocabulary still finds it.
 5. **Recorded where it is used.** An element nobody uses is not finished: `usedOn` must name at
    least one site, and when the element goes into another client site, add that site too.
+   An element built ahead of client work counts its own public page until a client site uses
+   it: `usedOn: [{ site: 'superherotech.ai', where: '/elements/<id>/ (demo)' }]`. When the
+   first client site takes it, add that site; the demo line can then go.
 6. **One search per page.** `search.query` is the one query the element's public page targets.
    No two elements may claim the same query, as their query or in `alsoRanks`: two of our
    pages in one auction is how both lose.
