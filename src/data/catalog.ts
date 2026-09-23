@@ -289,6 +289,53 @@ export const catalog: Element[] = [
     file: 'src/library/parallax-band/ParallaxBand.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'scroll-reveal',
+    name: 'Scroll reveal',
+    aka: ['AOS', 'ScrollReveal.js', 'animate on scroll', 'Elementor entrance animations', 'WOW.js', 'fade in on scroll'],
+    summary: 'A wrapper that reveals its children as they scroll into view: a fade with a small rise, a slide from a side, or a slight scale, staggered across a list. Content stays visible if the script never runs.',
+    pitch: 'Let sections and cards arrive as visitors scroll to them, so a long page feels alive without anything getting in the way.',
+    // 170/mo, difficulty 22 (SE Ranking US, 2026-09-23).
+    search: { query: 'scroll animation website', alsoRanks: ['scroll reveal animation', 'fade in on scroll'] },
+    replaces: ['AOS (Animate On Scroll)', 'ScrollReveal.js', 'WOW.js + animate.css', 'Elementor “Motion effects → Entrance animation”', 'Divi and Beaver Builder entrance animations'],
+    goodFor: 'Card grids, feature lists, testimonials and section intros further down a page, where a small arrival draws the eye.',
+    notFor: 'The hero or anything in the first screen (it costs Largest Contentful Paint and looks like a slow page), body text inside an article, or every section of a page.',
+    props: [
+      { name: 'effect', type: '“slide” | “fade” | “scale”', default: '“slide”', note: 'Slide moves `distance` in `direction`; fade is opacity only; scale grows from 94%.' },
+      { name: 'direction', type: '“up” | “down” | “left” | “right”', default: '“up”', note: 'For slide, the way it moves: “up” rises into place, “left” slides in moving left.' },
+      { name: 'stagger', type: 'number', default: '0', note: 'ms between direct children. 0 reveals the wrapper as one block.' },
+      { name: 'once', type: 'boolean', default: 'true', note: '`false` hides it again once it scrolls away below, so it replays.' },
+      { name: 'threshold', type: 'number', default: '0.15', note: 'Share of a target that must be on screen to reveal it, 0–1.' },
+      { name: 'delay', type: 'number', default: '0', note: 'ms before the first target moves.' },
+      { name: 'distance', type: 'string', note: 'How far a slide travels, any CSS length. Overrides `--sr-distance` (fallback 1.5rem).' },
+      { name: 'as', type: 'string', default: '“div”', note: 'Tag of the wrapper, e.g. “ul” around list items.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper; make it the grid or flex row and the stagger runs across it.' },
+    ],
+    theming: [
+      { name: '--sr-duration', fallback: '600ms', note: 'Length of each reveal.' },
+      { name: '--sr-easing', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Timing function.' },
+      { name: '--sr-distance', fallback: '1.5rem', note: 'How far a slide travels; the `distance` prop overrides it.' },
+    ],
+    a11y: [
+      'Nothing is hidden by the stylesheet: the script adds the hiding class, so if it fails or never loads every word is visible.',
+      'prefers-reduced-motion (tracked live): everything is shown at once, with no transition.',
+      'Keyboard focus landing inside a not-yet-revealed target reveals it immediately, so focus never sits on something invisible.',
+      'Printing shows everything. Hidden content stays in the accessibility tree and in find-in-page, since it is only transparent.',
+    ],
+    usage: `<ScrollReveal as="ul" class="cards" stagger={100}>
+  <li class="card">…</li>
+  <li class="card">…</li>
+  <li class="card">…</li>
+</ScrollReveal>
+
+<ScrollReveal direction="left" distance="2rem">
+  <blockquote>…</blockquote>
+</ScrollReveal>
+<!-- :root { --sr-duration: 500ms; } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/scroll-reveal/ (demo)' }],
+    file: 'src/library/scroll-reveal/ScrollReveal.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

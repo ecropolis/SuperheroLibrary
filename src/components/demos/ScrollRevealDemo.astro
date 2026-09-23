@@ -1,0 +1,73 @@
+---
+/**
+ * Demo for `scroll-reveal`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ */
+import ScrollReveal from '../../library/scroll-reveal/ScrollReveal.astro';
+---
+<div class="demo-sr" tabindex="0" role="region" aria-label="Scroll reveal demo: scroll inside this box">
+  <p class="demo-sr__hint">Scroll inside this box ↓</p>
+  <div class="demo-sr__spacer" aria-hidden="true"></div>
+  <ScrollReveal as="ul" class="demo-sr__grid" stagger={120} once={false}>
+    <li>One</li>
+    <li>Two</li>
+    <li>Three</li>
+    <li>Four</li>
+    <li>Five</li>
+    <li>Six</li>
+  </ScrollReveal>
+  <ScrollReveal direction="left" distance="3rem" class="demo-sr__wide" once={false}>
+    <p>This block slides in from the right.</p>
+  </ScrollReveal>
+  <ScrollReveal effect="scale" class="demo-sr__wide" once={false}>
+    <p>This one grows into place.</p>
+  </ScrollReveal>
+  <div class="demo-sr__spacer demo-sr__spacer--end" aria-hidden="true"></div>
+</div>
+<style>
+  .demo-sr {
+    --sr-duration: 700ms;
+    height: 20rem;
+    overflow-y: auto;
+    overflow-x: clip;
+    padding: 1.25rem;
+    border: 1px solid var(--line, #e6e6f0);
+    border-radius: var(--radius, 14px);
+    background: var(--tint, #f8f8fc);
+  }
+  .demo-sr__hint {
+    margin: 0;
+    color: var(--ink, #16192a);
+    font-weight: 700;
+  }
+  .demo-sr__spacer {
+    height: 16rem;
+  }
+  .demo-sr__spacer--end {
+    height: 4rem;
+  }
+  .demo-sr :global(.demo-sr__grid) {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+  }
+  .demo-sr :global(.demo-sr__grid li),
+  .demo-sr :global(.demo-sr__wide) {
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font-weight: 700;
+    text-align: center;
+  }
+  .demo-sr :global(.demo-sr__wide) {
+    margin-bottom: 1rem;
+    background: var(--navy, #1e283c);
+  }
+  .demo-sr :global(.demo-sr__wide p) {
+    margin: 0;
+  }
+</style>

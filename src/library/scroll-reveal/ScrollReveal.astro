@@ -1,0 +1,179 @@
+---
+/**
+ * ScrollReveal — reveals what it wraps when it scrolls into view: a fade with a small rise, a
+ * slide from one side, or a slight scale. It is what AOS, ScrollReveal.js, WOW.js and
+ * Elementor's "Entrance animation" do, for the cases sites actually use, with no library.
+ *
+ * Nothing is hidden until the script has run: the script, not the stylesheet, adds the class
+ * that hides the targets, so a script that fails or never loads leaves every word visible.
+ * Under prefers-reduced-motion (tracked live) everything is shown at once and nothing moves.
+ * Keyboard focus landing inside a hidden target reveals it first. Printing shows everything.
+ *
+ * `stagger` > 0 reveals each direct child in turn, `stagger` ms apart (a card grid, a list);
+ * 0 reveals the wrapper as one block. `once` (default) leaves it shown; `once={false}` hides it
+ * again when it scrolls away, so it replays. `threshold` is the share of a target that must be
+ * visible (0–1), `delay` ms before the first one moves.
+ *
+ * Sizing and stacking: the wrapper is a plain block (`as` sets the tag, `class` lets the host
+ * make it a grid or flex row; stagger then runs across that layout). It adds no box of its own
+ * and no z-index. Transforms start from inside the final position, so nothing overflows
+ * sideways, but give a `direction="left"|"right"` slide a parent with `overflow-x: clip` if it
+ * sits at the page edge. Do not wrap the hero or anything above the fold: content that starts
+ * hidden there costs Largest Contentful Paint and looks like a slow page.
+ *
+ * Theming (each has a fallback):
+ *   --sr-duration  600ms      --sr-easing  cubic-bezier(0.2, 0.7, 0.2, 1)
+ *   --sr-distance  1.5rem (how far a slide travels; the `distance` prop overrides it)
+ */
+interface Props {
+  effect?: 'slide' | 'fade' | 'scale';
+  /** For `slide`: the way it moves. 'up' rises into place, 'left' slides in moving left. */
+  direction?: 'up' | 'down' | 'left' | 'right';
+  /** ms between direct children; 0 reveals the wrapper as one block. */
+  stagger?: number;
+  once?: boolean;
+  /** Share of a target that must be on screen to reveal it, 0–1. */
+  threshold?: number;
+  /** ms before the first target moves. */
+  delay?: number;
+  /** Any CSS length. Overrides --sr-distance when set. */
+  distance?: string;
+  as?: string;
+  class?: string;
+}
+const {
+  effect = 'slide',
+  direction = 'up',
+  stagger = 0,
+  once = true,
+  threshold = 0.15,
+  delay = 0,
+  distance,
+  as: Tag = 'div',
+  class: className,
+} = Astro.props;
+---
+
+<Tag
+  class:list={['sr', className]}
+  style={distance ? `--sr-distance:${distance}` : undefined}
+  data-sr
+  data-effect={effect}
+  data-direction={direction}
+  data-stagger={stagger}
+  data-once={once ? '' : undefined}
+  data-threshold={threshold}
+  data-delay={delay}
+>
+  <slot />
+</Tag>
+
+<script is:inline>
+  (() => {
+    if (window.__scrollReveal) return;
+    window.__scrollReveal = true;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    const wrappers = [];
+
+    const init = (el) => {
+      if (el.dataset.ready) return;
+      el.dataset.ready = '1';
+      const stagger = parseFloat(el.dataset.stagger) || 0;
+      const delay = parseFloat(el.dataset.delay) || 0;
+      const once = 'once' in el.dataset;
+      const threshold = Math.min(1, Math.max(0, parseFloat(el.dataset.threshold) || 0));
+      const targets = stagger > 0 ? [...el.children] : [el];
+      const show = (t) => t.classList.remove('sr-hidden');
+      const seenAt = new WeakMap();
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              show(e.target);
+              seenAt.set(e.target, e.boundingClientRect.top);
+              if (once) io.unobserve(e.target);
+            } else if (!once && e.boundingClientRect.top > (seenAt.get(e.target) ?? -Infinity)) {
+              // Re-hide only when it left moving down (the visitor scrolled back up), so it
+              // replays on the way down again. Judged against where it was last seen, which
+              // works inside a scrolling box as well as for the page.
+              e.target.classList.add('sr-hidden');
+            }
+          }
+        },
+        { threshold },
+      );
+      targets.forEach((t, i) => {
+        t.classList.add('sr-item');
+        t.style.setProperty('--sr-delay', `${delay + i * stagger}ms`);
+      });
+      // Focus must never land on something invisible.
+      el.addEventListener('focusin', (e) => {
+        const t = targets.find((x) => x.contains(e.target));
+        if (t) { t.style.setProperty('--sr-delay', '0ms'); show(t); }
+      });
+      const arm = () => {
+        if (still.matches) {
+          io.disconnect();
+          targets.forEach(show);
+          return;
+        }
+        targets.forEach((t) => {
+          if (!t.dataset.srSeen || !once) t.classList.add('sr-hidden');
+          t.dataset.srSeen = '1';
+          io.observe(t);
+        });
+      };
+      wrappers.push(arm);
+      arm();
+    };
+
+    still.addEventListener('change', () => wrappers.forEach((arm) => arm()));
+    const boot = () => document.querySelectorAll('[data-sr]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .sr[data-effect='slide'][data-direction='up'] {
+    --sr-from: translate3d(0, var(--sr-distance, 1.5rem), 0);
+  }
+  .sr[data-effect='slide'][data-direction='down'] {
+    --sr-from: translate3d(0, calc(-1 * var(--sr-distance, 1.5rem)), 0);
+  }
+  .sr[data-effect='slide'][data-direction='left'] {
+    --sr-from: translate3d(var(--sr-distance, 1.5rem), 0, 0);
+  }
+  .sr[data-effect='slide'][data-direction='right'] {
+    --sr-from: translate3d(calc(-1 * var(--sr-distance, 1.5rem)), 0, 0);
+  }
+  .sr[data-effect='scale'] {
+    --sr-from: scale(0.94);
+  }
+  .sr[data-effect='fade'] {
+    --sr-from: none;
+  }
+  /* Targets are the slotted children, so these rules cannot be scoped. */
+  :global(.sr-item) {
+    transition:
+      opacity var(--sr-duration, 600ms) var(--sr-easing, cubic-bezier(0.2, 0.7, 0.2, 1)) var(--sr-delay, 0ms),
+      transform var(--sr-duration, 600ms) var(--sr-easing, cubic-bezier(0.2, 0.7, 0.2, 1)) var(--sr-delay, 0ms);
+  }
+  :global(.sr-item.sr-hidden) {
+    opacity: 0;
+    transform: var(--sr-from, none);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.sr-item),
+    :global(.sr-item.sr-hidden) {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+  @media print {
+    :global(.sr-item.sr-hidden) {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
