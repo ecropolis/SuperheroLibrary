@@ -524,6 +524,68 @@ const faqs: AccordionItem[] = [
     file: 'src/library/card-slider/CardSlider.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'tabs',
+    name: 'Tabs',
+    aka: ['PowerPack Advanced Tabs', 'UABB Advanced Tabs', 'Elementor Tabs', 'tabbed content', 'vertical tabs'],
+    summary:
+      'The WAI-ARIA tabs pattern, horizontal or vertical with icons, automatic or manual activation, with a shareable #hash per tab. Below collapseBelow the same panels render as an accordion; without JavaScript every panel shows under its heading.',
+    pitch: 'Put several related answers in one place, a tab each, that folds into a simple list on a phone.',
+    // html tabs 540/mo, difficulty 22; tabs component 260/23 (rising); tabs ui design 210/15;
+    // vertical tabs 1000/74, out of reach, listed only (SE Ranking US, 2026-09-23).
+    search: { query: 'html tabs', alsoRanks: ['tabs component', 'tabs ui design', 'vertical tabs'] },
+    replaces: ['PowerPack “Advanced Tabs” (Beaver Builder)', 'UABB “Advanced Tabs”', 'Elementor Tabs widget'],
+    goodFor: 'Alternatives a visitor picks one of: plans, service areas, a product’s description, specifications and delivery, an about page’s team, history and values.',
+    notFor: 'Content people must compare side by side (use a table or columns), or more than about six tabs: past that the strip scrolls and some tabs are out of sight.',
+    props: [
+      { name: 'tabs', type: 'Tab[]', note: '`{ id, label, icon?, panel?, slot? }`. `id` is the anchor and hash (unique on the page). `icon` is an inline SVG string (decorative). `panel` is an HTML string; or name a slot in `slot`.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
+      { name: 'orientation', type: '“horizontal” | “vertical”', default: '“horizontal”', note: 'Vertical puts the strip in a column beside the panel; ↑ ↓ move between tabs.' },
+      { name: 'activation', type: '“automatic” | “manual”', default: '“automatic”', note: 'Automatic selects the tab that gets focus; manual moves focus only, and Enter or Space selects.' },
+      { name: 'collapseBelow', type: 'number', default: '640', note: 'Viewport width (px) below which the tabs render as an accordion. Tracked live. 0 never collapses.' },
+      { name: 'hash', type: 'boolean', default: 'true', note: '`#id` selects that tab on load and on hashchange; selecting a tab rewrites the hash (replaceState, so Back does not step through tabs).' },
+      { name: 'defaultTab', type: 'string', note: 'id of the tab selected when the URL names none. Default: the first.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Level of each panel’s heading: shown without JavaScript, and holding the accordion button on phones.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tb-accent', fallback: 'currentColor', note: 'Selected tab marker, icons, accordion chevron.' },
+      { name: '--tb-fg', fallback: 'inherit', note: 'Selected tab and panel text.' },
+      { name: '--tb-muted', fallback: 'currentColor at 75%', note: 'Other tabs’ text.' },
+      { name: '--tb-bg', fallback: 'transparent', note: 'Tab fill.' },
+      { name: '--tb-bg-selected', fallback: 'var(--tb-bg)', note: 'Selected tab fill.' },
+      { name: '--tb-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rule under (or beside) the strip; accordion rules.' },
+      { name: '--tb-panel-bg', fallback: 'transparent', note: 'Panel fill.' },
+      { name: '--tb-panel-pad', fallback: '1.25rem 0', note: 'Panel padding (tabs layout).' },
+      { name: '--tb-radius', fallback: '0', note: 'Tab corners.' },
+      { name: '--tb-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+      { name: '--tb-list-width', fallback: '16rem', note: 'Widest the vertical strip gets.' },
+    ],
+    a11y: [
+      'The WAI-ARIA Authoring Practices tabs pattern: tablist, tab and tabpanel, with aria-selected, aria-controls, aria-labelledby and aria-orientation, and a roving tabindex so the strip is one Tab stop.',
+      '← → (↑ ↓ when vertical) move between tabs and wrap; Home and End jump to the ends. Automatic activation selects on focus; manual waits for Enter or Space. Tab then moves into the panel, which is itself focusable only when it has nothing focusable inside.',
+      'Below `collapseBelow` the tab strip is removed and each panel’s heading holds a disclosure button (aria-expanded, aria-controls). The panels are the same elements, rendered once; the label appears as the tab and as the heading, and only one of the two is ever displayed.',
+      'Without JavaScript there is no tab strip: every panel shows under its label as a heading, and #id links jump to the panel.',
+      'The newly shown panel fades in over 150 ms; under prefers-reduced-motion it does not.',
+    ],
+    usage: `<Tabs
+  label="Plans"
+  tabs={[
+    { id: 'starter', label: 'Starter', panel: '<p>…</p>' },
+    { id: 'studio', label: 'Studio', slot: 'studio' },
+    { id: 'agency', label: 'Agency', panel: '<p>…</p>' },
+  ]}
+  defaultTab="studio"
+>
+  <div slot="studio"><p>…</p><a href="/contact/">Talk to us</a></div>
+</Tabs>
+
+<Tabs label="Why us" orientation="vertical" activation="manual" tabs={why} hash={false} />
+<!-- .plans { --tb-accent: var(--brand); --tb-border: var(--line); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tabs/ (demo)' }],
+    file: 'src/library/tabs/Tabs.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

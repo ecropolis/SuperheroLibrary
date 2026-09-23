@@ -1,0 +1,422 @@
+---
+/**
+ * Tabs — the WAI-ARIA Authoring Practices tabs pattern, horizontal or vertical (with icons),
+ * that becomes an accordion on phones. What PowerPack's Advanced Tabs, UABB's Advanced Tabs and
+ * Elementor's Tabs widget were used for.
+ *
+ * One copy of the content. Each panel is rendered once, as a <section> with its label as a
+ * heading. The tab strip is a separate row of buttons naming the same panels, so the label text
+ * appears twice in the HTML (tab and heading) but only one of the two is ever displayed:
+ *   - Without JavaScript: no tab strip; every panel shows under its heading, a plain page.
+ *   - Tabs (at or above `collapseBelow`): tablist / tab / tabpanel with aria-selected,
+ *     aria-controls and a roving tabindex; one panel shows, the headings are hidden.
+ *   - Accordion (below `collapseBelow`): no tab strip; each heading holds a disclosure button
+ *     (aria-expanded) that opens its panel. Opening one closes the others, and the open one is
+ *     the selected tab when the width crosses back.
+ *
+ * Keyboard (tabs): ← → (↑ ↓ when vertical) move between tabs, wrapping; Home / End jump to the
+ * ends. `activation="automatic"` (default) selects the tab that gets focus; `"manual"` only
+ * moves focus, and Enter or Space selects. Tab moves from the selected tab into the panel: the
+ * panel itself is focusable (tabindex 0) only when it has nothing focusable inside.
+ *
+ * `hash` (default true): `#<tab id>` in the URL selects that tab (on load and on hashchange;
+ * without JavaScript it is an ordinary anchor to that panel's section), and selecting a tab
+ * rewrites the hash with history.replaceState, so the address can be shared and Back does not
+ * step through tabs.
+ *
+ * Motion: the newly shown panel fades in over 150 ms; nothing under prefers-reduced-motion.
+ *
+ * Sizing: it fills its container's width. Horizontal tabs scroll sideways if they do not fit
+ * (keep to six or fewer). Vertical puts the strip in a column as wide as the longest label
+ * (`--tb-list-width` caps it) with the panel beside it. No positioning, no z-index.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --tb-accent                 selected tab marker, icons, open accordion item  (currentColor)
+ *   --tb-fg / --tb-muted        selected tab text / other tabs                   (inherit / inherit at 75%)
+ *   --tb-bg / --tb-bg-selected  tab fill / selected tab fill                     (transparent / transparent)
+ *   --tb-border                 rules and accordion borders                      (rgb(0 0 0 / 0.14))
+ *   --tb-panel-bg / --tb-panel-pad  panel fill / padding                         (transparent / 1.25rem 0)
+ *   --tb-radius / --tb-focus    corners / keyboard focus ring                     (0 / currentColor)
+ *   --tb-list-width             widest the vertical strip gets                    (16rem)
+ */
+export interface Tab {
+  /** Anchor and hash for the tab, kebab-case and unique on the page: `#pricing`. */
+  id: string;
+  label: string;
+  /** Inline SVG string, decorative (aria-hidden). Use currentColor so it follows the text. */
+  icon?: string;
+  /** The panel as an HTML string. Or leave it out and name a slot in `slot`. */
+  panel?: string;
+  /** Name of a slot that fills the panel: `slot: 'pricing'` plus `<div slot="pricing">…</div>`. */
+  slot?: string;
+}
+interface Props {
+  tabs: Tab[];
+  /** Accessible name of the tab strip, e.g. "About the studio". */
+  label: string;
+  orientation?: 'horizontal' | 'vertical';
+  activation?: 'automatic' | 'manual';
+  /** Viewport width (px) below which the tabs render as an accordion. 0 never collapses. */
+  collapseBelow?: number;
+  /** `#id` selects a tab; selecting rewrites the hash. */
+  hash?: boolean;
+  /** id of the tab selected when the URL names none. Default: the first. */
+  defaultTab?: string;
+  /** Level of each panel's heading (shown without JavaScript and as the accordion button). */
+  headingLevel?: 2 | 3 | 4;
+  class?: string;
+}
+const {
+  tabs,
+  label,
+  orientation = 'horizontal',
+  activation = 'automatic',
+  collapseBelow = 640,
+  hash = true,
+  defaultTab,
+  headingLevel = 3,
+  class: className,
+} = Astro.props;
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const panels = await Promise.all(
+  tabs.map((t) => (t.panel !== undefined ? Promise.resolve(t.panel) : t.slot && Astro.slots.has(t.slot) ? Astro.slots.render(t.slot) : Promise.resolve(''))),
+);
+const ids = new Set<string>();
+for (const t of tabs) {
+  if (!/^[A-Za-z][\w-]*$/.test(t.id)) throw new Error(`Tabs: tab id "${t.id}" must start with a letter and use letters, digits, - or _.`);
+  if (ids.has(t.id)) throw new Error(`Tabs: tab id "${t.id}" is used twice.`);
+  ids.add(t.id);
+}
+---
+
+<div
+  class:list={['tb', `tb--${orientation}`, className]}
+  data-tb
+  data-activation={activation}
+  data-collapse={collapseBelow}
+  data-hash={hash ? '' : undefined}
+  data-default={defaultTab}
+>
+  <div class="tb__list" role="tablist" aria-label={label} aria-orientation={orientation} hidden data-tb-list>
+    {
+      tabs.map((t) => (
+        <button class="tb__tab" type="button" role="tab" id={`${t.id}-tab`} aria-controls={t.id} aria-selected="false" tabindex="-1">
+          {t.icon && <span class="tb__icon" aria-hidden="true" set:html={t.icon} />}
+          <span>{t.label}</span>
+        </button>
+      ))
+    }
+  </div>
+  {
+    tabs.map((t, i) => (
+      <section class="tb__panel" id={t.id} data-tb-panel>
+        <H class="tb__heading">
+          <span class="tb__heading-text">
+            {t.icon && <span class="tb__icon" aria-hidden="true" set:html={t.icon} />}
+            <span>{t.label}</span>
+          </span>
+        </H>
+        <div class="tb__body" id={`${t.id}-body`} set:html={panels[i]} />
+      </section>
+    ))
+  }
+</div>
+
+<script is:inline>
+  (() => {
+    if (window.__tabs) return;
+    window.__tabs = true;
+    const FOCUSABLE = 'a[href], button, input, select, textarea, iframe, audio[controls], video[controls], summary, [tabindex]:not([tabindex="-1"]), [contenteditable]';
+
+    const init = (root) => {
+      if (root.dataset.ready) return;
+      root.dataset.ready = '1';
+      const list = root.querySelector('[data-tb-list]');
+      const tabs = [...list.querySelectorAll('[role="tab"]')];
+      const panels = [...root.querySelectorAll(':scope > [data-tb-panel]')];
+      const bodies = panels.map((p) => p.querySelector('.tb__body'));
+      const vertical = list.getAttribute('aria-orientation') === 'vertical';
+      const manual = root.dataset.activation === 'manual';
+      const useHash = 'hash' in root.dataset;
+      const bp = parseFloat(root.dataset.collapse) || 0;
+      const narrow = matchMedia(`(max-width: ${bp - 0.02}px)`);
+      const compact = () => bp > 0 && narrow.matches;
+
+      // Accordion buttons: each heading's text moves into a disclosure button.
+      const accButtons = panels.map((p, i) => {
+        const h = p.querySelector('.tb__heading');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tb__acc';
+        b.setAttribute('aria-controls', bodies[i].id);
+        b.append(h.querySelector('.tb__heading-text'));
+        h.append(b);
+        return b;
+      });
+      const hasFocusable = panels.map((p, i) => !!bodies[i].querySelector(FOCUSABLE));
+
+      let selected = 0;
+      let openIndex = -1; // accordion: -1 means all closed
+      const indexOf = (id) => panels.findIndex((p) => p.id === id);
+      const fromHash = () => {
+        if (!useHash) return -1;
+        try { return indexOf(decodeURIComponent(location.hash.slice(1))); } catch { return -1; }
+      };
+      const writeHash = (i) => {
+        if (useHash && location.hash !== `#${panels[i].id}`) history.replaceState(history.state, '', `#${panels[i].id}`);
+      };
+
+      const render = () => {
+        const acc = compact();
+        root.classList.toggle('tb--tabs', !acc);
+        root.classList.toggle('tb--acc', acc);
+        list.hidden = acc;
+        panels.forEach((p, i) => {
+          const on = i === selected;
+          tabs[i].setAttribute('aria-selected', String(on));
+          tabs[i].tabIndex = on ? 0 : -1;
+          if (acc) {
+            p.removeAttribute('role');
+            p.removeAttribute('aria-labelledby');
+            p.removeAttribute('tabindex');
+            p.hidden = false;
+            accButtons[i].setAttribute('aria-expanded', String(i === openIndex));
+            bodies[i].hidden = i !== openIndex;
+          } else {
+            p.setAttribute('role', 'tabpanel');
+            p.setAttribute('aria-labelledby', tabs[i].id);
+            hasFocusable[i] ? p.removeAttribute('tabindex') : (p.tabIndex = 0);
+            p.hidden = !on;
+            bodies[i].hidden = false;
+          }
+        });
+      };
+      const select = (i, { focus = false, user = false } = {}) => {
+        if (i < 0 || i >= tabs.length) return;
+        const changed = i !== selected;
+        selected = i;
+        openIndex = i;
+        render();
+        if (focus) tabs[i].focus();
+        if (changed && !compact()) {
+          panels[i].classList.remove('tb__panel--in');
+          void panels[i].offsetWidth; // restart the fade
+          panels[i].classList.add('tb__panel--in');
+        }
+        if (user) writeHash(i);
+      };
+
+      tabs.forEach((t, i) => t.addEventListener('click', () => select(i, { user: true })));
+      list.addEventListener('keydown', (e) => {
+        const i = tabs.indexOf(document.activeElement);
+        if (i < 0) return;
+        const nextKey = vertical ? 'ArrowDown' : 'ArrowRight';
+        const prevKey = vertical ? 'ArrowUp' : 'ArrowLeft';
+        let n = -1;
+        if (e.key === nextKey) n = (i + 1) % tabs.length;
+        else if (e.key === prevKey) n = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') n = 0;
+        else if (e.key === 'End') n = tabs.length - 1;
+        if (n < 0) return;
+        e.preventDefault();
+        if (manual) tabs[n].focus();
+        else select(n, { focus: true, user: true });
+      });
+      accButtons.forEach((b, i) =>
+        b.addEventListener('click', () => {
+          if (openIndex === i) { openIndex = -1; render(); return; }
+          select(i, { user: true });
+        }),
+      );
+      addEventListener('hashchange', () => {
+        const i = fromHash();
+        if (i >= 0) select(i);
+      });
+      narrow.addEventListener('change', render);
+
+      const h = fromHash();
+      const d = indexOf(root.dataset.default || '');
+      selected = h >= 0 ? h : d >= 0 ? d : 0;
+      openIndex = selected;
+      render();
+    };
+
+    const boot = () => document.querySelectorAll('[data-tb]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .tb {
+    color: var(--tb-fg, inherit);
+  }
+  .tb [hidden] {
+    display: none !important;
+  }
+  .tb__icon {
+    display: inline-grid;
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+    color: var(--tb-accent, currentColor);
+  }
+  .tb__icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .tb__heading {
+    margin: 1.5rem 0 0.5rem;
+    font-size: 1.15rem;
+  }
+  .tb__heading-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .tb__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .tb__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+  .tb :focus-visible {
+    outline: 3px solid var(--tb-focus, currentColor);
+    outline-offset: 2px;
+  }
+
+  /* ---- tabs */
+  .tb--tabs .tb__heading {
+    display: none;
+  }
+  .tb__list {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .tb--horizontal .tb__list {
+    overflow-x: auto;
+    border-bottom: 1px solid var(--tb-border, rgb(0 0 0 / 0.14));
+    scrollbar-width: thin;
+  }
+  .tb__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 2.75rem;
+    padding: 0.6rem 1.1rem;
+    border: 0;
+    border-radius: var(--tb-radius, 0) var(--tb-radius, 0) 0 0;
+    background: var(--tb-bg, transparent);
+    color: var(--tb-muted, color-mix(in srgb, currentColor 75%, transparent));
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tb__tab:hover {
+    color: var(--tb-fg, inherit);
+  }
+  .tb__tab[aria-selected='true'] {
+    background: var(--tb-bg-selected, var(--tb-bg, transparent));
+    color: var(--tb-fg, inherit);
+    box-shadow: inset 0 -3px 0 var(--tb-accent, currentColor);
+  }
+  .tb__tab:focus-visible {
+    outline-offset: -3px;
+  }
+  .tb--tabs .tb__panel {
+    padding: var(--tb-panel-pad, 1.25rem 0);
+    background: var(--tb-panel-bg, transparent);
+  }
+  .tb--tabs .tb__panel:focus-visible {
+    outline-offset: -3px;
+  }
+
+  /* Vertical: strip in a column, panel beside it. */
+  .tb--vertical.tb--tabs {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    align-items: start;
+    gap: 0 1.5rem;
+  }
+  .tb--vertical .tb__list {
+    flex-direction: column;
+    max-width: var(--tb-list-width, 16rem);
+    border-inline-end: 1px solid var(--tb-border, rgb(0 0 0 / 0.14));
+    padding-inline-end: 0.25rem;
+  }
+  .tb--vertical .tb__tab {
+    justify-content: flex-start;
+    white-space: normal;
+    text-align: start;
+    border-radius: var(--tb-radius, 0);
+  }
+  .tb--vertical .tb__tab[aria-selected='true'] {
+    box-shadow: inset 3px 0 0 var(--tb-accent, currentColor);
+  }
+  .tb--vertical.tb--tabs .tb__panel {
+    grid-column: 2;
+    grid-row: 1;
+    padding: var(--tb-panel-pad, 0.25rem 0);
+  }
+
+  /* ---- accordion (below collapseBelow) */
+  .tb--acc .tb__panel {
+    border-bottom: 1px solid var(--tb-border, rgb(0 0 0 / 0.14));
+  }
+  .tb--acc .tb__panel:first-of-type {
+    border-top: 1px solid var(--tb-border, rgb(0 0 0 / 0.14));
+  }
+  .tb--acc .tb__heading {
+    margin: 0;
+    font-size: 1rem;
+  }
+  /* Created by the script, so it carries no scope attribute: :global. */
+  .tb :global(.tb__acc) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.85rem 0.25rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-align: start;
+    cursor: pointer;
+  }
+  .tb :global(.tb__acc)::after {
+    content: '';
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-inline-end: 0.35rem;
+    border-right: 2px solid var(--tb-accent, currentColor);
+    border-bottom: 2px solid var(--tb-accent, currentColor);
+    rotate: 45deg;
+    translate: 0 -0.15rem;
+  }
+  .tb :global(.tb__acc[aria-expanded='true'])::after {
+    rotate: 225deg;
+    translate: 0 0.15rem;
+  }
+  .tb :global(.tb__acc:focus-visible) {
+    outline-offset: -3px;
+  }
+  .tb--acc .tb__body {
+    padding: 0 0.25rem 1.1rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tb--tabs .tb__panel--in {
+      animation: tb-in 150ms ease-out;
+    }
+  }
+  @keyframes tb-in {
+    from {
+      opacity: 0;
+    }
+  }
+</style>
