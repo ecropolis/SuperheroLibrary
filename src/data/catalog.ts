@@ -394,6 +394,71 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'testimonial-carousel',
+    name: 'Testimonial carousel',
+    aka: ['testimonial slider', 'testimonial rotator', 'review scroller', 'reviews slider', 'Elementor Testimonial Carousel', 'Slick carousel', 'Owl Carousel testimonials', 'Strong Testimonials', 'rotating testimonials'],
+    summary: 'A row of quote cards, all in the HTML, that scrolls and snaps by swipe, by arrows or on its own. Autoplay waits on each card for its reading time, holds on hover, stops once the visitor takes hold of the row, and has a visible pause button.',
+    pitch: 'Let what your clients say move gently across the page, without anyone losing a quote halfway through reading it.',
+    // 90/mo, difficulty 15; variants 90/21 and 50/9 (SE Ranking US, 2026-09-23). "review
+    // carousel" shows 320/mo, but that volume is reviews of Carousel the musical and Sharp's
+    // carousel microwave, not the element — do not move this page onto it.
+    search: { query: 'testimonial carousel', alsoRanks: ['testimonial slider', 'testimonial rotator'] },
+    replaces: ['Elementor Pro “Testimonial Carousel” widget', 'Slick and Owl Carousel testimonial sliders', 'Strong Testimonials and similar WordPress plugins', 'Beaver Builder and UABB testimonials modules'],
+    goodFor: 'Five to fifteen testimonials or reviews you want read, short and long mixed, on a home page or a service page.',
+    notFor: 'A live feed of Google or Tripadvisor reviews: this shows what you give it and fetches nothing. And two or three quotes, which read better side by side.',
+    props: [
+      { name: 'items', type: '{ quote, name, meta? }[]', note: 'The cards, in order. `name` as the person agreed to be named; `meta` is a second line, such as the service and date.' },
+      { name: 'label', type: 'string', default: '“N testimonials, scroll sideways for more”', note: 'Accessible name of the row. Say how many and that it scrolls.' },
+      { name: 'autoplay', type: 'boolean', default: 'true', note: 'Move on its own. Off leaves a swipeable row with arrows and no pause button.' },
+      { name: 'minDwell', type: 'number', default: '7000', note: 'The least time (ms) the row waits on a card, however short the quote.' },
+      { name: 'wordsPerMinute', type: 'number', default: '200', note: 'Reading pace. A card waits its reading time plus 2 s, so long quotes hold the row longer.' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: '“Pause the testimonials” / “Play …”', note: 'Names of the play/pause button in each state.' },
+      { name: 'prevLabel / nextLabel', type: 'string', default: '“Previous testimonials” / “Next …”', note: 'Names of the arrows.' },
+      { name: 'slot "heading"', type: 'markup', note: 'The section heading, set on the same row as the controls.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tc-gap', fallback: 'clamp(1rem, 0.7rem + 1.4vw, 1.6rem)', note: 'Space between cards.' },
+      { name: '--tc-card-bg', fallback: '#fff', note: 'Card fill. A translucent mix over a patterned band works if the text still clears 4.5:1.' },
+      { name: '--tc-card-border', fallback: '#e4e4e7', note: 'Card edge and the rule above the byline.' },
+      { name: '--tc-card-shadow', fallback: '0 1.2rem 2.6rem -1.4rem rgb(0 0 0 / 0.28)', note: 'Card depth. The track is padded so it is not clipped.' },
+      { name: '--tc-radius', fallback: '14px', note: 'Card corners.' },
+      { name: '--tc-ink', fallback: 'inherit', note: 'Quote and name.' },
+      { name: '--tc-muted', fallback: '#5b6472', note: 'The meta line. Must clear 4.5:1 on the card.' },
+      { name: '--tc-quote-font', fallback: 'inherit', note: 'Typeface of the quote, often the display face.' },
+      { name: '--tc-accent', fallback: 'currentColor', note: 'The opening quotation mark. Decorative, so no contrast duty.' },
+      { name: '--tc-control-bg', fallback: '#fff', note: 'Button fill.' },
+      { name: '--tc-control-fg', fallback: '#1d2320', note: 'Button glyph.' },
+      { name: '--tc-control-border', fallback: '#5b6472', note: 'Button ring: the control’s only edge, so it needs 3:1.' },
+      { name: '--tc-control-hover', fallback: '#1e76aa', note: 'Ring and glyph on hover.' },
+      { name: '--tc-focus', fallback: 'currentColor', note: 'Focus rings on the buttons and the row.' },
+    ],
+    a11y: [
+      'Every card is in the HTML as a list item: a figure with a blockquote and a figcaption. Without JavaScript it is a swipeable, scroll-snapping row and nothing is hidden, from readers or from search.',
+      'WCAG 2.2.2: a visible, 44 px play/pause button sits with the arrows whenever the row can move. Its name says what it will do.',
+      'The autoplay never takes a quote from someone reading it: each card waits its reading time (never under 7 s), a hovering mouse holds the row, and it moves one card at a time.',
+      'Taking hold of the row stops it until Play is pressed — an arrow, a swipe or click in the row, a sideways wheel, or keyboard focus anywhere in it except the play button. That is the WAI-ARIA carousel pattern.',
+      'The row is focusable and named, so a keyboard can scroll it with the arrow keys. The arrows use aria-disabled at the ends, so focus is not dropped when a button stops working.',
+      'prefers-reduced-motion (tracked live): no autoplay, no play button, and the arrows jump instead of gliding. It also stops while off screen and in hidden tabs.',
+    ],
+    usage: `---
+import TestimonialCarousel from '../components/TestimonialCarousel.astro';
+import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }]
+---
+<section class="band">
+  <TestimonialCarousel class="reviews" items={testimonials}>
+    <h2 slot="heading">In their words</h2>
+  </TestimonialCarousel>
+</section>
+<!-- .reviews { --tc-accent: var(--teal); --tc-quote-font: var(--font-display); --tc-focus: var(--teal-deep); } -->`,
+    usedOn: [
+      { site: 'nicolelawton.com', where: 'Home, "In their words" (her own copy, pre-launch on nicolelawton.gohero.us); the reading-time dwell was built for it' },
+      { site: 'jwalktours.com', where: 'Home and tour pages, as ReviewScroller: the earlier version, with a fixed 5 s interval' },
+    ],
+    file: 'src/library/testimonial-carousel/TestimonialCarousel.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
