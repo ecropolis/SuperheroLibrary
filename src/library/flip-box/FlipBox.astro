@@ -1,0 +1,525 @@
+---
+/**
+ * FlipBox — an info card that turns over to show a second face: an icon or image, a title and
+ * a line on the front; a longer text and a link on the back. It is PowerPack's, UABB's and
+ * Elementor Pro's "Flip Box" module, without the parts that fail on a phone or a keyboard.
+ *
+ * Triggers. A click, a tap, Enter or Space always turns it (the card is a real button, named
+ * from the title, with aria-expanded). `trigger` only decides whether hover ALSO turns it:
+ * `both` (default) and `hover` turn it while a mouse is over it, on devices that have hover;
+ * `click` never does. A hover-only flip is refused on purpose — it locks out touch screens
+ * and keyboards — so `hover` behaves as `both`. On a touch screen the first tap turns the card
+ * and the link on the back is an ordinary link for the second tap; a tap on the back, away
+ * from its links, turns it back. With a mouse, hover shows the back and leaving turns it
+ * back; a click holds it open, a second click lets it go.
+ *
+ * Accessibility. Both faces are in the DOM. The face turned away is `inert` and aria-hidden,
+ * so its links are not tab stops and a screen reader reads only the face that shows. Tab
+ * order: the card's button, then the back's links while it shows. Escape turns it back and
+ * returns focus to the button. Focus inside the back keeps it shown; focus leaving the card
+ * turns back a card opened from the keyboard, but not one a pointer clicked open. Under
+ * prefers-reduced-motion (live) there is no rotation: the faces crossfade. Without JavaScript
+ * the button is never shown and both faces render stacked, front then back, so nothing is lost.
+ * Keep links off the front face: the whole front is the button.
+ *
+ * Sizing. The faces share one grid cell, so the card is as tall as its taller face and neither
+ * face is clipped; there is no fixed height anywhere. Width comes from the host (a grid of
+ * three or four); in a grid row the cards stretch to one height. `--fb-min-height` sets a floor.
+ *
+ * Images. `image` fills the front (variant `image`) under a scrim for the text. `imageAlt` is
+ * required with it: describe the photo, or pass `imageAlt=""` to mark it decorative on purpose
+ * (usually right: the title says what the card is about). Icons are always decorative.
+ *
+ * Content. Props cover the usual shape (icon, title, text / backTitle, backText, cta). Named
+ * slots `front`, `back` and `icon` take any HTML and win over the props when both are given.
+ * `front` replaces the whole front (icon, title and text), so `icon` applies only without it.
+ *
+ * Theming (each has a fallback):
+ *   --fb-accent      #5933d8   back face and icon colour, focus ring
+ *   --fb-front-bg    #fff      front, variant plain      --fb-tint     #f4f1fe   front, variant tint
+ *   --fb-front-fg    inherit   front text (plain, tint)  --fb-image-fg #fff      front text, variant image
+ *   --fb-scrim       rgb(20 24 40 / 0.6)   over the image
+ *   --fb-back-bg     var(--fb-accent)      --fb-back-fg  #fff
+ *   --fb-cta-bg      #fff      --fb-cta-fg   the back's background
+ *   --fb-border      rgb(0 0 0 / 0.08) (plain)          --fb-focus    var(--fb-accent)
+ *   --fb-radius 14px  --fb-padding 2rem 1.5rem  --fb-shadow (box-shadow)  --fb-min-height 16rem
+ *   --fb-icon-size 2.5rem  --fb-icon-bg #fff (tint)  --fb-duration 600ms  --fb-fade 250ms
+ *   --fb-perspective 1500px  --fb-easing cubic-bezier(0.4, 0.2, 0.2, 1)
+ */
+interface Props {
+  title?: string;
+  text?: string;
+  /** Inline SVG markup for the front. Decorative. The `icon` slot does the same. */
+  icon?: string;
+  /** Front background image (variant `image`). */
+  image?: string;
+  /** Required with `image`: its description, or "" when it is decorative on purpose. */
+  imageAlt?: string;
+  /** Default: `title`. */
+  backTitle?: string;
+  backText?: string;
+  cta?: { text: string; href: string };
+  /** The way the front turns: 'left' — its right edge comes toward you and swings left. */
+  direction?: 'left' | 'right' | 'up' | 'down';
+  /** ms. Overrides --fb-duration. */
+  duration?: number;
+  /** Whether hover ALSO turns it. Click, tap and keyboard always do; 'hover' behaves as 'both'. */
+  trigger?: 'hover' | 'click' | 'both';
+  /** Default: 'image' when `image` is set, else 'tint'. */
+  variant?: 'plain' | 'tint' | 'image';
+  /** Level of the title headings. */
+  headingLevel?: 2 | 3 | 4 | 5 | 6;
+  /** Accessible name of the card's button. Default: `title`, else the front's first heading. */
+  label?: string;
+  class?: string;
+}
+const {
+  title,
+  text,
+  icon,
+  image,
+  imageAlt,
+  backTitle,
+  backText,
+  cta,
+  direction = 'left',
+  duration,
+  trigger = 'both',
+  variant = image ? 'image' : 'tint',
+  headingLevel = 3,
+  label,
+  class: className,
+} = Astro.props;
+
+if (image && typeof imageAlt !== 'string') {
+  throw new Error(
+    `FlipBox${title ? ` "${title}"` : ''}: \`image\` needs \`imageAlt\` — describe the photo, or pass imageAlt="" if it is decorative on purpose.`,
+  );
+}
+
+const uid = 'fb-' + Math.random().toString(36).slice(2, 8);
+const H = `h${headingLevel}`;
+const hasFront = Astro.slots.has('front');
+const hasBack = Astro.slots.has('back');
+const hasIcon = Astro.slots.has('icon');
+const back = backTitle ?? title;
+// The script goes out once per page; each later card only calls it, right after its own markup,
+// so every card is set up as soon as it is parsed (no flash of both faces stacked).
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__flipBoxScript;
+locals.__flipBoxScript = true;
+---
+
+<div
+  class:list={['fb', className]}
+  data-fb
+  data-direction={direction}
+  data-trigger={trigger}
+  data-variant={variant}
+  style={duration !== undefined ? `--fb-duration:${duration}ms` : undefined}
+>
+  <button type="button" class="fb__control" aria-expanded="false" aria-controls={`${uid}-back`} hidden data-fb-control>
+    <span class="fb__label" data-fb-label>{label ?? title}</span>
+  </button>
+  <div class="fb__card">
+    <div class="fb__face fb__front" id={`${uid}-front`} data-fb-front>
+      {image && <img class="fb__image" src={image} alt={imageAlt} loading="lazy" decoding="async" />}
+      <div class="fb__body">
+        {
+          hasFront ? (
+            <slot name="front" />
+          ) : (
+            <>
+              {hasIcon ? (
+                <span class="fb__icon" aria-hidden="true"><slot name="icon" /></span>
+              ) : (
+                icon && <span class="fb__icon" aria-hidden="true" set:html={icon} />
+              )}
+              {title && <H class="fb__title">{title}</H>}
+              {text && <p class="fb__text">{text}</p>}
+            </>
+          )
+        }
+      </div>
+    </div>
+    <div class="fb__face fb__back" id={`${uid}-back`} data-fb-back>
+      <div class="fb__body">
+        {
+          hasBack ? (
+            <slot name="back" />
+          ) : (
+            <>
+              {back && <H class="fb__title">{back}</H>}
+              {backText && <p class="fb__text">{backText}</p>}
+              {cta && <a class="fb__cta" href={cta.href}>{cta.text}</a>}
+            </>
+          )
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+{
+  firstOnPage ? (
+    <script is:inline>
+      (() => {
+        const boot = (window.__flipBox ||= (() => {
+          const INTERACTIVE = 'a[href],button,input,select,textarea,summary,label,[tabindex],[contenteditable]';
+          const canHover = matchMedia('(hover: hover)');
+          const ms = (face) => {
+            const s = getComputedStyle(face).transitionDuration.split(',').map((v) => parseFloat(v) * (v.includes('ms') ? 1 : 1000));
+            return Math.max(0, ...s.filter((n) => !Number.isNaN(n)));
+          };
+          const init = (el) => {
+            if (el.hasAttribute('data-ready')) return;
+            const control = el.querySelector('[data-fb-control]');
+            const front = el.querySelector('[data-fb-front]');
+            const back = el.querySelector('[data-fb-back]');
+            if (!control || !front || !back) return;
+            const label = control.querySelector('[data-fb-label]');
+            if (label && !label.textContent.trim()) {
+              const h = front.querySelector('h1,h2,h3,h4,h5,h6') || front;
+              label.textContent = h.textContent.replace(/\s+/g, ' ').trim().slice(0, 80) || 'Show more';
+            }
+            const hoverTurns = el.dataset.trigger !== 'click';
+            // Why it is open. It shows the back while any of these holds.
+            let held = false; // a pointer clicked it open
+            let keyOpen = false; // Enter / Space (or assistive tech) opened it
+            let focusBack = false; // focus is inside the back
+            let hovering = false; // a mouse is over it
+            let suppress = false; // a click or Escape closed it under the mouse: ignore hover until it leaves
+            let open = null;
+            let timer;
+    
+            const render = () => {
+              const next = held || keyOpen || focusBack || (hovering && !suppress);
+              if (next === open) return;
+              const first = open === null;
+              open = next;
+              if (!open && back.contains(document.activeElement)) control.focus({ preventScroll: true });
+              el.toggleAttribute('data-open', open);
+              control.setAttribute('aria-expanded', String(open));
+              for (const [face, shown] of [[front, !open], [back, open]]) {
+                face.inert = !shown;
+                if (shown) face.removeAttribute('aria-hidden');
+                else face.setAttribute('aria-hidden', 'true');
+              }
+              if (first) return;
+              // While it turns, clip sideways so an up/down turn never widens the page.
+              el.setAttribute('data-turning', '');
+              clearTimeout(timer);
+              timer = setTimeout(() => el.removeAttribute('data-turning'), ms(front) + 60);
+            };
+            const close = () => {
+              held = keyOpen = focusBack = false;
+              suppress = hovering;
+              render();
+            };
+    
+            el.addEventListener('pointerenter', (e) => {
+              if (!hoverTurns || e.pointerType === 'touch' || !canHover.matches) return;
+              hovering = true;
+              render();
+            });
+            el.addEventListener('pointerleave', () => {
+              if (!hovering) return;
+              hovering = suppress = false;
+              render();
+            });
+            el.addEventListener('click', (e) => {
+              const hit = e.target.closest(INTERACTIVE);
+              if (hit && hit !== control && el.contains(hit)) return; // a link on the back does its own job
+              const sel = getSelection();
+              if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return; // selecting text is not a click
+              if (e.detail === 0 && e.target === control) {
+                // Keyboard or assistive tech: toggle; focus leaving turns it back.
+                if (open) close();
+                else {
+                  keyOpen = true;
+                  render();
+                }
+                return;
+              }
+              if (open && held) close();
+              else {
+                held = true; // on a hover-open card this changes nothing visible: it now stays
+                render();
+              }
+            });
+            el.addEventListener('keydown', (e) => {
+              if (e.key !== 'Escape' || !open) return;
+              e.preventDefault();
+              close();
+            });
+            el.addEventListener('focusin', (e) => {
+              if (back.contains(e.target)) {
+                focusBack = true;
+                render();
+              }
+            });
+            el.addEventListener('focusout', () => {
+              setTimeout(() => {
+                const a = document.activeElement;
+                focusBack = back.contains(a);
+                if (!el.contains(a) && document.hasFocus()) keyOpen = false;
+                render();
+              });
+            });
+    
+            render();
+            control.hidden = false;
+            el.setAttribute('data-ready', '');
+            // Transitions start only after the first frame, so nothing turns on load.
+            requestAnimationFrame(() => requestAnimationFrame(() => el.setAttribute('data-armed', '')));
+          };
+          return () => document.querySelectorAll('[data-fb]:not([data-ready])').forEach(init);
+        })());
+        boot();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+      })();
+    </script>
+  ) : (
+    <script is:inline>window.__flipBox && window.__flipBox();</script>
+  )
+}
+
+<style>
+  .fb {
+    position: relative;
+    display: grid;
+    border-radius: var(--fb-radius, 14px);
+  }
+  .fb[data-direction='left'] {
+    --fb-turned: rotateY(-180deg);
+    --fb-waiting: rotateY(180deg);
+  }
+  .fb[data-direction='right'] {
+    --fb-turned: rotateY(180deg);
+    --fb-waiting: rotateY(-180deg);
+  }
+  .fb[data-direction='up'] {
+    --fb-turned: rotateX(180deg);
+    --fb-waiting: rotateX(-180deg);
+  }
+  .fb[data-direction='down'] {
+    --fb-turned: rotateX(-180deg);
+    --fb-waiting: rotateX(180deg);
+  }
+
+  /* The card's button covers the card; it is the pointer target for the front. */
+  .fb__control {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fb__control[hidden] {
+    display: none;
+  }
+  .fb__control:focus-visible {
+    outline: 3px solid var(--fb-focus, var(--fb-accent, #5933d8));
+    outline-offset: 3px;
+  }
+  /* Open: clicks reach the back face and its links. */
+  .fb[data-open] .fb__control {
+    pointer-events: none;
+  }
+  .fb__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Without JavaScript: two rows, front then back. With it: one cell, as tall as the taller face. */
+  .fb__card {
+    position: relative;
+    z-index: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .fb[data-ready] .fb__card {
+    perspective: var(--fb-perspective, 1500px);
+  }
+  .fb[data-turning] .fb__card {
+    overflow-x: clip;
+  }
+  .fb__face {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    align-content: center;
+    min-height: var(--fb-min-height, 16rem);
+    padding: var(--fb-padding, 2rem 1.5rem);
+    overflow: hidden;
+    border-radius: var(--fb-radius, 14px);
+    box-shadow: var(--fb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .fb[data-ready] .fb__face {
+    grid-area: 1 / 1;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .fb[data-ready] .fb__back {
+    transform: var(--fb-waiting);
+  }
+  .fb[data-ready][data-open] .fb__front {
+    transform: var(--fb-turned);
+  }
+  .fb[data-ready][data-open] .fb__back {
+    transform: none;
+  }
+  .fb[data-armed] .fb__face {
+    transition: transform var(--fb-duration, 600ms) var(--fb-easing, cubic-bezier(0.4, 0.2, 0.2, 1));
+  }
+  .fb[data-ready] .fb__back {
+    cursor: pointer;
+  }
+
+  /* Front, by variant. */
+  .fb__front {
+    background: var(--fb-tint, #f4f1fe);
+    color: var(--fb-front-fg, inherit);
+  }
+  .fb[data-variant='plain'] .fb__front {
+    background: var(--fb-front-bg, #fff);
+    border: 1px solid var(--fb-border, rgb(0 0 0 / 0.08));
+  }
+  .fb[data-variant='image'] .fb__front {
+    background: var(--fb-back-bg, var(--fb-accent, #5933d8));
+    color: var(--fb-image-fg, #fff);
+  }
+  .fb[data-variant='image'] .fb__front::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--fb-scrim, rgb(20 24 40 / 0.6));
+  }
+  .fb__image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+  }
+
+  .fb__back {
+    background: var(--fb-back-bg, var(--fb-accent, #5933d8));
+    color: var(--fb-back-fg, #fff);
+  }
+
+  .fb__body {
+    display: grid;
+    justify-items: center;
+  }
+  .fb__body > :global(*) {
+    max-width: 100%;
+  }
+  .fb__icon {
+    display: grid;
+    place-items: center;
+    margin-bottom: 1rem;
+    color: var(--fb-icon-color, var(--fb-accent, #5933d8));
+    line-height: 0;
+  }
+  .fb[data-variant='tint'] .fb__icon {
+    width: calc(var(--fb-icon-size, 2.5rem) * 2);
+    height: calc(var(--fb-icon-size, 2.5rem) * 2);
+    border-radius: 50%;
+    background: var(--fb-icon-bg, #fff);
+  }
+  .fb[data-variant='image'] .fb__icon {
+    color: inherit;
+  }
+  .fb__icon :global(svg) {
+    width: var(--fb-icon-size, 2.5rem);
+    height: var(--fb-icon-size, 2.5rem);
+  }
+  .fb__title {
+    margin: 0 0 0.5rem;
+    font-size: var(--fb-title-size, 1.25rem);
+    line-height: 1.2;
+  }
+  /* On a coloured face the host's heading colour would not read; plain and tint keep it. */
+  .fb__back .fb__title,
+  .fb[data-variant='image'] .fb__title {
+    color: inherit;
+  }
+  .fb__text {
+    margin: 0;
+  }
+  .fb__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-top: 1.25rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 999px;
+    background: var(--fb-cta-bg, #fff);
+    color: var(--fb-cta-fg, var(--fb-back-bg, var(--fb-accent, #5933d8)));
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .fb__cta:hover {
+    text-decoration: underline;
+  }
+  .fb__cta:focus-visible {
+    outline: 3px solid var(--fb-back-fg, #fff);
+    outline-offset: 3px;
+  }
+
+  /* No rotation: the faces crossfade. */
+  @media (prefers-reduced-motion: reduce) {
+    .fb[data-ready] .fb__back,
+    .fb[data-ready][data-open] .fb__front,
+    .fb[data-ready][data-open] .fb__back {
+      transform: none;
+    }
+    .fb[data-ready] .fb__back,
+    .fb[data-ready][data-open] .fb__front {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .fb[data-ready][data-open] .fb__back {
+      opacity: 1;
+      visibility: visible;
+    }
+    .fb[data-armed] .fb__face {
+      transition:
+        opacity var(--fb-fade, 250ms) ease,
+        visibility 0s linear var(--fb-fade, 250ms);
+    }
+    .fb[data-armed]:not([data-open]) .fb__front,
+    .fb[data-armed][data-open] .fb__back {
+      transition-delay: 0s;
+    }
+  }
+
+  @media print {
+    .fb__control {
+      display: none;
+    }
+    .fb[data-ready] .fb__face {
+      grid-area: auto;
+      transform: none;
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+</style>

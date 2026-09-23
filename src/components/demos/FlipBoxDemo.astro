@@ -1,0 +1,71 @@
+---
+/**
+ * Demo for `flip-box`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * Four cards, one per look on the reference: an icon on a tinted face, a plain face, an
+ * image-background face, and one that turns up and only on click. The back texts differ in
+ * length on purpose: the faces of each card, and the cards of a row, still share one height.
+ */
+import FlipBox from '../../library/flip-box/FlipBox.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const svg = (paths: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const pencil = svg('<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>');
+const chat = svg('<path d="M4 5h16v11H9l-5 4V5z"/><path d="M8 10h8M8 13h5"/>');
+const book = svg('<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/>');
+---
+<div class="demo-fb" id="flip-box-demo">
+  <FlipBox
+    icon={pencil}
+    title="Design"
+    text="Pages drawn around what your customers ask first."
+    backText="We start from the questions your front desk answers every day, and design the pages so a visitor finds the answer before they reach for the phone."
+    cta={{ text: 'See the work', href: '#flip-box-demo' }}
+  />
+  <FlipBox
+    variant="plain"
+    icon={chat}
+    title="Support"
+    text="A person answers, the same day."
+    backText="Email or call. Short answer."
+    cta={{ text: 'Get in touch', href: '#flip-box-demo' }}
+  />
+  <FlipBox
+    image={asset('hills.svg')}
+    imageAlt=""
+    title="Hosting"
+    text="Fast pages, served close to your visitors."
+    backText="Every page is prebuilt and served from a network of data centres, so it opens quickly wherever your visitors are, and there is no server of yours to patch."
+    cta={{ text: 'How hosting works', href: '#flip-box-demo' }}
+  />
+  <FlipBox
+    class="demo-fb__navy"
+    direction="up"
+    trigger="click"
+    icon={book}
+    title="Training"
+    text="Tap or click to turn this one over: it ignores hover."
+    backText="One hour with your team, recorded, so whoever edits the site next has seen it done."
+    cta={{ text: 'Book a session', href: '#flip-box-demo' }}
+  />
+</div>
+<style>
+  .demo-fb {
+    --fb-accent: var(--purple, #5933d8);
+    --fb-radius: var(--radius, 14px);
+    --fb-min-height: 15rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 1rem;
+  }
+  .demo-fb :global(.demo-fb__navy) {
+    --fb-back-bg: var(--navy, #1e283c);
+  }
+</style>
