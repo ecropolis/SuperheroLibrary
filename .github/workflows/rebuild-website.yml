@@ -1,0 +1,46 @@
+# superherotech.ai builds its /elements/ pages from this repo's main-branch tarball
+# (README, "Consumed by superherotech.ai"). This workflow rebuilds the website when main
+# changes, and only after `npm run check` passes, so a broken catalogue never reaches a
+# production build.
+#
+# PAGES_DEPLOY_HOOK is the Cloudflare Pages deploy hook "superhero-library" on the
+# `superherotech` project (Ecropolis account), branch main. Anyone holding the URL can
+# trigger a production build, so it lives only in the repo secret: never echo it.
+name: Rebuild website
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: rebuild-website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  rebuild:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the superherotech Pages deploy hook
+        env:
+          PAGES_DEPLOY_HOOK: ${{ secrets.PAGES_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$PAGES_DEPLOY_HOOK" ]; then
+            echo "PAGES_DEPLOY_HOOK is not set on this repo; the website was not rebuilt." >&2
+            exit 1
+          fi
+          curl -fsS -o /dev/null -X POST "$PAGES_DEPLOY_HOOK"
+          echo "superherotech.ai rebuild requested."

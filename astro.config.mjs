@@ -1,10 +1,10 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 
-// No home yet. When the gallery gets a hostname (library.superherotech.ai is the
-// obvious one), set it here, then drop the noindex in public/_headers and
-// public/robots.txt in the same commit.
+// No `site`, on purpose. This gallery is a development preview and never gets a hostname.
+// The published pages are https://superherotech.ai/elements/, built by the website from
+// this repo's tarball (README, "Consumed by superherotech.ai"). The noindex in
+// public/_headers, src/layouts/Base.astro and public/robots.txt is permanent.
 export default defineConfig({
-  site: 'https://library.superherotech.ai',
   build: { format: 'directory' },
 });

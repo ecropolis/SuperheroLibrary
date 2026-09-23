@@ -1,5 +1,7 @@
-# NOINDEX until the gallery has a hostname. Remove the X-Robots-Tag line and
-# restore Allow in robots.txt together, in the commit that attaches the domain.
+# NOINDEX, permanently. This gallery is a development preview; the indexable pages
+# for each element are https://superherotech.ai/elements/, and the gallery must never
+# compete with them in search. Keep this line and the Disallow in robots.txt even if
+# the gallery is ever deployed.
 #
 # Two CSP headers, on purpose (see the astro-cloudflare-pages skill): the enforced
 # one governs nothing that can break the page; the Report-Only one carries the

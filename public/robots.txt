@@ -1,3 +1,4 @@
-# Draft: no hostname yet. Restore "Allow: /" and add the Sitemap line with the domain.
+# Permanently disallowed. This gallery is a development preview; the public pages are
+# https://superherotech.ai/elements/ and the gallery must never compete with them.
 User-agent: *
 Disallow: /

@@ -30,6 +30,7 @@ const { title, description } = Astro.props;
     <footer class="foot">
       <div class="wrap">
         <p>Superhero Technologies. Every element here is dependency-free, keyboard operable and themed from the host site's tokens.</p>
+        <p>This is the development preview. The public pages are on <a href="https://superherotech.ai/elements/">superherotech.ai/elements/</a>.</p>
       </div>
     </footer>
   </body>
@@ -80,5 +81,8 @@ const { title, description } = Astro.props;
   }
   .foot p {
     margin: 0;
+  }
+  .foot p + p {
+    margin-top: 0.4rem;
   }
 </style>
