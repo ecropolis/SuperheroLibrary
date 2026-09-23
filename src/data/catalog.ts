@@ -394,6 +394,91 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'flip-box',
+    name: 'Flip box',
+    aka: ['PowerPack Flip Box', 'UABB Flip Box', 'Elementor Flip Box', 'flip card', 'info box with hover reveal', '3D card flip'],
+    summary:
+      'An info card with a front (icon or image, title, a line) and a back (longer text, a link) that turns over in 3D: on hover where there is a mouse, and on click, tap, Enter or Space everywhere. Both faces share one height; the hidden face is inert.',
+    pitch: 'A card that turns over to say more — works on a phone, not just on hover.',
+    // 480/mo, difficulty 8; card flip animation 170/16; flip card css 90/20 (SE Ranking US, 2026-09-23).
+    search: { query: 'flip box', alsoRanks: ['card flip animation', 'flip card css'] },
+    replaces: ['PowerPack / UABB / Elementor Pro Flip Box modules', 'hand-rolled CSS flip cards'],
+    goodFor: 'Services grids, team members, features: three or four cards in a row, where the front names the thing and the back says a little more and links on.',
+    notFor:
+      'Content people must read without interacting. The back is optional detail, never the only place a price, a phone number or an opening time lives: put those on the front or on the page.',
+    props: [
+      { name: 'title', type: 'string', note: 'Front heading, and the accessible name of the card’s button.' },
+      { name: 'text', type: 'string', note: 'The front’s short line.' },
+      { name: 'icon', type: 'string', note: 'Inline SVG markup for the front; decorative (aria-hidden). The `icon` slot does the same.' },
+      { name: 'image', type: 'string', note: 'Front background image, under a scrim. Selects variant `image` unless `variant` says otherwise.' },
+      { name: 'imageAlt', type: 'string', note: 'Required with `image` (the build fails without it): describe the photo, or pass "" to mark it decorative on purpose.' },
+      { name: 'backTitle', type: 'string', default: '`title`', note: 'Back heading.' },
+      { name: 'backText', type: 'string', note: 'The back’s longer text.' },
+      { name: 'cta', type: '{ text: string; href: string }', note: 'A link on the back. A real link: on a touch screen the first tap turns the card, the second follows it.' },
+      { name: 'direction', type: '“left” | “right” | “up” | “down”', default: '“left”', note: 'The way the front turns. “left”: its right edge comes toward you and swings left, like a book page. (PowerPack’s Left is `right`, its Top is `down`.)' },
+      { name: 'duration', type: 'number', note: 'ms for the turn. Overrides `--fb-duration` (fallback 600ms).' },
+      { name: 'trigger', type: '“both” | “hover” | “click”', default: '“both”', note: 'Whether hover ALSO turns it. Click, tap, Enter and Space always do: the element refuses a hover-only flip, which locks out touch and keyboards, so “hover” behaves as “both”. “click”: hover never turns it.' },
+      { name: 'variant', type: '“plain” | “tint” | “image”', default: '“image” with `image`, else “tint”', note: 'plain: white face, bordered. tint: tinted face, icon in a white circle. image: photo under a scrim, white text.' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the title headings; match the page outline.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the card’s button. Default: `title`, else the front’s first heading.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for theming one card.' },
+      { name: 'slot front / slot back / slot icon', type: 'slot', note: 'Any HTML for a face or the icon. A slot wins over the props for that part; `front` replaces the whole front, icon included. Keep links off the front: the whole front is the button.' },
+    ],
+    theming: [
+      { name: '--fb-accent', fallback: '#5933d8', note: 'Back face, icons and focus ring, unless set separately.' },
+      { name: '--fb-back-bg', fallback: 'var(--fb-accent)', note: 'Back background.' },
+      { name: '--fb-back-fg', fallback: '#fff', note: 'Back text, and the ring around a focused back link.' },
+      { name: '--fb-front-bg', fallback: '#fff', note: 'Front background, variant plain.' },
+      { name: '--fb-tint', fallback: '#f4f1fe', note: 'Front background, variant tint.' },
+      { name: '--fb-front-fg', fallback: 'inherit', note: 'Front text, variants plain and tint.' },
+      { name: '--fb-image-fg', fallback: '#fff', note: 'Front text, variant image.' },
+      { name: '--fb-scrim', fallback: 'rgb(20 24 40 / 0.6)', note: 'Over the image, for the text. Keep white text at 4.5:1 against the brightest part.' },
+      { name: '--fb-cta-bg', fallback: '#fff', note: 'Back link fill.' },
+      { name: '--fb-cta-fg', fallback: 'var(--fb-back-bg)', note: 'Back link text.' },
+      { name: '--fb-icon-color', fallback: 'var(--fb-accent)', note: 'Icon stroke (plain, tint).' },
+      { name: '--fb-icon-bg', fallback: '#fff', note: 'Circle behind the icon, variant tint.' },
+      { name: '--fb-icon-size', fallback: '2.5rem', note: 'Icon size; the tint circle is twice it.' },
+      { name: '--fb-border', fallback: 'rgb(0 0 0 / 0.08)', note: 'Border, variant plain.' },
+      { name: '--fb-radius', fallback: '14px', note: 'Corner radius.' },
+      { name: '--fb-padding', fallback: '2rem 1.5rem', note: 'Inside each face.' },
+      { name: '--fb-shadow', fallback: '0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1)', note: 'box-shadow of each face.' },
+      { name: '--fb-min-height', fallback: '16rem', note: 'A floor, not a height: the card grows with its taller face.' },
+      { name: '--fb-title-size', fallback: '1.25rem', note: 'Title font size.' },
+      { name: '--fb-focus', fallback: 'var(--fb-accent)', note: 'Focus ring around the card.' },
+      { name: '--fb-duration', fallback: '600ms', note: 'The turn; the `duration` prop overrides it.' },
+      { name: '--fb-easing', fallback: 'cubic-bezier(0.4, 0.2, 0.2, 1)', note: 'Timing of the turn.' },
+      { name: '--fb-fade', fallback: '250ms', note: 'The crossfade under reduced motion.' },
+      { name: '--fb-perspective', fallback: '1500px', note: 'Depth of the 3D turn; smaller is more dramatic.' },
+    ],
+    a11y: [
+      'The card is a real button named from the title, with aria-expanded showing which face is up and aria-controls pointing at the back. Enter or Space turns it; Escape turns it back and returns focus to the button.',
+      'Both faces are in the DOM. The face turned away is inert and aria-hidden, so its links are not tab stops and a screen reader reads only the face that shows. With the back up, Tab goes from the button to the back’s link.',
+      'Focus inside the back keeps it shown. Focus leaving the card turns back a card opened from the keyboard; a card a pointer clicked open stays open until clicked again.',
+      'Hover never works alone: on a touch screen the first tap turns the card and its link works on the second tap; a tap on the back away from the link turns it back.',
+      'prefers-reduced-motion (tracked live): no rotation; the faces crossfade.',
+      'Without JavaScript the button is never shown and both faces render stacked, front then back, with the link. Printing shows both faces.',
+      'A front image carries real alt text, or imageAlt="" when it is decorative on purpose; the build fails if imageAlt is missing. Icons are decorative.',
+    ],
+    usage: `<div class="services">   <!-- grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)) -->
+  <FlipBox
+    icon={toothIcon}
+    title="Cleanings"
+    text="Every six months, about an hour."
+    backText="A hygienist cleans, checks and polishes; the dentist looks in at the end."
+    cta={{ text: 'Book a cleaning', href: '/book/' }}
+  />
+  <FlipBox image="/images/office.webp" imageAlt="" title="Our office" … />
+  <FlipBox direction="up" trigger="click">
+    <div slot="front">…</div>
+    <div slot="back">…</div>
+  </FlipBox>
+</div>
+<!-- :root { --fb-accent: var(--brand); --fb-radius: var(--radius); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/flip-box/ (demo)' }],
+    file: 'src/library/flip-box/FlipBox.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
