@@ -469,6 +469,9 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
 <!-- .nt { --nt-accent: var(--brand); --nt-bg: var(--tint); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/news-ticker/ (demo)' }],
     file: 'src/library/news-ticker/NewsTicker.astro',
+    added: '2026-09-23',
+  },
+  {
     id: 'flip-box',
     name: 'Flip box',
     aka: ['PowerPack Flip Box', 'UABB Flip Box', 'Elementor Flip Box', 'flip card', 'info box with hover reveal', '3D card flip'],
@@ -551,6 +554,9 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
 <!-- :root { --fb-accent: var(--brand); --fb-radius: var(--radius); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/flip-box/ (demo)' }],
     file: 'src/library/flip-box/FlipBox.astro',
+    added: '2026-09-23',
+  },
+  {
     id: 'social-grid',
     name: 'Instagram feed',
     aka: ['PowerPack Instagram Feed', 'Smash Balloon', 'Instagram feed widget', 'social feed', 'Elfsight Instagram', 'LightWidget'],
@@ -619,6 +625,9 @@ const feed = social as SocialFeed;
      img-src 'self' https://social.compass.st -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/social-grid/ (demo)' }],
     file: 'src/library/social-grid/SocialGrid.astro',
+    added: '2026-09-23',
+  },
+  {
     id: 'accordion',
     name: 'Accordion / FAQ',
     aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible'],
@@ -867,6 +876,9 @@ const faqs: AccordionItem[] = [
 <!-- .steps { --il-accent: var(--brand); --il-connector: var(--line); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/info-list/ (demo)' }],
     file: 'src/library/info-list/InfoList.astro',
+    added: '2026-09-23',
+  },
+  {
     id: 'video-player',
     name: 'Video player',
     aka: ['PowerPack Video', 'UABB Video', 'Elementor Video', 'YouTube embed', 'Vimeo embed', 'video lightbox', 'lite YouTube embed'],
@@ -935,6 +947,9 @@ const faqs: AccordionItem[] = [
 <!-- .video { --vp-play-bg: var(--brand); --vp-radius: var(--radius); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/video-player/ (demo)' }],
     file: 'src/library/video-player/VideoPlayer.astro',
+    added: '2026-09-23',
+  },
+  {
     id: 'testimonial-carousel',
     name: 'Testimonial carousel',
     aka: ['testimonial slider', 'testimonial rotator', 'review scroller', 'reviews slider', 'Elementor Testimonial Carousel', 'Slick carousel', 'Owl Carousel testimonials', 'Strong Testimonials', 'rotating testimonials'],
