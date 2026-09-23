@@ -22,6 +22,7 @@ import AccordionDemo from './AccordionDemo.astro';
 import CardSliderDemo from './CardSliderDemo.astro';
 import TabsDemo from './TabsDemo.astro';
 import InfoListDemo from './InfoListDemo.astro';
+import VideoPlayerDemo from './VideoPlayerDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,4 +43,5 @@ export const demos: Record<string, AstroComponent> = {
   'card-slider': CardSliderDemo,
   tabs: TabsDemo,
   'info-list': InfoListDemo,
+  'video-player': VideoPlayerDemo,
 };

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <!-- Neutral poster for the video-player demo: mountains at dusk. Abstract shapes only. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e283c"/>
+      <stop offset="0.6" stop-color="#6b3f6e"/>
+      <stop offset="1" stop-color="#e98a5c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <g fill="#fff" opacity="0.8">
+    <circle cx="140" cy="90" r="2"/><circle cx="310" cy="60" r="1.6"/><circle cx="520" cy="120" r="2"/>
+    <circle cx="700" cy="50" r="1.4"/><circle cx="880" cy="100" r="2"/><circle cx="1100" cy="70" r="1.6"/>
+    <circle cx="1210" cy="150" r="1.4"/><circle cx="420" cy="180" r="1.4"/>
+  </g>
+  <circle cx="900" cy="470" r="90" fill="#f7c07a" opacity="0.9"/>
+  <path d="M0 520 L 180 330 L 300 430 L 470 250 L 640 470 L 760 380 L 900 500 L 1050 320 L 1280 520 V720 H0 Z" fill="#3b2f55"/>
+  <path d="M470 250 L 520 310 L 495 300 L 470 330 L 445 300 L 420 305 Z" fill="#e8e2f0" opacity="0.85"/>
+  <path d="M1050 320 L 1095 370 L 1070 362 L 1050 385 L 1030 362 L 1005 370 Z" fill="#e8e2f0" opacity="0.85"/>
+  <path d="M0 600 L 220 470 L 380 560 L 560 440 L 760 590 L 960 480 L 1140 570 L 1280 520 V720 H0 Z" fill="#231c38"/>
+  <path d="M0 680 C 320 620 640 690 960 650 S 1200 640 1280 660 V720 H0 Z" fill="#141022"/>
+</svg>

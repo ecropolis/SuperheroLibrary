@@ -1,0 +1,83 @@
+---
+/**
+ * Demo for `video-player`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * The YouTube videos are the Blender Foundation's open films, Big Buck Bunny (2008) and
+ * Sintel (2010), both CC BY 3.0 and on Blender's own channel: a public page may show them, and
+ * the credit is in the caption as the licence asks. The posters are our own neutral SVGs, not
+ * frames from the films, and nothing is fetched from YouTube until a button is pressed.
+ */
+import VideoPlayer from '../../library/video-player/VideoPlayer.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+// The "custom play button" the page-builder modules sell: any inline SVG.
+const expandIcon =
+  '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor"/></svg>';
+---
+<div class="demo-vp">
+  <div class="demo-vp__item">
+    <p class="demo-vp__label">YouTube, in place</p>
+    <VideoPlayer
+      src="https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+      title="Big Buck Bunny"
+      poster={asset('film-poster.svg')}
+      posterAlt="Illustrated meadow with a tree under a morning sky"
+      caption="Big Buck Bunny © Blender Foundation, peach.blender.org, CC BY 3.0. Nothing loads from YouTube until you press play."
+    />
+  </div>
+  <div class="demo-vp__item">
+    <p class="demo-vp__label">Self-hosted, with captions</p>
+    <VideoPlayer
+      src={[
+        { src: asset('drift.webm'), type: 'video/webm' },
+        { src: asset('drift.mp4'), type: 'video/mp4' },
+      ]}
+      title="Drift, a three-second loop"
+      poster={asset('drift-poster.jpg')}
+      tracks={[{ src: asset('drift.vtt'), srclang: 'en', label: 'English', kind: 'captions' }]}
+      loop
+      caption="Native controls: turn captions on from the player's menu."
+    />
+  </div>
+  <div class="demo-vp__item demo-vp__item--lightbox">
+    <p class="demo-vp__label">Lightbox, custom play icon</p>
+    <VideoPlayer
+      src="aqz-KE-bpKQ"
+      title="Big Buck Bunny, in a lightbox"
+      poster={asset('film-poster-dusk.svg')}
+      posterAlt="Illustrated mountains at dusk"
+      start={30}
+      lightbox
+      playIcon={expandIcon}
+      caption="Opens over the page from 0:30. Escape or the close button stops it."
+    />
+  </div>
+</div>
+<style>
+  .demo-vp {
+    --vp-radius: var(--radius, 14px);
+    --vp-play-bg: var(--purple, #5933d8);
+    --vp-play-fg: var(--white, #fff);
+    --vp-bg: var(--navy, #1e283c);
+    --vp-caption: var(--ink, #1e283c);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1.5rem;
+  }
+  .demo-vp__item {
+    min-width: 0;
+  }
+  .demo-vp__item--lightbox {
+    --vp-play-bg: rgb(30 40 60 / 0.75);
+    --vp-play-size: 5rem;
+  }
+  .demo-vp__label {
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+  }
+</style>
