@@ -619,6 +619,254 @@ const feed = social as SocialFeed;
      img-src 'self' https://social.compass.st -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/social-grid/ (demo)' }],
     file: 'src/library/social-grid/SocialGrid.astro',
+    id: 'accordion',
+    name: 'Accordion / FAQ',
+    aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible'],
+    summary:
+      'Questions (or any titles) that open to show their answer, on native <details>/<summary>: keyboard, screen readers and find-in-page work with no script. One open at a time or several, numbered, chevron or plus, deep-linkable by #id. With jsonLd on, the same items become the page’s FAQPage structured data, so the FAQ and the accordion are one element.',
+    pitch: 'FAQ page design that gets people their answer fast: each question opens with a tap, every answer is findable with Ctrl+F, and search engines and AI assistants can read them as questions and answers.',
+    // faq page design 320/mo, difficulty 6; wordpress accordion 110/17; accordion design 210/35;
+    // html accordion 320/41 (SE Ranking US, 2026-09-23).
+    search: { query: 'faq page design', alsoRanks: ['wordpress accordion', 'accordion design', 'html accordion'] },
+    replaces: [
+      'PowerPack “FAQ” module (Beaver Builder)',
+      'PowerPack “Advanced Accordions” module',
+      'UABB “Advanced Accordion”',
+      'Elementor Accordion and Toggle widgets',
+      'hand-written FAQ lists',
+      'FAQ schema plugins (Yoast and Rank Math FAQ blocks, Structured Content)',
+    ],
+    goodFor: 'An FAQ page or section; services, policies or specifications that visitors scan for the one they need; any page where most readers want one answer out of many.',
+    notFor:
+      'Content everyone must read (behind a tap, most people never see it), a single paragraph, or navigation. Nor is it a promise of search features: since August 2023 Google shows FAQ rich results only for well-known, authoritative government and health sites. The schema is still correct markup that tells machines these are questions and answers; it does not buy extra space in results.',
+    props: [
+      { name: 'items', type: 'AccordionItem[]', note: '`{ title, body?, slot?, id?, open? }`. `title` is plain text (the summary and the JSON-LD question). `body` is an HTML string; or name a slot in `slot` and pass `<div slot="…">…</div>`. `id` is the deep-link anchor (default: the title, slugified).' },
+      { name: 'exclusive', type: 'boolean', default: 'true', note: 'One open at a time. Uses the `name` attribute, so the browser closes the others itself.' },
+      { name: 'openFirst', type: 'boolean', default: 'false', note: 'Open the first item on load.' },
+      { name: 'numbered', type: 'boolean', default: 'false', note: '“1) 2) 3)” before each title, in the accent colour.' },
+      { name: 'icon', type: '“chevron” | “plus” | “none”', default: '“chevron”', note: 'Chevron turns over; plus becomes a minus.' },
+      { name: 'boxed', type: 'boolean', default: 'false', note: 'Separate bordered boxes with `--ac-gap` between, instead of a ruled list.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Heading level of each title inside its summary, so the page outline stays unbroken.' },
+      { name: 'jsonLd', type: 'boolean', default: 'false', note: 'Emit FAQPage JSON-LD from `items`. One instance per page; delete any hand-written FAQPage on that page.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--ac-fg', fallback: 'inherit', note: 'Question text.' },
+      { name: '--ac-muted', fallback: 'inherit', note: 'Answer text.' },
+      { name: '--ac-accent', fallback: 'currentColor', note: 'Icon and number.' },
+      { name: '--ac-bg', fallback: 'transparent', note: 'Summary fill.' },
+      { name: '--ac-bg-open', fallback: 'var(--ac-bg)', note: 'Summary fill while open.' },
+      { name: '--ac-hover', fallback: 'rgb(0 0 0 / 0.04)', note: 'Summary fill on hover.' },
+      { name: '--ac-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rules between items, or box borders when `boxed`.' },
+      { name: '--ac-radius', fallback: '0', note: 'Corners of each item.' },
+      { name: '--ac-gap', fallback: '0 (0.75rem when boxed)', note: 'Space between items.' },
+      { name: '--ac-pad-y / --ac-pad-x', fallback: '1rem / 1.25rem', note: 'Summary and answer padding.' },
+      { name: '--ac-focus', fallback: 'currentColor', note: 'Keyboard focus ring, drawn inside the summary.' },
+      { name: '--ac-duration', fallback: '250ms', note: 'Open animation and icon turn.' },
+    ],
+    a11y: [
+      'Native <details>/<summary>: Tab reaches each question, Enter or Space opens and closes it, and screen readers announce expanded or collapsed. The browser does this, not a script, so it cannot break.',
+      'Every answer is in the page even when closed: find-in-page (Ctrl/⌘+F) matches it, and current Chrome, Edge and Firefox open the item. This is why the element is <details> and not a JavaScript accordion. It works with JavaScript off.',
+      'Each question is a heading at `headingLevel` inside its summary, so the page outline lists the questions. The icon is decorative (aria-hidden).',
+      '`exclusive` uses the name attribute, so the browser closes the others. A link to #item-id opens that item and scrolls to it (the one script in the element).',
+      'Opening animates its height where ::details-content and interpolate-size exist (Chromium) and is instant elsewhere; under prefers-reduced-motion nothing animates, the icon included.',
+    ],
+    usage: `---
+import Accordion, { type AccordionItem } from '../components/Accordion.astro';
+const faqs: AccordionItem[] = [
+  { id: 'parking', title: 'Is there parking?', body: '<p>Free two-hour parking out front.</p>' },
+  { id: 'dogs', title: 'Can I bring my dog?', body: '<p>On the patio, yes.</p>' },
+];
+---
+<!-- The FAQ page: schema on, first answer open. Delete any hand-written FAQPage. -->
+<Accordion items={faqs} openFirst jsonLd headingLevel={2} />
+
+<!-- A services list: numbered, plus icons, several open at once, no schema -->
+<Accordion items={services} numbered icon="plus" boxed exclusive={false} />
+<!-- .faq { --ac-accent: var(--brand); --ac-border: var(--line); } -->`,
+    usedOn: [
+      { site: 'jwalktours.com', where: '/faqs/ and the tour pages: its own FaqList.astro (<details>, FAQPage JSON-LD from the same array); moves to this element on its next FAQ request' },
+      { site: 'stbeautybar.com', where: '/about-us/ FAQ: its own Faqs.astro (exclusive, first open, rotating icon, FAQPage JSON-LD); moves to this element on its next FAQ request' },
+    ],
+    file: 'src/library/accordion/Accordion.astro',
+    added: '2026-09-23',
+  },
+  {
+    id: 'card-slider',
+    name: 'Card slider',
+    aka: ['PowerPack Card Slider', 'Elementor Testimonial Carousel', 'Slick slider', 'Swiper', 'Owl carousel', 'post carousel', 'team carousel'],
+    summary:
+      'A row of cards (testimonials, team, posts, products) on a real horizontally scrolling track with CSS scroll-snap, so touch and trackpad swiping need no code. Arrows page it, dots follow the page, cards per page are set per breakpoint. Loop and autoplay are off by default; autoplay comes with a pause button.',
+    pitch: 'Show more reviews, team members or posts than fit across the page, and let visitors swipe or click through them.',
+    // card slider 210/mo, difficulty 7; card carousel 260/21; testimonial carousel 90/15
+    // (SE Ranking US, 2026-09-23).
+    search: { query: 'card slider', alsoRanks: ['card carousel', 'testimonial carousel'] },
+    replaces: ['PowerPack Card Slider', 'Slick/Swiper/Owl embeds', 'Elementor Pro carousels'],
+    goodFor: 'Testimonials, team members, recent posts, related products: a set of similar cards where seeing three and knowing there are more is enough.',
+    notFor:
+      'A hero (that is video-background or particle-field territory), or anything every visitor must see all of: a slider hides most of its cards, so when each card matters a grid is the honest choice.',
+    props: [
+      { name: 'label', type: 'string', note: 'Accessible name of the carousel, e.g. “What our customers say”. Required.' },
+      { name: 'default slot', type: 'cards', note: 'Each direct child is one card (article, div, figure), not a list. The script names each “3 of 8”.' },
+      { name: 'perView', type: 'number | { base?, md?, lg? }', default: '{ base: 1, md: 2, lg: 3 }', note: 'Cards per page; md ≥ 48rem, lg ≥ 64rem (viewport). A missing breakpoint inherits the one below.' },
+      { name: 'gap', type: 'string', note: 'Space between cards, any CSS length. Overrides `--cs-gap` (fallback 1rem).' },
+      { name: 'loop', type: 'boolean', default: 'false', note: 'Next on the last page rewinds to the first, Previous on the first goes to the last. A visible rewind: no cloned cards, so nothing is read twice.' },
+      { name: 'autoplay', type: 'boolean', default: 'false', note: 'Advance a page every `interval`, rewinding at the end. Adds a pause button. Never under reduced motion.' },
+      { name: 'interval', type: 'number', default: '5000', note: 'ms between pages when autoplaying (at least 2000).' },
+      { name: 'arrows', type: 'boolean', default: 'true', note: 'Previous / Next buttons under the track.' },
+      { name: 'dots', type: 'boolean', default: 'true', note: 'One button per page. With neither arrows nor dots the scrollbar stays visible.' },
+      { name: 'pauseOnHover', type: 'boolean', default: 'true', note: 'Autoplay waits while a mouse is over the slider.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--cs-gap', fallback: '1rem', note: 'Space between cards; the `gap` prop overrides it.' },
+      { name: '--cs-control-bg', fallback: '#1b1c22', note: 'Arrow and pause buttons.' },
+      { name: '--cs-control-fg', fallback: '#fff', note: 'Their icons.' },
+      { name: '--cs-dot', fallback: 'rgb(0 0 0 / 0.25)', note: 'Other pages’ dots.' },
+      { name: '--cs-dot-active', fallback: '#1b1c22', note: 'The current page’s dot, which is also longer.' },
+      { name: '--cs-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'The track is a region with aria-roledescription="carousel" and the `label` as its name, and it is focusable, so ← → scroll it. Each card is role="group" with aria-roledescription="slide" and “3 of 8” in its name.',
+      'The cards’ own links are ordinary tab stops; focusing one scrolls its whole card into view. Arrows and dots are real buttons with names (“Previous”, “Page 2 of 3”); the current dot has aria-current and a longer shape, not only a colour. No aria-live: nothing is announced on its own.',
+      'Swiping, trackpad and scroll-wheel are the browser’s own scrolling. Paging is smooth, and instant under prefers-reduced-motion.',
+      'Autoplay (off by default) has a visible pause button, WCAG 2.2.2, named for what it will do. It waits while hovered, while focus is inside, while the tab is hidden and while off screen, and a swipe restarts its countdown. Under prefers-reduced-motion (tracked live) it never starts and the button is not shown.',
+      'Without JavaScript the track scrolls by hand with its scrollbar visible; arrows, dots and the pause button are absent.',
+    ],
+    usage: `<CardSlider label="What our customers say" perView={{ base: 1, md: 2, lg: 3 }}>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+</CardSlider>
+
+<CardSlider label="From the blog" perView={{ base: 1, md: 2 }} autoplay interval={6000} loop>
+  {posts.map((p) => <article class="post">…<a href={p.url}>{p.title}</a></article>)}
+</CardSlider>
+<!-- .quotes { --cs-control-bg: var(--brand); --cs-dot-active: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/card-slider/ (demo)' }],
+    file: 'src/library/card-slider/CardSlider.astro',
+    added: '2026-09-23',
+  },
+  {
+    id: 'tabs',
+    name: 'Tabs',
+    aka: ['PowerPack Advanced Tabs', 'UABB Advanced Tabs', 'Elementor Tabs', 'tabbed content', 'vertical tabs'],
+    summary:
+      'The WAI-ARIA tabs pattern, horizontal or vertical with icons, automatic or manual activation, with a shareable #hash per tab. Below collapseBelow the same panels render as an accordion; without JavaScript every panel shows under its heading.',
+    pitch: 'Put several related answers in one place, a tab each, that folds into a simple list on a phone.',
+    // html tabs 540/mo, difficulty 22; tabs component 260/23 (rising); tabs ui design 210/15;
+    // vertical tabs 1000/74, out of reach, listed only (SE Ranking US, 2026-09-23).
+    search: { query: 'html tabs', alsoRanks: ['tabs component', 'tabs ui design', 'vertical tabs'] },
+    replaces: ['PowerPack “Advanced Tabs” (Beaver Builder)', 'UABB “Advanced Tabs”', 'Elementor Tabs widget'],
+    goodFor: 'Alternatives a visitor picks one of: plans, service areas, a product’s description, specifications and delivery, an about page’s team, history and values.',
+    notFor: 'Content people must compare side by side (use a table or columns), or more than about six tabs: past that the strip scrolls and some tabs are out of sight.',
+    props: [
+      { name: 'tabs', type: 'Tab[]', note: '`{ id, label, icon?, panel?, slot? }`. `id` is the anchor and hash (unique on the page). `icon` is an inline SVG string (decorative). `panel` is an HTML string; or name a slot in `slot`.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
+      { name: 'orientation', type: '“horizontal” | “vertical”', default: '“horizontal”', note: 'Vertical puts the strip in a column beside the panel; ↑ ↓ move between tabs.' },
+      { name: 'activation', type: '“automatic” | “manual”', default: '“automatic”', note: 'Automatic selects the tab that gets focus; manual moves focus only, and Enter or Space selects.' },
+      { name: 'collapseBelow', type: 'number', default: '640', note: 'Viewport width (px) below which the tabs render as an accordion. Tracked live. 0 never collapses.' },
+      { name: 'hash', type: 'boolean', default: 'true', note: '`#id` selects that tab on load and on hashchange; selecting a tab rewrites the hash (replaceState, so Back does not step through tabs).' },
+      { name: 'defaultTab', type: 'string', note: 'id of the tab selected when the URL names none. Default: the first.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Level of each panel’s heading: shown without JavaScript, and holding the accordion button on phones.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tb-accent', fallback: 'currentColor', note: 'Selected tab marker, icons, accordion chevron.' },
+      { name: '--tb-fg', fallback: 'inherit', note: 'Selected tab and panel text.' },
+      { name: '--tb-muted', fallback: 'currentColor at 75%', note: 'Other tabs’ text.' },
+      { name: '--tb-bg', fallback: 'transparent', note: 'Tab fill.' },
+      { name: '--tb-bg-selected', fallback: 'var(--tb-bg)', note: 'Selected tab fill.' },
+      { name: '--tb-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rule under (or beside) the strip; accordion rules.' },
+      { name: '--tb-panel-bg', fallback: 'transparent', note: 'Panel fill.' },
+      { name: '--tb-panel-pad', fallback: '1.25rem 0', note: 'Panel padding (tabs layout).' },
+      { name: '--tb-radius', fallback: '0', note: 'Tab corners.' },
+      { name: '--tb-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+      { name: '--tb-list-width', fallback: '16rem', note: 'Widest the vertical strip gets.' },
+    ],
+    a11y: [
+      'The WAI-ARIA Authoring Practices tabs pattern: tablist, tab and tabpanel, with aria-selected, aria-controls, aria-labelledby and aria-orientation, and a roving tabindex so the strip is one Tab stop.',
+      '← → (↑ ↓ when vertical) move between tabs and wrap; Home and End jump to the ends. Automatic activation selects on focus; manual waits for Enter or Space. Tab then moves into the panel, which is itself focusable only when it has nothing focusable inside.',
+      'Below `collapseBelow` the tab strip is removed and each panel’s heading holds a disclosure button (aria-expanded, aria-controls). The panels are the same elements, rendered once; the label appears as the tab and as the heading, and only one of the two is ever displayed.',
+      'Without JavaScript there is no tab strip: every panel shows under its label as a heading, and #id links jump to the panel.',
+      'The newly shown panel fades in over 150 ms; under prefers-reduced-motion it does not.',
+    ],
+    usage: `<Tabs
+  label="Plans"
+  tabs={[
+    { id: 'starter', label: 'Starter', panel: '<p>…</p>' },
+    { id: 'studio', label: 'Studio', slot: 'studio' },
+    { id: 'agency', label: 'Agency', panel: '<p>…</p>' },
+  ]}
+  defaultTab="studio"
+>
+  <div slot="studio"><p>…</p><a href="/contact/">Talk to us</a></div>
+</Tabs>
+
+<Tabs label="Why us" orientation="vertical" activation="manual" tabs={why} hash={false} />
+<!-- .plans { --tb-accent: var(--brand); --tb-border: var(--line); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tabs/ (demo)' }],
+    file: 'src/library/tabs/Tabs.astro',
+    added: '2026-09-23',
+  },
+  {
+    id: 'info-list',
+    name: 'Info list',
+    aka: ['PowerPack Info List', 'UABB Info List', 'Elementor Icon List', 'icon list', 'steps list', 'process steps', 'vertical timeline', 'feature list'],
+    summary:
+      'Items with a marker (icon, image, number or dot), a title, a line of text and an optional link, stacked or inline in columns. With the connector the markers are joined by a line: a steps list or a vertical timeline. HTML and CSS only; there is no script.',
+    pitch: 'Lay out your services, how you work step by step, or your story year by year, each with an icon or a number, in a list that reads on any screen.',
+    // vertical timeline 500/mo, difficulty 21 (rising); icon list 660/45; timeline design website
+    // 170/25 (SE Ranking US, 2026-09-23).
+    search: { query: 'vertical timeline', alsoRanks: ['icon list', 'timeline design website'] },
+    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists'],
+    goodFor: 'Services, “how it works”, process steps, milestones and feature lists.',
+    notFor: 'Navigation (that is a menu) and long prose (write paragraphs).',
+    props: [
+      { name: 'items', type: 'InfoItem[]', note: '`{ title, text?, href?, icon?, iconLabel?, image?, imageAlt?, number?, meta? }`. `icon` is an inline SVG string; `number` overrides the position (“01”); `meta` is a small line above the title (a year, a duration).' },
+      { name: 'layout', type: '“stack” | “inline”', default: '“stack”', note: 'Stack is one column, marker at the left. Inline is a grid of `columns`; where it has one column it is laid out as the stack.' },
+      { name: 'marker', type: '“icon” | “image” | “number” | “dot” | “none”', default: '“icon”', note: 'What sits beside (or above) each title.' },
+      { name: 'connector', type: 'boolean', default: 'false', note: 'A line between markers: vertical at the left, horizontal along a row when markers are on top. Makes the list an <ol>.' },
+      { name: 'columns', type: 'number | { base?, md?, lg? }', default: '{ base: 1, md: 2, lg: 4 }', note: 'Inline only. 1–6 per breakpoint; md ≥ 48rem, lg ≥ 64rem (viewport). A missing breakpoint inherits the one below.' },
+      { name: 'markerPosition', type: '“left” | “top”', default: 'left for stack, top for inline', note: 'Top applies where inline has more than one column.' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5', default: '3', note: 'Level of each title.' },
+      { name: 'size', type: '“sm” | “md” | “lg”', default: '“md”', note: 'Marker size: 2.25, 3 or 4rem. A dot is 1rem.' },
+      { name: 'class', type: 'string', note: 'Class on the list, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--il-accent', fallback: '#3451b2', note: 'Default marker fill and dot ring. Map it to the host accent.' },
+      { name: '--il-marker-bg', fallback: 'var(--il-accent)', note: 'Marker fill (for outline icons: a tint or transparent).' },
+      { name: '--il-marker-fg', fallback: '#fff', note: 'Icon or number colour.' },
+      { name: '--il-marker-size', fallback: 'by `size`', note: 'Marker box, any length.' },
+      { name: '--il-marker-radius', fallback: '50%', note: 'Marker corners; 8px for rounded squares.' },
+      { name: '--il-connector', fallback: 'rgb(0 0 0 / 0.18)', note: 'Connector colour.' },
+      { name: '--il-connector-width', fallback: '2px', note: 'Connector thickness.' },
+      { name: '--il-title / --il-text / --il-meta', fallback: 'inherit', note: 'Text colours.' },
+      { name: '--il-gap / --il-col-gap', fallback: '1.75rem / 1.5rem', note: 'Space between rows / columns. The connector spans the row gap.' },
+      { name: '--il-focus', fallback: 'currentColor', note: 'Focus ring around a linked item.' },
+    ],
+    a11y: [
+      'A real list: <ol> when the order matters (connector or numbers), <ul> otherwise, with role="list" so Safari keeps announcing it with list-style removed.',
+      'Each title is a heading at `headingLevel`. Numbers are real text, not generated content.',
+      'A linked item is ONE link, the title, whose hit area is stretched over the item by a pseudo-element: a screen reader hears one link named by its title, and the focus ring outlines the whole item.',
+      'Icons are decorative (aria-hidden) unless an item gives `iconLabel`; images take `imageAlt` (empty by default). The connector is CSS, not markup, so nothing extra is read.',
+      'No script and no motion, so nothing to reduce and nothing to fail.',
+    ],
+    usage: `<!-- Services, stacked, icons -->
+<InfoList items={[
+  { title: 'Garden design', text: 'A plan drawn to scale.', href: '/design/', icon: leafSvg },
+  { title: 'Lawn care', text: 'Mowing and feeding, March to November.', icon: sunSvg },
+]} />
+
+<!-- How it works: four across on desktop, a vertical steps list on a phone -->
+<InfoList items={steps} layout="inline" marker="number" connector columns={{ base: 1, md: 2, lg: 4 }} />
+
+<!-- A vertical timeline -->
+<InfoList items={history.map((h) => ({ meta: h.year, title: h.title, text: h.text }))} marker="dot" connector />
+<!-- .steps { --il-accent: var(--brand); --il-connector: var(--line); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/info-list/ (demo)' }],
+    file: 'src/library/info-list/InfoList.astro',
     added: '2026-09-23',
   },
 ];

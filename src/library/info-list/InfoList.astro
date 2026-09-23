@@ -1,0 +1,436 @@
+---
+/**
+ * InfoList — a list of items, each with a marker (an icon, an image, a number or a dot), a
+ * title and a line or two of text, optionally a link. Stacked, or inline in columns; with a
+ * connector line between the markers it becomes a steps list or a vertical timeline. This is
+ * PowerPack's Info List module (the one SCORE builds pages from), UABB's Info List and
+ * Elementor's Icon List. It is HTML and CSS: there is no script at all, because an info list
+ * never needed one. The plugin was a form for typing it.
+ *
+ * Semantics:
+ *   - An ordered list (<ol>) when `connector` is on or `marker="number"` (steps have an order),
+ *     an unordered list (<ul>) otherwise; role="list" keeps the list announced in Safari, which
+ *     drops it when list-style is none.
+ *   - Each title is a heading at `headingLevel`.
+ *   - `href` makes the whole item a link: ONE <a> around the title text, its hit area stretched
+ *     over the item by a CSS pseudo-element, so a screen reader hears one link named by the
+ *     title. Keep `text` free of links on a linked item (they would sit under the overlay).
+ *   - Icons are decorative (aria-hidden) unless the item has `iconLabel`. An image marker takes
+ *     `imageAlt` (default empty: decorative). Numbers are real text.
+ *   - The connector is CSS on the item, no markup.
+ *
+ * Layout: `layout="stack"` is one column, marker at the left. `layout="inline"` is a grid with
+ * `columns` per breakpoint (base, md ≥ 48rem, lg ≥ 64rem, viewport widths; 1–6), marker on top
+ * (`markerPosition`, default top for inline). Wherever inline has one column it is laid out as
+ * the stack (marker left), so a four-across "how it works" row becomes a vertical steps list on a
+ * phone. Connector: vertical between markers at the left; horizontal between markers of one
+ * row when they are on top, stopping at the end of each row. Inline with markers at the left
+ * and more than one column draws no connector (a line would cross the text).
+ *
+ * Sizing: it fills its container's width; the marker is `size` (sm 2.25rem, md 3rem,
+ * lg 4rem, or --il-marker-size). Items stretch to the tallest in their row. No positioning
+ * beyond the items' own (for the link overlay and the connector), no z-index.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --il-accent                  default marker fill, dot and number colour     (#3451b2)
+ *   --il-marker-bg / --il-marker-fg  marker fill / icon or number colour       (--il-accent / #fff)
+ *   --il-marker-size / --il-marker-radius  marker box / its corners             (by size / 50%)
+ *   --il-connector / --il-connector-width  line colour / thickness              (rgb(0 0 0 / 0.18) / 2px)
+ *   --il-title / --il-text / --il-meta     text colours                         (inherit / inherit / inherit)
+ *   --il-gap / --il-col-gap      space between rows / columns                   (1.75rem / 1.5rem)
+ *   --il-focus                   focus ring of a linked item                    (currentColor)
+ */
+export interface InfoItem {
+  title: string;
+  /** Plain text under the title. */
+  text?: string;
+  /** Makes the whole item a link, named by its title. */
+  href?: string;
+  /** Inline SVG string for `marker="icon"`. Use currentColor. */
+  icon?: string;
+  /** Makes the icon meaningful: announced with this text instead of hidden. */
+  iconLabel?: string;
+  /** Image URL for `marker="image"`. */
+  image?: string;
+  /** Alt text of the image. Default empty (decorative). */
+  imageAlt?: string;
+  /** For `marker="number"`: shown instead of the position ("01", "Step A"). */
+  number?: string | number;
+  /** A small line above the title: a date on a timeline, a duration on a step. */
+  meta?: string;
+}
+interface Columns {
+  base?: number;
+  md?: number;
+  lg?: number;
+}
+interface Props {
+  items: InfoItem[];
+  layout?: 'stack' | 'inline';
+  marker?: 'icon' | 'image' | 'number' | 'dot' | 'none';
+  /** Line between markers: the steps / timeline look. Makes the list ordered. */
+  connector?: boolean;
+  /** Inline only: columns per breakpoint (md ≥ 48rem, lg ≥ 64rem). A number means every width. */
+  columns?: number | Columns;
+  /** Default: `left` for stack, `top` for inline. */
+  markerPosition?: 'left' | 'top';
+  headingLevel?: 2 | 3 | 4 | 5;
+  size?: 'sm' | 'md' | 'lg';
+  class?: string;
+}
+const {
+  items,
+  layout = 'stack',
+  marker = 'icon',
+  connector = false,
+  columns = { base: 1, md: 2, lg: 4 },
+  markerPosition = layout === 'inline' ? 'top' : 'left',
+  headingLevel = 3,
+  size = 'md',
+  class: className,
+} = Astro.props;
+const Tag = connector || marker === 'number' ? 'ol' : 'ul';
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5';
+const cols: Columns = typeof columns === 'number' ? { base: columns } : columns;
+const clamp = (n: number | undefined) => (n ? Math.min(6, Math.max(1, Math.round(n))) : undefined);
+const b = clamp(cols.base) ?? 1;
+const m = clamp(cols.md) ?? b;
+const l = clamp(cols.lg) ?? m;
+const colClasses = layout === 'inline' ? [`il--b${b}`, `il--m${m}`, `il--l${l}`] : [];
+---
+
+<Tag
+  class:list={[
+    'il',
+    `il--${layout}`,
+    `il--${marker}`,
+    `il--${size}`,
+    { 'il--connector': connector && marker !== 'none', 'il--top': markerPosition === 'top' },
+    ...colClasses,
+    className,
+  ]}
+  role="list"
+>
+  {
+    items.map((it, i) => (
+      <li class:list={['il__item', { 'il__item--link': !!it.href }]}>
+        {marker === 'icon' &&
+          (it.iconLabel ? (
+            <span class="il__marker" role="img" aria-label={it.iconLabel} set:html={it.icon ?? ''} />
+          ) : (
+            <span class="il__marker" aria-hidden="true" set:html={it.icon ?? ''} />
+          ))}
+        {marker === 'image' && (
+          <span class="il__marker">{it.image && <img src={it.image} alt={it.imageAlt ?? ''} loading="lazy" decoding="async" />}</span>
+        )}
+        {marker === 'number' && <span class="il__marker">{it.number ?? i + 1}</span>}
+        {marker === 'dot' && <span class="il__marker" aria-hidden="true" />}
+        <div class="il__content">
+          {it.meta && <p class="il__meta">{it.meta}</p>}
+          <H class="il__title">
+            {it.href ? (
+              <a class="il__link" href={it.href}>
+                {it.title}
+              </a>
+            ) : (
+              it.title
+            )}
+          </H>
+          {it.text && <p class="il__text">{it.text}</p>}
+        </div>
+      </li>
+    ))
+  }
+</Tag>
+
+<style>
+  .il {
+    --il-s: var(--il-marker-size, 3rem);
+    --il-w: var(--il-connector-width, 2px);
+    --il-line-gap: 0.4rem;
+    display: grid;
+    gap: var(--il-gap, 1.75rem) var(--il-col-gap, 1.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .il--sm {
+    --il-s: var(--il-marker-size, 2.25rem);
+  }
+  .il--lg {
+    --il-s: var(--il-marker-size, 4rem);
+  }
+  .il.il--dot {
+    --il-s: var(--il-marker-size, 1rem);
+  }
+  .il--inline {
+    grid-template-columns: repeat(var(--il-cols, 1), minmax(0, 1fr));
+  }
+
+  /* An item: marker at the left by default. */
+  .il__item {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--il-s) minmax(0, 1fr);
+    align-content: start;
+    gap: 0.75rem 1rem;
+  }
+  .il--none .il__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .il__marker {
+    display: grid;
+    place-items: center;
+    width: var(--il-s);
+    height: var(--il-s);
+    overflow: hidden;
+    border-radius: var(--il-marker-radius, 50%);
+    background: var(--il-marker-bg, var(--il-accent, #3451b2));
+    color: var(--il-marker-fg, #fff);
+    font-weight: 700;
+    font-size: calc(var(--il-s) * 0.4);
+    line-height: 1;
+  }
+  .il__marker > :global(svg) {
+    width: 50%;
+    height: 50%;
+  }
+  .il__marker img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .il--dot .il__marker {
+    border: 3px solid var(--il-marker-bg, var(--il-accent, #3451b2));
+    background: var(--il-dot-fill, #fff);
+  }
+  /* Line the title's first line up with the middle of the marker. */
+  .il__content {
+    padding-top: max(0px, calc(var(--il-s) / 2 - 0.75em));
+  }
+  .il__meta {
+    margin: 0 0 0.2rem;
+    color: var(--il-meta, inherit);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .il__title {
+    margin: 0;
+    color: var(--il-title, inherit);
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+  .il__text {
+    margin: 0.35rem 0 0;
+    color: var(--il-text, inherit);
+    line-height: 1.55;
+  }
+
+  /* A linked item: one link, the title, whose hit area covers the item. */
+  .il__link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .il__link::after {
+    content: '';
+    position: absolute;
+    inset: -0.5rem;
+    border-radius: 10px;
+  }
+  .il__item--link:hover .il__link {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .il__link:focus-visible {
+    outline: none;
+  }
+  .il__link:focus-visible::after {
+    outline: 3px solid var(--il-focus, currentColor);
+  }
+
+  /* Connector, vertical: from under this marker to the top of the next one. */
+  .il--connector .il__item::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: calc(var(--il-s) / 2 - var(--il-w) / 2);
+    top: calc(var(--il-s) + var(--il-line-gap));
+    bottom: calc(-1 * var(--il-gap, 1.75rem) + var(--il-line-gap));
+    width: var(--il-w);
+    background: var(--il-connector, rgb(0 0 0 / 0.18));
+  }
+  .il--connector .il__item:last-child::before {
+    display: none;
+  }
+  /* Marker on top in a stack: no connector (it would cross the text). */
+  .il--stack.il--top .il__item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .il--stack.il--top .il__item::before {
+    display: none;
+  }
+  .il--stack.il--top .il__content {
+    padding-top: 0;
+  }
+
+  /* <il-columns> generated: per breakpoint range, the column count; for markerPosition top with
+     more than one column, the top layout and a horizontal connector that stops at each row end.
+     Ranges do not overlap, so no rule has to undo another. */
+  @media (max-width: 47.99rem) {
+    .il--b1 {
+      --il-cols: 1;
+    }
+    .il--b2 {
+      --il-cols: 2;
+    }
+    .il--b3 {
+      --il-cols: 3;
+    }
+    .il--b4 {
+      --il-cols: 4;
+    }
+    .il--b5 {
+      --il-cols: 5;
+    }
+    .il--b6 {
+      --il-cols: 6;
+    }
+    .il--inline.il--top:is(.il--b2, .il--b3, .il--b4, .il--b5, .il--b6) > .il__item {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .il--inline.il--top:is(.il--b2, .il--b3, .il--b4, .il--b5, .il--b6) .il__content {
+      padding-top: 0;
+    }
+    .il--connector.il--inline.il--top:is(.il--b2, .il--b3, .il--b4, .il--b5, .il--b6) > .il__item::before {
+      top: calc(var(--il-s) / 2 - var(--il-w) / 2);
+      bottom: auto;
+      inset-inline-start: calc(var(--il-s) + var(--il-line-gap));
+      inset-inline-end: calc(-1 * var(--il-col-gap, 1.5rem) + var(--il-line-gap));
+      width: auto;
+      height: var(--il-w);
+    }
+    .il--connector.il--inline:not(.il--top):is(.il--b2, .il--b3, .il--b4, .il--b5, .il--b6) > .il__item::before {
+      display: none;
+    }
+    .il--connector.il--top.il--b2 > .il__item:nth-child(2n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--b3 > .il__item:nth-child(3n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--b4 > .il__item:nth-child(4n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--b5 > .il__item:nth-child(5n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--b6 > .il__item:nth-child(6n)::before {
+      display: none;
+    }
+  }
+  @media (min-width: 48rem) and (max-width: 63.99rem) {
+    .il--m1 {
+      --il-cols: 1;
+    }
+    .il--m2 {
+      --il-cols: 2;
+    }
+    .il--m3 {
+      --il-cols: 3;
+    }
+    .il--m4 {
+      --il-cols: 4;
+    }
+    .il--m5 {
+      --il-cols: 5;
+    }
+    .il--m6 {
+      --il-cols: 6;
+    }
+    .il--inline.il--top:is(.il--m2, .il--m3, .il--m4, .il--m5, .il--m6) > .il__item {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .il--inline.il--top:is(.il--m2, .il--m3, .il--m4, .il--m5, .il--m6) .il__content {
+      padding-top: 0;
+    }
+    .il--connector.il--inline.il--top:is(.il--m2, .il--m3, .il--m4, .il--m5, .il--m6) > .il__item::before {
+      top: calc(var(--il-s) / 2 - var(--il-w) / 2);
+      bottom: auto;
+      inset-inline-start: calc(var(--il-s) + var(--il-line-gap));
+      inset-inline-end: calc(-1 * var(--il-col-gap, 1.5rem) + var(--il-line-gap));
+      width: auto;
+      height: var(--il-w);
+    }
+    .il--connector.il--inline:not(.il--top):is(.il--m2, .il--m3, .il--m4, .il--m5, .il--m6) > .il__item::before {
+      display: none;
+    }
+    .il--connector.il--top.il--m2 > .il__item:nth-child(2n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--m3 > .il__item:nth-child(3n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--m4 > .il__item:nth-child(4n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--m5 > .il__item:nth-child(5n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--m6 > .il__item:nth-child(6n)::before {
+      display: none;
+    }
+  }
+  @media (min-width: 64rem) {
+    .il--l1 {
+      --il-cols: 1;
+    }
+    .il--l2 {
+      --il-cols: 2;
+    }
+    .il--l3 {
+      --il-cols: 3;
+    }
+    .il--l4 {
+      --il-cols: 4;
+    }
+    .il--l5 {
+      --il-cols: 5;
+    }
+    .il--l6 {
+      --il-cols: 6;
+    }
+    .il--inline.il--top:is(.il--l2, .il--l3, .il--l4, .il--l5, .il--l6) > .il__item {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .il--inline.il--top:is(.il--l2, .il--l3, .il--l4, .il--l5, .il--l6) .il__content {
+      padding-top: 0;
+    }
+    .il--connector.il--inline.il--top:is(.il--l2, .il--l3, .il--l4, .il--l5, .il--l6) > .il__item::before {
+      top: calc(var(--il-s) / 2 - var(--il-w) / 2);
+      bottom: auto;
+      inset-inline-start: calc(var(--il-s) + var(--il-line-gap));
+      inset-inline-end: calc(-1 * var(--il-col-gap, 1.5rem) + var(--il-line-gap));
+      width: auto;
+      height: var(--il-w);
+    }
+    .il--connector.il--inline:not(.il--top):is(.il--l2, .il--l3, .il--l4, .il--l5, .il--l6) > .il__item::before {
+      display: none;
+    }
+    .il--connector.il--top.il--l2 > .il__item:nth-child(2n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--l3 > .il__item:nth-child(3n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--l4 > .il__item:nth-child(4n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--l5 > .il__item:nth-child(5n)::before {
+      display: none;
+    }
+    .il--connector.il--top.il--l6 > .il__item:nth-child(6n)::before {
+      display: none;
+    }
+  }
+  /* </il-columns> */
+</style>

@@ -1,0 +1,100 @@
+---
+/**
+ * Demo for `accordion`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * Two instances: a real FAQ for a neighbourhood bakery (FAQPage JSON-LD on, first answer
+ * open) and a plain numbered accordion of services with plus icons, several open at once.
+ */
+import Accordion from '../../library/accordion/Accordion.astro';
+
+const faqs = [
+  {
+    id: 'custom-cakes',
+    title: 'Do you take custom cake orders?',
+    body: '<p>Yes. Order at least five days ahead for a celebration cake, and two weeks ahead for a wedding. Tell us the size, the flavour and any lettering, and we confirm the price before we bake.</p>',
+  },
+  {
+    id: 'order-ahead',
+    title: 'Can I order ahead and pick up?',
+    body: '<p>Call or message us by 4 PM and your order is boxed and waiting from 8 AM the next morning. Pay when you collect.</p>',
+  },
+  {
+    id: 'dietary',
+    title: 'Do you have gluten-free or vegan options?',
+    body: '<p>Every day we bake a gluten-free loaf and at least two vegan pastries. They share an oven and a kitchen with wheat flour, so they are not suitable for coeliac disease.</p>',
+  },
+  {
+    id: 'parking',
+    title: 'Is there parking?',
+    body: '<p>There is free two-hour parking on the street out front and a public lot behind the library, a two-minute walk away.</p>',
+  },
+  {
+    id: 'catering',
+    title: 'Do you cater meetings and events?',
+    body: '<p>Yes, from a box of pastries for a morning meeting to breakfast for eighty. Give us three days’ notice; we deliver within five miles.</p>',
+  },
+  {
+    id: 'dogs',
+    title: 'Can I bring my dog?',
+    body: '<p>Dogs are welcome on the patio, and there is always a water bowl by the door. Inside, only assistance dogs, because of the kitchen.</p>',
+  },
+];
+
+const services = [
+  { title: 'Celebration cakes', body: '<p>Layer cakes for birthdays, anniversaries and office goodbyes, decorated to order.</p>' },
+  { title: 'Wedding cakes', body: '<p>A tasting, a design meeting and delivery and set-up on the day.</p>' },
+  { title: 'Breakfast catering', body: '<p>Pastries, bread, fruit and coffee for groups of ten to eighty.</p>' },
+  { title: 'Baking classes', body: '<p>Saturday-morning classes for eight people: bread, pastry or decorating.</p>' },
+];
+---
+<div class="demo-ac">
+  <section class="demo-ac__part">
+    <h2 class="demo-ac__h">Frequently asked questions</h2>
+    <Accordion class="demo-ac__faq" items={faqs} openFirst jsonLd />
+    <p class="demo-ac__note">
+      Every answer is in the page even while it is closed, so find in page (Ctrl+F or ⌘F) finds words inside
+      it and opens it. A link opens the answer it points to: <a href="#dogs">can I bring my dog?</a>
+    </p>
+  </section>
+
+  <section class="demo-ac__part">
+    <h2 class="demo-ac__h">What we do</h2>
+    <Accordion class="demo-ac__services" items={services} numbered icon="plus" boxed exclusive={false} />
+  </section>
+</div>
+<style>
+  .demo-ac {
+    display: grid;
+    gap: 2.5rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-ac__h {
+    margin: 0 0 1rem;
+    font-size: 1.35rem;
+  }
+  .demo-ac__note {
+    margin: 1rem 0 0;
+    font-size: 0.95rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-ac :global(.demo-ac__faq) {
+    --ac-accent: var(--purple, #5933d8);
+    --ac-border: var(--line, #e6e6f0);
+    --ac-focus: var(--purple, #5933d8);
+    --ac-hover: var(--tint, #f8f8fc);
+  }
+  .demo-ac :global(.demo-ac__services) {
+    --ac-accent: var(--white, #fff);
+    --ac-fg: var(--white, #fff);
+    --ac-bg: var(--navy, #1e283c);
+    --ac-hover: var(--purple-dark, #4526ad);
+    --ac-bg-open: var(--purple, #5933d8);
+    --ac-border: var(--line, #e6e6f0);
+    --ac-radius: var(--radius, 14px);
+    --ac-focus: var(--white, #fff);
+  }
+  .demo-ac :global(.demo-ac__services .ac__body) {
+    padding-top: 1rem;
+  }
+</style>

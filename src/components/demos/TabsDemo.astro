@@ -1,0 +1,85 @@
+---
+/**
+ * Demo for `tabs`. The website renders this too (see README, "Consumed by superherotech.ai"),
+ * so every host token has a fallback. It uses no assets; the icons are inline SVG.
+ *
+ * Two instances: horizontal with automatic activation and the hash on (#pricing selects
+ * Pricing), and vertical with icons and manual activation. Both become an accordion below 640px.
+ */
+import Tabs from '../../library/tabs/Tabs.astro';
+
+const svg = (d: string) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const icons = {
+  team: svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c3 .2 5.5 2.3 5.5 5.8"/>'),
+  tools: svg('<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.8-.4-.4-2.8z"/>'),
+  support: svg('<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>'),
+};
+
+const studio = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    panel: '<p>We design and build small websites for local businesses: a clear home page, the pages people actually look for, and a contact form that reaches you.</p>',
+  },
+  {
+    id: 'process',
+    label: 'Process',
+    panel: '<p>One call to understand the business, a written plan within a week, a first draft two weeks later, and changes until you are happy with it.</p>',
+  },
+  {
+    id: 'pricing',
+    label: 'Pricing',
+    panel: '<p>A fixed price agreed before we start, paid in two halves: one at the plan, one at launch. Hosting and small changes are a flat monthly fee.</p>',
+  },
+  {
+    id: 'contact',
+    label: 'Contact',
+    panel: '<p>Tell us about the business and what the site needs to do. <a href="#contact-form">Send us a message</a> and we reply within one working day.</p>',
+  },
+];
+const why = [
+  { id: 'why-team', label: 'A small team', icon: icons.team, panel: '<p>The people you meet on the first call are the people who build the site. Nothing is handed to a subcontractor.</p>' },
+  { id: 'why-tools', label: 'Plain tools', icon: icons.tools, panel: '<p>Fast static pages with no plugin to update, so the site does not break on its own and loads quickly on a phone.</p>' },
+  { id: 'why-support', label: 'Real support', icon: icons.support, panel: '<p>Email or call and a person answers. Most small changes are made the same day.</p>' },
+];
+---
+<div class="demo-tb">
+  <section>
+    <h2 class="demo-tb__h">About the studio</h2>
+    <Tabs label="About the studio" tabs={studio} class="demo-tb__studio" />
+    <p class="demo-tb__note">A link can pick a tab: <a href="#pricing">see pricing</a>.</p>
+  </section>
+
+  <section>
+    <h2 class="demo-tb__h">Why people choose us</h2>
+    <Tabs label="Why people choose us" tabs={why} orientation="vertical" activation="manual" class="demo-tb__why" />
+  </section>
+</div>
+<style>
+  .demo-tb {
+    display: grid;
+    gap: 2.5rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-tb__h {
+    margin: 0 0 1rem;
+    font-size: 1.35rem;
+  }
+  .demo-tb__note {
+    margin: 0.5rem 0 0;
+    font-size: 0.95rem;
+  }
+  .demo-tb :global(.demo-tb__studio) {
+    --tb-accent: var(--purple, #5933d8);
+    --tb-border: var(--line, #e6e6f0);
+    --tb-focus: var(--purple, #5933d8);
+  }
+  .demo-tb :global(.demo-tb__why) {
+    --tb-accent: var(--purple, #5933d8);
+    --tb-border: var(--line, #e6e6f0);
+    --tb-focus: var(--purple, #5933d8);
+    --tb-bg-selected: var(--tint, #f8f8fc);
+    --tb-radius: 8px;
+  }
+</style>

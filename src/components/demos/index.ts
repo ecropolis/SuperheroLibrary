@@ -18,6 +18,10 @@ import BusinessHoursDemo from './BusinessHoursDemo.astro';
 import NewsTickerDemo from './NewsTickerDemo.astro';
 import FlipBoxDemo from './FlipBoxDemo.astro';
 import SocialGridDemo from './SocialGridDemo.astro';
+import AccordionDemo from './AccordionDemo.astro';
+import CardSliderDemo from './CardSliderDemo.astro';
+import TabsDemo from './TabsDemo.astro';
+import InfoListDemo from './InfoListDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,4 +38,8 @@ export const demos: Record<string, AstroComponent> = {
   'news-ticker': NewsTickerDemo,
   'flip-box': FlipBoxDemo,
   'social-grid': SocialGridDemo,
+  accordion: AccordionDemo,
+  'card-slider': CardSliderDemo,
+  tabs: TabsDemo,
+  'info-list': InfoListDemo,
 };
