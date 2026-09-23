@@ -1,0 +1,68 @@
+---
+/**
+ * Demo for `social-grid`: Neutral Grounds, the library's fictional café, as @neutralgrounds.
+ * The feed is public/demo/social-feed.json, a fixture in the SocialFeedHandler shape; its
+ * images are abstract SVG tiles in public/demo/ (no Instagram images, nobody's photos). The
+ * fixture stores each image as a file name, and this demo prefixes `assetBase`, so the website
+ * can serve the tiles from /elements-demo/. A real feed carries absolute URLs on
+ * social.compass.st and needs no rewriting.
+ *
+ * The fixture is imported by relative path: the website vendors public/demo/ beside src/ (see
+ * its scripts/fetch-elements.mjs), so the path resolves there too. `npm run check` allows a
+ * demo to import JSON from public/demo/ and nothing else outside src/library/.
+ */
+import SocialGrid, { type SocialFeed } from '../../library/social-grid/SocialGrid.astro';
+import fixture from '../../../public/demo/social-feed.json';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const feed: SocialFeed = {
+  source: fixture.source,
+  posts: (fixture.posts as SocialFeed['posts']).map((p) => ({ ...p, image: { ...p.image, url: asset(p.image.url) } })),
+};
+const disconnected: SocialFeed = { ...feed, source: { ...feed.source, connected: false } };
+const empty: SocialFeed = { ...feed, posts: [] };
+---
+<div class="demo-sg">
+  <p class="demo-sg__label">Twelve posts, 3 / 4 / 6 columns, captions on hover or keyboard focus</p>
+  <SocialGrid feed={feed} />
+
+  <p class="demo-sg__label">Three columns, captions below</p>
+  <SocialGrid feed={feed} columns={3} max={6} captions="below" />
+
+  <p class="demo-sg__label">Disconnected: the last posts stay up, without the live claim</p>
+  <SocialGrid feed={disconnected} columns={{ base: 3, md: 6 }} max={6} captions="none" />
+
+  <p class="demo-sg__label">No posts: the element renders nothing, and the page decides what to say</p>
+  <div class="demo-sg__empty" data-sg-demo-empty><SocialGrid feed={empty} /></div>
+</div>
+
+<style>
+  .demo-sg {
+    --sg-gap: 0.4rem;
+    --sg-radius: 6px;
+    --sg-follow-bg: var(--purple, #5933d8);
+    --sg-follow-fg: var(--white, #fff);
+    --sg-focus: var(--purple, #5933d8);
+    color: var(--ink, #1d1a2e);
+  }
+  .demo-sg__label {
+    margin: 1.75rem 0 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  .demo-sg__label:first-child {
+    margin-top: 0;
+  }
+  .demo-sg__empty {
+    min-height: 1.5rem;
+    border: 1px dashed var(--line, #e5e1f0);
+    border-radius: var(--radius, 14px);
+  }
+</style>

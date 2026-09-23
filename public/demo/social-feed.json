@@ -1,0 +1,167 @@
+{
+  "_comment": "Demo fixture in the SocialFeedHandler feed shape (GET /v1/feeds/<site>.json). image.url here is a file name in public/demo/, which the demo prefixes with assetBase; the Worker serves absolute URLs on social.compass.st. @neutralgrounds is the library demo café, not a client.",
+  "source": {
+    "username": "neutralgrounds",
+    "profile_url": "https://www.instagram.com/neutralgrounds/",
+    "connected": true,
+    "last_pulled_at": "2026-09-23T06:00:00Z"
+  },
+  "posts": [
+    {
+      "id": "179000000000000001",
+      "permalink": "https://www.instagram.com/p/NGdemo01/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-09-22T14:00:00Z",
+      "image": {
+        "url": "social-01.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "First light on the window counter.",
+      "caption": "First light on the window counter. Doors open at 8, the kettle is already on."
+    },
+    {
+      "id": "179000000000000002",
+      "permalink": "https://www.instagram.com/p/NGdemo02/",
+      "media_type": "VIDEO",
+      "taken_at": "2026-09-19T15:05:00Z",
+      "image": {
+        "url": "social-02.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Pouring the autumn blend, start to finish.",
+      "caption": "Pouring the autumn blend, start to finish. Thirty seconds of calm for your Tuesday."
+    },
+    {
+      "id": "179000000000000003",
+      "permalink": "https://www.instagram.com/p/NGdemo03/",
+      "media_type": "CAROUSEL_ALBUM",
+      "taken_at": "2026-09-17T16:10:00Z",
+      "image": {
+        "url": "social-03.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Five new mugs from the studio down the road.",
+      "caption": "Five new mugs from the studio down the road. Swipe for all of them, and the glaze that went wrong."
+    },
+    {
+      "id": "179000000000000004",
+      "permalink": "https://www.instagram.com/p/NGdemo04/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-09-14T17:15:00Z",
+      "image": {
+        "url": "social-04.svg",
+        "width": 1080,
+        "height": 1350
+      },
+      "alt": "",
+      "caption": null
+    },
+    {
+      "id": "179000000000000005",
+      "permalink": "https://www.instagram.com/p/NGdemo05/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-09-12T18:20:00Z",
+      "image": {
+        "url": "social-05.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Saturday evening set list is up.",
+      "caption": "Saturday evening set list is up. Music from 6, kitchen open till late."
+    },
+    {
+      "id": "179000000000000006",
+      "permalink": "https://www.instagram.com/p/NGdemo06/",
+      "media_type": "VIDEO",
+      "taken_at": "2026-09-09T14:25:00Z",
+      "image": {
+        "url": "social-06.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "",
+      "caption": null
+    },
+    {
+      "id": "179000000000000007",
+      "permalink": "https://www.instagram.com/p/NGdemo07/",
+      "media_type": "CAROUSEL_ALBUM",
+      "taken_at": "2026-09-07T15:30:00Z",
+      "image": {
+        "url": "social-07.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Behind the counter: how the pastry case gets filled before we open.",
+      "caption": "Behind the counter: how the pastry case gets filled before we open. It takes two of us and most of the radio. #behindthecounter #earlyshift"
+    },
+    {
+      "id": "179000000000000008",
+      "permalink": "https://www.instagram.com/p/NGdemo08/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-09-04T16:35:00Z",
+      "image": {
+        "url": "social-08.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Rain outside, cocoa inside.",
+      "caption": "Rain outside, cocoa inside."
+    },
+    {
+      "id": "179000000000000009",
+      "permalink": "https://www.instagram.com/p/NGdemo09/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-09-02T17:40:00Z",
+      "image": {
+        "url": "social-09.svg",
+        "width": 1080,
+        "height": 1350
+      },
+      "alt": "Stacked cups drying on a rack by the sink",
+      "caption": null
+    },
+    {
+      "id": "179000000000000010",
+      "permalink": "https://www.instagram.com/p/NGdemo10/",
+      "media_type": "VIDEO",
+      "taken_at": "2026-08-30T18:45:00Z",
+      "image": {
+        "url": "social-10.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "Grinding for the morning rush.",
+      "caption": "Grinding for the morning rush. Sound on."
+    },
+    {
+      "id": "179000000000000011",
+      "permalink": "https://www.instagram.com/p/NGdemo11/",
+      "media_type": "IMAGE",
+      "taken_at": "2026-08-28T14:50:00Z",
+      "image": {
+        "url": "social-11.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "The long table is back.",
+      "caption": "The long table is back. Bring a friend, or make one."
+    },
+    {
+      "id": "179000000000000012",
+      "permalink": "https://www.instagram.com/p/NGdemo12/",
+      "media_type": "CAROUSEL_ALBUM",
+      "taken_at": "2026-08-25T15:55:00Z",
+      "image": {
+        "url": "social-12.svg",
+        "width": 1080,
+        "height": 1080
+      },
+      "alt": "",
+      "caption": null
+    }
+  ]
+}
