@@ -357,7 +357,7 @@ export const catalog: Element[] = [
       { name: 'hourCycle', type: "'h12' | 'h23'", note: 'Default: the locale’s own (h12 for en-US).' },
       { name: 'locale', type: 'string', note: 'Day and time names. Default: the page’s `lang` in the browser, en-US for the server-rendered table. Set it on a non-English site.' },
       { name: 'label', type: 'string', note: 'Location name, for a site with several; shown above and in the table caption.' },
-      { name: 'jsonLd', type: 'false | { id: string; type?: string }', note: 'Emit openingHoursSpecification for the page’s LocalBusiness node with this `@id` (and `@type`, default LocalBusiness). Omit or false: none. One instance per location sets it; the layout stops hand-writing hours.' },
+      { name: 'jsonLd', type: 'false | { id: string; type?: string }', note: 'Emit openingHoursSpecification for the page’s LocalBusiness node with this `@id` (and `@type`, default LocalBusiness). The id must be absolute (`https://example.com/#business`) and identical to the layout’s: it is emitted verbatim, and a bare `#business` resolves against each page’s own URL. Omit or false: none. One instance per location sets it; the layout stops hand-writing hours.' },
       { name: 'upcomingDays', type: 'number', default: '30', note: 'Exceptions and closures starting within this many days are listed (full).' },
       { name: 'words', type: 'Partial<Words>', note: 'Override any text: open, closed, closesAt, closingIn, opensAt, opensTomorrow, opensOn, reopens, openingIn, closedFor, closedUntil, exceptionHours, open24, byAppointment, the duration units, table headings. `{time}`, `{day}`, `{date}`, `{duration}`, `{name}` are filled in.' },
       { name: 'now', type: 'number | string', note: 'Freezes the clock. Demos and checks only; never on a real site.' },
@@ -390,7 +390,7 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
 
 <!-- Footer: one line, no second JSON-LD -->
 <BusinessHours hours={hours} variant="line" jsonLd={false} />`,
-    usedOn: [{ site: 'wellnessondemand', where: 'Contact page and footer (H1b)' }],
+    usedOn: [{ site: 'wellnessondemand', where: '/contact-us/ (full, JSON-LD as MedicalBusiness) and the footer (line); ecropolis/WellnessOnDemand#1' }],
     file: 'src/library/business-hours/BusinessHours.astro',
     added: '2026-09-23',
   },
