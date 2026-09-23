@@ -448,7 +448,8 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
 //   GET https://social.compass.st/v1/feeds/<site>.json  →  src/data/social.json
 //   unreachable or malformed, and a previous social.json exists → keep it, warn, exit 0
 //   unreachable or malformed, and no social.json yet            → fail the build, exit 1
-// The Worker fires the site's deploy hook when new posts arrive, so the grid refreshes itself.
+// Commit src/data/social.json: a Pages build starts from a clean clone, so the committed copy
+// is the "previous" one. The Worker fires the site's deploy hook when new posts arrive.
 
 ---
 import SocialGrid, { type SocialFeed } from '../components/SocialGrid.astro';
