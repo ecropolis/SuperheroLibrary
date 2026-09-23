@@ -467,6 +467,63 @@ const faqs: AccordionItem[] = [
     file: 'src/library/accordion/Accordion.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'card-slider',
+    name: 'Card slider',
+    aka: ['PowerPack Card Slider', 'Elementor Testimonial Carousel', 'Slick slider', 'Swiper', 'Owl carousel', 'post carousel', 'team carousel'],
+    summary:
+      'A row of cards (testimonials, team, posts, products) on a real horizontally scrolling track with CSS scroll-snap, so touch and trackpad swiping need no code. Arrows page it, dots follow the page, cards per page are set per breakpoint. Loop and autoplay are off by default; autoplay comes with a pause button.',
+    pitch: 'Show more reviews, team members or posts than fit across the page, and let visitors swipe or click through them.',
+    // card slider 210/mo, difficulty 7; card carousel 260/21; testimonial carousel 90/15
+    // (SE Ranking US, 2026-09-23).
+    search: { query: 'card slider', alsoRanks: ['card carousel', 'testimonial carousel'] },
+    replaces: ['PowerPack Card Slider', 'Slick/Swiper/Owl embeds', 'Elementor Pro carousels'],
+    goodFor: 'Testimonials, team members, recent posts, related products: a set of similar cards where seeing three and knowing there are more is enough.',
+    notFor:
+      'A hero (that is video-background or particle-field territory), or anything every visitor must see all of: a slider hides most of its cards, so when each card matters a grid is the honest choice.',
+    props: [
+      { name: 'label', type: 'string', note: 'Accessible name of the carousel, e.g. “What our customers say”. Required.' },
+      { name: 'default slot', type: 'cards', note: 'Each direct child is one card (article, div, figure), not a list. The script names each “3 of 8”.' },
+      { name: 'perView', type: 'number | { base?, md?, lg? }', default: '{ base: 1, md: 2, lg: 3 }', note: 'Cards per page; md ≥ 48rem, lg ≥ 64rem (viewport). A missing breakpoint inherits the one below.' },
+      { name: 'gap', type: 'string', note: 'Space between cards, any CSS length. Overrides `--cs-gap` (fallback 1rem).' },
+      { name: 'loop', type: 'boolean', default: 'false', note: 'Next on the last page rewinds to the first, Previous on the first goes to the last. A visible rewind: no cloned cards, so nothing is read twice.' },
+      { name: 'autoplay', type: 'boolean', default: 'false', note: 'Advance a page every `interval`, rewinding at the end. Adds a pause button. Never under reduced motion.' },
+      { name: 'interval', type: 'number', default: '5000', note: 'ms between pages when autoplaying (at least 2000).' },
+      { name: 'arrows', type: 'boolean', default: 'true', note: 'Previous / Next buttons under the track.' },
+      { name: 'dots', type: 'boolean', default: 'true', note: 'One button per page. With neither arrows nor dots the scrollbar stays visible.' },
+      { name: 'pauseOnHover', type: 'boolean', default: 'true', note: 'Autoplay waits while a mouse is over the slider.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--cs-gap', fallback: '1rem', note: 'Space between cards; the `gap` prop overrides it.' },
+      { name: '--cs-control-bg', fallback: '#1b1c22', note: 'Arrow and pause buttons.' },
+      { name: '--cs-control-fg', fallback: '#fff', note: 'Their icons.' },
+      { name: '--cs-dot', fallback: 'rgb(0 0 0 / 0.25)', note: 'Other pages’ dots.' },
+      { name: '--cs-dot-active', fallback: '#1b1c22', note: 'The current page’s dot, which is also longer.' },
+      { name: '--cs-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'The track is a region with aria-roledescription="carousel" and the `label` as its name, and it is focusable, so ← → scroll it. Each card is role="group" with aria-roledescription="slide" and “3 of 8” in its name.',
+      'The cards’ own links are ordinary tab stops; focusing one scrolls its whole card into view. Arrows and dots are real buttons with names (“Previous”, “Page 2 of 3”); the current dot has aria-current and a longer shape, not only a colour. No aria-live: nothing is announced on its own.',
+      'Swiping, trackpad and scroll-wheel are the browser’s own scrolling. Paging is smooth, and instant under prefers-reduced-motion.',
+      'Autoplay (off by default) has a visible pause button, WCAG 2.2.2, named for what it will do. It waits while hovered, while focus is inside, while the tab is hidden and while off screen, and a swipe restarts its countdown. Under prefers-reduced-motion (tracked live) it never starts and the button is not shown.',
+      'Without JavaScript the track scrolls by hand with its scrollbar visible; arrows, dots and the pause button are absent.',
+    ],
+    usage: `<CardSlider label="What our customers say" perView={{ base: 1, md: 2, lg: 3 }}>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+  <figure class="quote">…</figure>
+</CardSlider>
+
+<CardSlider label="From the blog" perView={{ base: 1, md: 2 }} autoplay interval={6000} loop>
+  {posts.map((p) => <article class="post">…<a href={p.url}>{p.title}</a></article>)}
+</CardSlider>
+<!-- .quotes { --cs-control-bg: var(--brand); --cs-dot-active: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/card-slider/ (demo)' }],
+    file: 'src/library/card-slider/CardSlider.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

@@ -16,6 +16,7 @@ import ParallaxBandDemo from './ParallaxBandDemo.astro';
 import ScrollRevealDemo from './ScrollRevealDemo.astro';
 import BusinessHoursDemo from './BusinessHoursDemo.astro';
 import AccordionDemo from './AccordionDemo.astro';
+import CardSliderDemo from './CardSliderDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,4 +31,5 @@ export const demos: Record<string, AstroComponent> = {
   'scroll-reveal': ScrollRevealDemo,
   'business-hours': BusinessHoursDemo,
   accordion: AccordionDemo,
+  'card-slider': CardSliderDemo,
 };

@@ -1,0 +1,441 @@
+---
+/**
+ * CardSlider — a row of cards (testimonials, team members, posts, products) on a real,
+ * horizontally scrollable track with CSS scroll-snap. What PowerPack's Card Slider, Elementor's
+ * carousels and the Slick / Swiper / Owl embeds were used for, with no library: touch and
+ * trackpad swiping are the browser's own scrolling, so they work with no code at all.
+ *
+ * Every direct child of the default slot is one card. Pass them as children (article, div,
+ * figure), not wrapped in a list: the script gives each one role="group",
+ * aria-roledescription="slide" and "3 of 8" in its name.
+ *
+ * - Arrows scroll the track by one page (`scrollBy` the visible width). Dots, one per page,
+ *   jump to that page and follow the snapped page through an IntersectionObserver.
+ * - `loop` (off by default) makes Next on the last page rewind to the first, and Previous on
+ *   the first go to the last. It is a rewind you can see, not an endless strip: an endless
+ *   strip on a native track means cloning cards, which duplicates links and content for
+ *   screen readers. So it stays off unless asked for.
+ * - `autoplay` (off by default) advances a page every `interval` ms, rewinding at the end. It
+ *   comes with a visible pause button (WCAG 2.2.2), and pauses while hovered (`pauseOnHover`),
+ *   while focus is inside, while the tab is hidden and while the slider is off screen. A swipe
+ *   or scroll restarts the countdown, so it never fights the visitor. Under
+ *   prefers-reduced-motion (tracked live) it does not autoplay and shows no pause button.
+ * - Keyboard: the track is a focusable, labelled region, so ← → scroll it; the cards' own
+ *   links are ordinary tab stops, and focusing one scrolls its card fully into view. Arrow and
+ *   dot buttons are real buttons with names. No aria-live: nothing is announced on its own.
+ * - Without JavaScript the track still scrolls by hand (its scrollbar shows); arrows, dots and
+ *   the pause button are absent.
+ *
+ * Sizing: it fills its container's width. `perView` sets cards per page at each breakpoint
+ * (base, md ≥ 48rem, lg ≥ 64rem, viewport widths); each card gets an equal share of the width
+ * minus the gaps, and the track is as tall as its tallest card (cards stretch to match). Cards
+ * keep a 4px inset so their focus rings are not clipped. No positioning, no z-index.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --cs-gap                  space between cards; the `gap` prop overrides it   (1rem)
+ *   --cs-control-bg / -fg     arrow and pause buttons                          (#1b1c22 / #fff)
+ *   --cs-dot / --cs-dot-active  inactive dot / current page dot                (rgb(0 0 0 / 0.25) / #1b1c22)
+ *   --cs-focus                keyboard focus ring                              (currentColor)
+ */
+interface PerView {
+  base?: number;
+  md?: number;
+  lg?: number;
+}
+interface Props {
+  /** Accessible name of the carousel, e.g. "What our customers say". */
+  label: string;
+  /** Cards per page by breakpoint (md ≥ 48rem, lg ≥ 64rem). A number means every width. */
+  perView?: number | PerView;
+  /** Space between cards, any CSS length. Overrides --cs-gap. */
+  gap?: string;
+  /** Next on the last page rewinds to the first (and Previous on the first goes to the last). */
+  loop?: boolean;
+  autoplay?: boolean;
+  /** ms between pages when autoplaying. */
+  interval?: number;
+  arrows?: boolean;
+  dots?: boolean;
+  pauseOnHover?: boolean;
+  class?: string;
+}
+const {
+  label,
+  perView = { base: 1, md: 2, lg: 3 },
+  gap,
+  loop = false,
+  autoplay = false,
+  interval = 5000,
+  arrows = true,
+  dots = true,
+  pauseOnHover = true,
+  class: className,
+} = Astro.props;
+const pv: PerView = typeof perView === 'number' ? { base: perView } : perView;
+const whole = (n: number | undefined) => (n && n >= 1 ? Math.round(n) : undefined);
+const vars = [
+  whole(pv.base) && `--cs-pv-base:${whole(pv.base)}`,
+  whole(pv.md) && `--cs-pv-md:${whole(pv.md)}`,
+  whole(pv.lg) && `--cs-pv-lg:${whole(pv.lg)}`,
+  gap && `--cs-gap:${gap}`,
+]
+  .filter(Boolean)
+  .join(';');
+const uid = 'cs-' + Math.random().toString(36).slice(2, 8);
+---
+
+<div
+  class:list={['cs', { 'cs--bare': !arrows && !dots }, className]}
+  style={vars || undefined}
+  data-cs
+  data-loop={loop ? '' : undefined}
+  data-autoplay={autoplay ? '' : undefined}
+  data-interval={interval}
+  data-pause-hover={pauseOnHover ? '' : undefined}
+>
+  {
+    autoplay && (
+      <div class="cs__bar">
+        <button class="cs__btn cs__play" type="button" aria-controls={`${uid}-track`} hidden data-cs-play>
+          <span class="cs__play-icon" aria-hidden="true" />
+          <span class="cs__sr" data-cs-play-text>Pause automatic slide show</span>
+        </button>
+      </div>
+    )
+  }
+  <div class="cs__track" id={`${uid}-track`} role="region" aria-roledescription="carousel" aria-label={label} tabindex="0" data-cs-track>
+    <slot />
+  </div>
+  {
+    (arrows || dots) && (
+      <div class="cs__controls" hidden data-cs-controls>
+        {arrows && (
+          <button class="cs__btn cs__arrow cs__arrow--prev" type="button" aria-controls={`${uid}-track`} data-cs-prev>
+            <span class="cs__sr">Previous</span>
+          </button>
+        )}
+        {dots && <div class="cs__dots" role="group" aria-label="Pages" data-cs-dots />}
+        {arrows && (
+          <button class="cs__btn cs__arrow cs__arrow--next" type="button" aria-controls={`${uid}-track`} data-cs-next>
+            <span class="cs__sr">Next</span>
+          </button>
+        )}
+      </div>
+    )
+  }
+</div>
+
+<script is:inline>
+  (() => {
+    if (window.__cardSlider) return;
+    window.__cardSlider = true;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const init = (root) => {
+      if (root.dataset.ready) return;
+      root.dataset.ready = '1';
+      root.classList.add('cs--js');
+      const track = root.querySelector('[data-cs-track]');
+      const cards = [...track.children];
+      const n = cards.length;
+      const controls = root.querySelector('[data-cs-controls]');
+      const prev = root.querySelector('[data-cs-prev]');
+      const next = root.querySelector('[data-cs-next]');
+      const dotsBox = root.querySelector('[data-cs-dots]');
+      const play = root.querySelector('[data-cs-play]');
+      const loop = 'loop' in root.dataset;
+      const interval = Math.max(2000, parseFloat(root.dataset.interval) || 5000);
+
+      cards.forEach((c, i) => {
+        const own = c.getAttribute('aria-label');
+        c.setAttribute('role', 'group');
+        c.setAttribute('aria-roledescription', 'slide');
+        c.setAttribute('aria-label', `${i + 1} of ${n}${own ? `: ${own}` : ''}`);
+      });
+      if (controls) controls.hidden = false;
+
+      const cs = () => getComputedStyle(track);
+      const perView = () => Math.max(1, Math.min(n, Math.round(parseFloat(cs().getPropertyValue('--cs-pv')) || 1)));
+      const rtl = () => cs().direction === 'rtl';
+      let pv = perView();
+      let pages = Math.max(1, Math.ceil(n / pv));
+      let page = 0;
+      const visible = new Set();
+
+      /** Scroll so card i sits at the start of the track. */
+      const toCard = (i) => {
+        const c = cards[Math.max(0, Math.min(i, n - pv))];
+        if (!c) return;
+        const s = cs();
+        const pad = parseFloat(rtl() ? s.paddingRight : s.paddingLeft) || 0;
+        const tr = track.getBoundingClientRect();
+        const cr = c.getBoundingClientRect();
+        const delta = rtl() ? cr.right - (tr.right - pad) : cr.left - (tr.left + pad);
+        track.scrollTo({ left: track.scrollLeft + delta });
+      };
+      const toPage = (p) => toCard(p * pv);
+      /** One page forward or back; `wrap` rewinds at the ends (loop, and autoplay). */
+      const step = (dir, wrap = loop) => {
+        const atStart = !visible.size || Math.min(...visible) === 0;
+        const atEnd = visible.has(n - 1);
+        if (dir > 0 && atEnd) return wrap ? toPage(0) : undefined;
+        if (dir < 0 && atStart) return wrap ? toPage(pages - 1) : undefined;
+        const s = cs();
+        const width = track.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) + (parseFloat(s.columnGap) || 0);
+        track.scrollBy({ left: dir * width * (rtl() ? -1 : 1) });
+      };
+
+      const dotButtons = [];
+      const buildDots = () => {
+        if (!dotsBox) return;
+        dotsBox.replaceChildren();
+        dotButtons.length = 0;
+        dotsBox.hidden = pages < 2;
+        for (let p = 0; p < pages; p++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cs__dot';
+          b.setAttribute('aria-label', `Page ${p + 1} of ${pages}`);
+          b.setAttribute('aria-controls', track.id);
+          b.addEventListener('click', () => toPage(p));
+          dotsBox.append(b);
+          dotButtons.push(b);
+        }
+      };
+      const update = () => {
+        if (visible.size) {
+          const first = Math.min(...visible);
+          page = visible.has(n - 1) ? pages - 1 : Math.min(pages - 1, Math.floor(first / pv));
+        }
+        dotButtons.forEach((b, p) => (p === page ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current')));
+        const first = visible.size ? Math.min(...visible) : 0;
+        if (prev) prev.setAttribute('aria-disabled', String(!loop && first === 0));
+        if (next) next.setAttribute('aria-disabled', String(!loop && (visible.has(n - 1) || n <= pv)));
+        if (controls) controls.hidden = n <= pv;
+      };
+
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            const i = cards.indexOf(e.target);
+            e.intersectionRatio >= 0.6 ? visible.add(i) : visible.delete(i);
+          }
+          update();
+        },
+        { root: track, threshold: [0, 0.6, 1] },
+      );
+      cards.forEach((c) => io.observe(c));
+
+      new ResizeObserver(() => {
+        const was = pv;
+        pv = perView();
+        pages = Math.max(1, Math.ceil(n / pv));
+        if (was !== pv || dotButtons.length !== pages) buildDots();
+        update();
+      }).observe(track);
+      buildDots();
+      update();
+
+      prev?.addEventListener('click', () => step(-1));
+      next?.addEventListener('click', () => step(1));
+
+      // A card whose link gets focus is scrolled fully into view, not just the link.
+      track.addEventListener('focusin', (e) => {
+        const i = cards.findIndex((c) => c.contains(e.target) && c !== e.target);
+        if (i < 0) return;
+        const tr = track.getBoundingClientRect();
+        const cr = cards[i].getBoundingClientRect();
+        if (cr.left < tr.left - 1 || cr.right > tr.right + 1) toCard(i);
+      });
+
+      // ---- autoplay
+      if (!play) return;
+      const playText = root.querySelector('[data-cs-play-text]');
+      let userPaused = false;
+      let hovered = false;
+      let focused = false;
+      let onScreen = false;
+      let timer = 0;
+      const autoplaying = () => !still.matches;
+      const running = () => autoplaying() && !userPaused && !hovered && !focused && onScreen && !document.hidden && n > pv;
+      const schedule = () => {
+        clearTimeout(timer);
+        if (running()) timer = setTimeout(() => running() && step(1, true), interval);
+      };
+      const render = () => {
+        play.hidden = !autoplaying();
+        play.classList.toggle('cs__play--paused', userPaused);
+        playText.textContent = userPaused ? 'Start automatic slide show' : 'Pause automatic slide show';
+        schedule();
+      };
+      play.addEventListener('click', () => { userPaused = !userPaused; render(); });
+      if ('pauseHover' in root.dataset) {
+        root.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') { hovered = true; schedule(); } });
+        root.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { hovered = false; schedule(); } });
+      }
+      root.addEventListener('focusin', () => { focused = true; schedule(); });
+      root.addEventListener('focusout', (e) => { if (!root.contains(e.relatedTarget)) { focused = false; schedule(); } });
+      document.addEventListener('visibilitychange', schedule);
+      new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; schedule(); }).observe(root);
+      // Any scroll, ours or the visitor's, restarts the countdown once it settles.
+      let settle = 0;
+      track.addEventListener('scroll', () => { clearTimeout(timer); clearTimeout(settle); settle = setTimeout(schedule, 200); }, { passive: true });
+      still.addEventListener('change', render);
+      render();
+    };
+
+    const boot = () => document.querySelectorAll('[data-cs]').forEach(init);
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+  })();
+</script>
+
+<style>
+  .cs {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .cs [hidden] {
+    display: none !important;
+  }
+  .cs__track {
+    --cs-pv: var(--cs-pv-base, 1);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - (var(--cs-pv) - 1) * var(--cs-gap, 1rem)) / var(--cs-pv));
+    gap: var(--cs-gap, 1rem);
+    padding: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 4px;
+  }
+  @media (min-width: 48rem) {
+    .cs__track {
+      --cs-pv: var(--cs-pv-md, var(--cs-pv-base, 1));
+    }
+  }
+  @media (min-width: 64rem) {
+    .cs__track {
+      --cs-pv: var(--cs-pv-lg, var(--cs-pv-md, var(--cs-pv-base, 1)));
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cs__track {
+      scroll-behavior: smooth;
+    }
+  }
+  /* With working arrows and dots the scrollbar is noise; without them it is the affordance. */
+  .cs--js:not(.cs--bare) .cs__track {
+    scrollbar-width: none;
+  }
+  .cs--js:not(.cs--bare) .cs__track::-webkit-scrollbar {
+    display: none;
+  }
+  .cs__track > :global(*) {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  .cs__track:focus-visible,
+  .cs :focus-visible {
+    outline: 3px solid var(--cs-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .cs__track:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .cs__bar {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .cs__controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+  .cs__btn {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--cs-control-bg, #1b1c22);
+    color: var(--cs-control-fg, #fff);
+    cursor: pointer;
+  }
+  .cs__btn[aria-disabled='true'] {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .cs__arrow::before {
+    content: '';
+    width: 0.6rem;
+    height: 0.6rem;
+    border-top: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+  }
+  .cs__arrow--next::before {
+    rotate: 45deg;
+    translate: -0.12rem 0;
+  }
+  .cs__arrow--prev::before {
+    rotate: -135deg;
+    translate: 0.12rem 0;
+  }
+  .cs:dir(rtl) .cs__arrow::before {
+    scale: -1 1;
+  }
+  .cs__play-icon {
+    width: 0.8rem;
+    height: 0.9rem;
+    border-inline: 0.27rem solid currentColor;
+  }
+  .cs__play--paused .cs__play-icon {
+    width: 0;
+    height: 0;
+    border-inline: 0;
+    border-block: 0.5rem solid transparent;
+    border-left: 0.8rem solid currentColor;
+    translate: 0.1rem 0;
+  }
+  .cs__dots {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .cs__dots :global(.cs__dot) {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .cs__dots :global(.cs__dot)::before {
+    content: '';
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    background: var(--cs-dot, rgb(0 0 0 / 0.25));
+  }
+  /* The current page is a longer pill, not just a different colour. */
+  .cs__dots :global(.cs__dot[aria-current='true'])::before {
+    width: 1.25rem;
+    background: var(--cs-dot-active, #1b1c22);
+  }
+  .cs__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
