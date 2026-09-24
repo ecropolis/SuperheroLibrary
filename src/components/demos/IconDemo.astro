@@ -29,7 +29,7 @@ const { assetBase = '/demo/' } = Astro.props;
 const asset = (name: string) => assetBase + name;
 
 type Entry = { n: string; l: string; t: string[]; s: Record<string, [string, string]> };
-const data = iconData as Entry[];
+const data = iconData as unknown as Entry[];
 
 const PAGE_SIZE = 200;
 const total = data.length;
