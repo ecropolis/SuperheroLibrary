@@ -20,7 +20,10 @@
  * `prefers-reduced-motion` (tracked live) and `motion="off"` draw one still frame and stop the
  * loop (the CSS presets pause their keyframe); `minWidth` tracked live; one per page — a
  * second live instance warns and draws only its still; a custom element, so removal (Astro view
- * transitions, SPA swaps) cancels the frame and frees the canvas.
+ * transitions, SPA swaps) cancels the frame and frees the canvas. `pointer` (drift, repel or
+ * none) lets the canvas presets lean toward or away from the mouse, on fine pointers only,
+ * never on touch, and never in a still state; the pointer is two eased numbers the frame
+ * already reads, so an idle pointer costs nothing.
  *
  * Stacking is the host's: it fills its nearest positioned ancestor, between the background
  * and the copy in z order (see the catalogue's usage block).
@@ -42,11 +45,13 @@ interface Props {
   minWidth?: number;
   /** `off` draws the still frame always. */
   motion?: 'auto' | 'off';
+  /** How the canvas presets answer the mouse: lean toward it, away from it, or not at all. Fine pointers only. */
+  pointer?: 'drift' | 'repel' | 'none';
   /** scroll-x / scroll-y only: URL of the host's own square, seamlessly tiling image (drawn at 512 px). */
   texture?: string;
   class?: string;
 }
-const { preset = 'waves', palette = 'superhero', intensity = 'medium', speed = 1, minWidth = 700, motion = 'auto', texture, class: className } = Astro.props;
+const { preset = 'waves', palette = 'superhero', intensity = 'medium', speed = 1, minWidth = 700, motion = 'auto', pointer = 'drift', texture, class: className } = Astro.props;
 if (!PRESETS.includes(preset)) throw new Error(`AnimatedBackground: unknown preset "${preset}". One of: ${PRESETS.join(', ')}.`);
 const css = preset === 'scroll-x' || preset === 'scroll-y';
 
@@ -83,6 +88,7 @@ const style = [
   data-speed={speed}
   data-min-width={minWidth}
   data-motion={motion}
+  data-pointer={pointer}
   data-still={motion === 'off' ? '' : undefined}
   style={style}
 >
@@ -98,7 +104,9 @@ const style = [
     // Each preset is { init(o) -> state, draw(ctx, t, dt, state, o) }. `o` is { w, h, level,
     // pace, a, b, c } with the palette as [r, g, b]. `t` is seconds (already scaled by
     // `speed`), `dt` the seconds since the last frame (0 for a still). A still frame is
-    // draw(T0) on a fresh state, so every preset spreads its elements at init.
+    // draw(T0) on a fresh state, so every preset spreads its elements at init. The pointer is
+    // o.px, o.py (0–1 across the box, eased, 0.5 when idle or absent), o.pm (+1 drift, -1
+    // repel, 0 none) and o.pvx (how far the eased x still trails the real one: a gust).
     const T0 = 10;
     const TAU = Math.PI * 2;
     const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
@@ -137,6 +145,14 @@ const style = [
       s.octx.putImageData(s.img, 0, 0);
       ctx.drawImage(s.off, 0, 0, o.w, o.h);
     };
+    // Force on a point from the pointer: toward it for drift, away for repel, fading to
+    // nothing at `radius` (in box heights). Returns [fx, fy] in box units.
+    const poke = (o, x, y, radius) => {
+      if (!o.pm) return [0, 0];
+      const ex = o.px - x / o.w, ey = o.py - y / o.h, d = Math.hypot(ex * (o.w / o.h), ey) || 1;
+      const f = d < radius ? ((radius - d) / radius) * o.pm / d : 0;
+      return [ex * f, ey * f];
+    };
     const wrap = (p, o, m) => {
       if (p.x < -m) p.x += o.w + 2 * m; else if (p.x > o.w + m) p.x -= o.w + 2 * m;
       if (p.y < -m) p.y += o.h + 2 * m; else if (p.y > o.h + m) p.y -= o.h + 2 * m;
@@ -148,7 +164,8 @@ const style = [
       waves: {
         init: (o) => ({ bands: [0.4, 0.52, 0.64, 0.76, 0.86].slice(0, o.level < 1 ? 3 : o.level > 1 ? 5 : 4) }),
         draw(ctx, t, dt, s, o) {
-          const amp = o.h * 0.06 * (0.7 + 0.3 * o.level);
+          const lean = (o.px - 0.5) * 2 * o.pm; // the bands lean and swell toward the cursor's x
+          const amp = o.h * 0.06 * (0.7 + 0.3 * o.level) * (1 + 0.3 * Math.abs(lean));
           s.bands.forEach((base, i) => {
             const g = ctx.createLinearGradient(0, o.h * base - amp, 0, o.h);
             g.addColorStop(0, rgba(mix(o.a, o.c, 0.15 * (3 - i)), 0.35 + i * 0.18));
@@ -158,7 +175,7 @@ const style = [
             ctx.moveTo(0, o.h);
             for (let x = 0; x <= o.w + 8; x += 8) {
               const k = x / o.w;
-              const y = o.h * base + amp * Math.sin(k * 5.2 + t * (0.5 + i * 0.12) + i) + amp * 0.5 * Math.sin(k * 11 - t * (0.32 + i * 0.08) + i * 2.1);
+              const y = o.h * base + amp * Math.sin(k * 5.2 + t * (0.5 + i * 0.12) + i + lean) + amp * 0.5 * Math.sin(k * 11 - t * (0.32 + i * 0.08) + i * 2.1);
               ctx.lineTo(x, y);
             }
             ctx.lineTo(o.w + 8, o.h);
@@ -178,7 +195,10 @@ const style = [
         },
         draw(ctx, t, dt, s, o) {
           const asp = o.w / o.h, r = s.r, R = 1 / (r * r * 1.4);
-          for (const p of s.seeds) { p.ox = p.x + 0.05 * Math.sin(t * p.fx + p.px); p.oy = p.y + 0.05 * Math.sin(t * p.fy + p.py); }
+          for (const p of s.seeds) {
+            p.ox = p.x + 0.05 * Math.sin(t * p.fx + p.px); p.oy = p.y + 0.05 * Math.sin(t * p.fy + p.py);
+            const [fx, fy] = poke(o, p.ox * o.w, p.oy * o.h, 0.35); p.ox += fx * 0.08; p.oy += fy * 0.08; // seeds near the cursor lean in or away
+          }
           raster(ctx, s, o, 150, (x, y, d, i) => {
             let d1 = 9, d2 = 9;
             for (const p of s.seeds) {
@@ -197,8 +217,9 @@ const style = [
         init: () => ({}),
         draw(ctx, t, dt, s, o) {
           const asp = o.w / o.h, f = 2.2, depth = 0.5 + 0.5 * o.level;
+          const ox = (o.px - 0.5) * 0.4 * o.pm, oy = (o.py - 0.5) * 0.4 * o.pm; // parallax: the field slides with the cursor
           raster(ctx, s, o, 120, (x, y, d, i) => {
-            const n1 = fbm(x * f * asp + t * 0.06, y * f + t * 0.015, 3);
+            const n1 = fbm((x + ox) * f * asp + t * 0.06, (y + oy) * f + t * 0.015, 3);
             const n2 = fbm(x * f * 1.9 * asp - t * 0.04 + 40, y * f * 1.9 + 40, 2);
             const n = clamp01((n1 * 0.7 + n2 * 0.3 - 0.3) * 2.2);
             const c = n < 0.5 ? mix(o.b, o.a, n * 2) : mix(o.a, o.c, (n - 0.5) * 2);
@@ -213,7 +234,7 @@ const style = [
         draw(ctx, t, dt, s, o) {
           ctx.lineWidth = 1.5;
           s.centres.forEach((c, ci) => {
-            const cx = c.x * o.w, cy = c.y * o.h, t1 = t + ci * 0.7;
+            const cx = (c.x + (o.px - 0.5) * 0.3 * o.pm) * o.w, cy = (c.y + (o.py - 0.5) * 0.3 * o.pm) * o.h, t1 = t + ci * 0.7; // centres trail the cursor
             for (let k = Math.max(0, Math.floor((t1 - s.life) / s.every)); k * s.every <= t1; k++) {
               const age = t1 - k * s.every, r = age * s.v * (0.8 + 0.2 * o.level);
               if (age <= 0) continue;
@@ -236,6 +257,7 @@ const style = [
           ctx.lineWidth = 1.2;
           for (const b of s.bs) {
             b.y -= b.v * dt * (0.7 + 0.3 * o.level);
+            const [fx, fy] = poke(o, b.x, b.y, 0.3); b.x += fx * o.w * 0.6 * dt; b.y += fy * o.h * 0.6 * dt; // a gentle push
             if (b.y < -b.r * 2) { b.y = o.h + b.r * 2; b.x = Math.random() * o.w; }
             const x = b.x + Math.sin(t * b.w + b.ph) * 9;
             ctx.fillStyle = rgba(o.c, 0.1); ctx.strokeStyle = rgba(o.c, 0.35);
@@ -271,6 +293,7 @@ const style = [
             }
             if (n) { b.vx += ((ax / n - b.vx) * 3 + (cx / n - b.x) * 0.6 + sx * 4) * step; b.vy += ((ay / n - b.vy) * 3 + (cy / n - b.y) * 0.6 + sy * 4) * step; }
             b.vx += (o.w / 2 - b.x) * 0.04 * step; b.vy += (o.h / 2 - b.y) * 0.08 * step;
+            const [fx, fy] = poke(o, b.x, b.y, 0.45); b.vx += fx * o.w * 1.2 * step; b.vy += fy * o.h * 1.2 * step; // drawn to the cursor, or scattered
             const v = Math.hypot(b.vx, b.vy) || 1, cap = Math.min(vmax, Math.max(40, v)) / v;
             b.vx *= cap; b.vy *= cap;
             b.x += b.vx * step; b.y += b.vy * step;
@@ -299,7 +322,7 @@ const style = [
           return { fs };
         },
         draw(ctx, t, dt, s, o) {
-          const drift = Math.sin(t * 0.2) * 12;
+          const drift = Math.sin(t * 0.2) * 12 + o.pvx * o.pm * 600; // a sweep of the cursor is a gust
           for (const f of s.fs) {
             f.y += f.v * dt * (0.7 + 0.3 * o.level); f.x += (Math.sin(t * f.sw + f.ph) * 10 + drift) * dt;
             wrap(f, o, 4);
@@ -310,15 +333,16 @@ const style = [
       },
       // Two radial glows, one in a and one in c, breathing out of phase. Three gradient fills.
       halo: {
-        init: () => ({}),
+        init: () => ({ hx: 0.5, hy: 0.5 }),
         draw(ctx, t, dt, s, o) {
+          s.hx += (o.px - s.hx) * Math.min(1, dt * 0.8); s.hy += (o.py - s.hy) * Math.min(1, dt * 0.8); // a long lag behind the cursor
           const glow = (x, y, r, c, a) => {
             const g = ctx.createRadialGradient(x, y, 0, x, y, r);
             g.addColorStop(0, rgba(c, a)); g.addColorStop(1, rgba(c, 0));
             ctx.fillStyle = g; ctx.fillRect(0, 0, o.w, o.h);
           };
           const base = Math.max(o.w, o.h) * (0.35 + 0.1 * o.level);
-          glow(o.w * 0.5, o.h * 0.55, base * (1 + 0.12 * Math.sin(t * 0.5)), o.a, 0.55);
+          glow(o.w * (0.5 + (s.hx - 0.5) * 0.4 * o.pm), o.h * (0.55 + (s.hy - 0.5) * 0.4 * o.pm), base * (1 + 0.12 * Math.sin(t * 0.5)), o.a, 0.55);
           glow(o.w * 0.35, o.h * 0.4, base * 0.6 * (1 + 0.15 * Math.sin(t * 0.37 + 2)), o.c, 0.22);
           glow(o.w * 0.7, o.h * 0.65, base * 0.5 * (1 + 0.15 * Math.sin(t * 0.43 + 4)), o.a, 0.35);
         },
@@ -339,11 +363,13 @@ const style = [
     };
 
     class AnimatedBackground extends HTMLElement {
-      static observedAttributes = ['data-preset', 'data-intensity', 'data-speed', 'data-motion'];
+      static observedAttributes = ['data-preset', 'data-intensity', 'data-speed', 'data-motion', 'data-pointer'];
       connectedCallback() { this.frames = 0; this.ms = 0; this.setup(); }
       disconnectedCallback() { this.teardown(); }
       attributeChangedCallback() { if (this.isConnected && this.ctx !== undefined) this.setup(); }
       get preset() { return PRESETS[this.dataset.preset] ? this.dataset.preset : null; }
+      /** The eased pointer, for checks. */
+      get cursor() { return this.o ? [this.o.px, this.o.py] : null; }
       get stillOnly() { return this.dataset.motion === 'off' || (live && live !== this && live.isConnected) || this.reduced?.matches || (this.small && this.small.matches); }
 
       setup() {
@@ -376,8 +402,20 @@ const style = [
         if (!ctx) return;
         const p = PRESETS[preset], level = LEVEL[this.dataset.intensity] || 1, pace = parseFloat(this.dataset.speed) || 1;
         const cs = getComputedStyle(this), v = (n, f) => parse(cs.getPropertyValue(n).trim() || f, f);
-        const o = { w: 0, h: 0, level, pace, a: v('--ab-a', '#5933d8'), b: v('--ab-b', '#1e283c'), c: v('--ab-c', '#fff') };
+        const o = (this.o = { w: 0, h: 0, level, pace, a: v('--ab-a', '#5933d8'), b: v('--ab-b', '#1e283c'), c: v('--ab-c', '#fff'), px: 0.5, py: 0.5, pm: 0, pvx: 0 });
         let state, raf = 0, last = 0, t = T0, visible = true, ema = 0, n = 0, interval = 1000 / 60;
+        // The pointer: fine pointers only, never touch. Listeners on the host (the hero), not
+        // the canvas, which keeps pointer-events: none. They only store the last position;
+        // the frame samples it once and eases toward it, so an idle pointer costs two lerps.
+        const mode = { drift: 1, repel: -1 }[this.dataset.pointer] || 0;
+        let tx = 0.5, ty = 0.5, mx = 0, my = 0, moved = false;
+        if (mode && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+          this.host = this.parentElement || window;
+          this.onMove = (e) => { mx = e.clientX; my = e.clientY; moved = true; };
+          this.onLeave = () => { tx = ty = 0.5; moved = false; }; // eases back to neutral in about a second
+          this.host.addEventListener('pointermove', this.onMove);
+          this.host.addEventListener('pointerleave', this.onLeave);
+        }
         const resize = () => {
           const box = this.getBoundingClientRect();
           o.w = Math.max(1, Math.round(box.width)); o.h = Math.max(1, Math.round(box.height));
@@ -387,13 +425,17 @@ const style = [
           state = p.init(o);
         };
         const frame = (dt) => { ctx.clearRect(0, 0, o.w, o.h); p.draw(ctx, t, dt, state, o); this.frames++; };
-        const still = () => { t = T0; frame(0); };
+        // A still never depends on the pointer or on where a run left things.
+        const still = () => { t = T0; o.px = o.py = 0.5; o.pm = o.pvx = 0; state = p.init(o); frame(0); };
         const step = (now) => {
           raf = 0;
           if (last && now - last < interval - 2) return schedule();
           const dt = last ? Math.min(0.1, (now - last) / 1000) * pace : 0;
           last = now;
           t += dt;
+          if (moved) { moved = false; const r = this.getBoundingClientRect(); tx = clamp01((mx - r.left) / r.width); ty = clamp01((my - r.top) / r.height); }
+          const k = Math.min(1, dt * 3);
+          o.pm = mode; o.pvx = tx - o.px; o.px += o.pvx * k; o.py += (ty - o.py) * k;
           const t0 = performance.now();
           frame(dt);
           // Adapt: a large canvas at high intensity that costs more than ~12 ms a frame drops
@@ -430,6 +472,7 @@ const style = [
         this.halt?.();
         this.ro?.disconnect(); this.io?.disconnect();
         if (this.onVis) document.removeEventListener('visibilitychange', this.onVis);
+        if (this.host) { this.host.removeEventListener('pointermove', this.onMove); this.host.removeEventListener('pointerleave', this.onLeave); this.host = null; }
         this.small?.removeEventListener('change', this.sync);
         this.reduced?.removeEventListener('change', this.sync);
         this.ro = this.io = this.onVis = this.halt = null;

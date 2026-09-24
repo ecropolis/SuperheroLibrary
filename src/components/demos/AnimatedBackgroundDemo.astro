@@ -4,7 +4,8 @@
  * superherotech.ai"), so every host token has a fallback. It uses no assets.
  *
  * One live instance, in the hero recipe with copy over it; the picker and the intensity
- * buttons write its `data-preset` / `data-intensity`, which the element watches. The second
+ * buttons write its `data-preset` / `data-intensity` / `data-pointer`, which the element watches.
+ * The pointer toggle does nothing on a touch screen (the element ignores coarse pointers). The second
  * instance is `motion="off"`: the still frame, which is also what a visitor who asked for
  * reduced motion gets from the live one.
  */
@@ -24,6 +25,12 @@ const presets = [
     <div class="demo-ab__group" role="group" aria-label="Intensity">
       {['low', 'medium', 'high'].map((v) => (
         <button type="button" data-intensity={v} aria-pressed={v === 'medium' ? 'true' : 'false'}>{v}</button>
+      ))}
+    </div>
+    <div class="demo-ab__group" role="group" aria-label="Pointer">
+      <span class="demo-ab__label">Pointer</span>
+      {['drift', 'repel', 'none'].map((v) => (
+        <button type="button" data-pointer={v} aria-pressed={v === 'drift' ? 'true' : 'false'}>{v}</button>
       ))}
     </div>
   </div>
@@ -51,7 +58,7 @@ const presets = [
       demo.dataset.ready = '1';
       const el = demo.querySelector('animated-background:not([data-motion="off"])');
       if (!el) continue;
-      for (const key of ['preset', 'intensity']) {
+      for (const key of ['preset', 'intensity', 'pointer']) {
         const buttons = demo.querySelectorAll(`button[data-${key}]`);
         buttons.forEach((b) =>
           b.addEventListener('click', () => {
@@ -79,6 +86,12 @@ const presets = [
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
+  }
+  .demo-ab__label {
+    font-size: 0.85rem;
+    align-self: center;
+    color: var(--ink, #1b1c22);
+    opacity: 0.7;
   }
   .demo-ab__group button {
     font: inherit;

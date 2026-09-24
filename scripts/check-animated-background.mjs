@@ -17,7 +17,9 @@
  *    and no file calling their APIs (THREE., VANTA., particlesJS). The words themselves are
  *    allowed in catalogue copy and comments: the page says what it replaces.
  * 5. The built demo page has exactly one live instance (not motion="off"); the still one is
- *    there too, and both are aria-hidden.
+ *    there too, and both are aria-hidden. Its props table lists `pointer`.
+ * 6. The pointer never lands on the canvas: the style keeps `pointer-events: none`, and no
+ *    move listener is attached to the canvas itself (the host gets it).
  *
  * Exits 1 with one line per failure.
  */
@@ -101,7 +103,7 @@ try {
   finish('still frames');
 }
 if (typeof T0 !== 'number') fail('the presets block must define T0, the time the still frame is drawn at.');
-const o = { w: 1280, h: 600, level: 1, pace: 1, a: [89, 51, 216], b: [30, 40, 60], c: [255, 255, 255] };
+const o = { w: 1280, h: 600, level: 1, pace: 1, a: [89, 51, 216], b: [30, 40, 60], c: [255, 255, 255], px: 0.5, py: 0.5, pm: 0, pvx: 0 };
 for (const name of fromMap) {
   const p = presets[name];
   if (!p || typeof p.init !== 'function' || typeof p.draw !== 'function') {
@@ -115,6 +117,8 @@ for (const name of fromMap) {
       const state = p.init(opts);
       p.draw(ctx, T0, 0, state, opts); // the still: fresh state, T0, no elapsed time
       p.draw(ctx, T0 + 1 / 60, 1 / 60, state, opts); // and one animated step after it
+      p.draw(ctx, T0 + 2 / 60, 1 / 60, state, { ...opts, px: 0.2, py: 0.7, pm: 1, pvx: 0.1 }); // and one with the pointer in play
+      p.draw(ctx, T0 + 3 / 60, 1 / 60, state, { ...opts, px: 0.8, py: 0.3, pm: -1, pvx: -0.1 });
     } catch (e) {
       fail(`${name} at level ${level}: draw threw: ${e.message}`);
       continue;
@@ -174,6 +178,16 @@ for (const t of tags) {
   if (/\sdata-motion="off"/.test(t) && !/\sdata-still(?=[\s>=])/.test(t)) fail('dist/animated-background/index.html: the motion="off" instance must render with data-still, so the CSS presets hold without JavaScript.');
 }
 if (!/<button type="button" data-preset="/.test(html)) fail('dist/animated-background/index.html: the demo has no preset picker.');
+if (!/<button type="button" data-pointer="/.test(html)) fail('dist/animated-background/index.html: the demo has no pointer toggle.');
+if (!/<td[^>]*><code[^>]*>pointer<\/code><\/td>/.test(html)) fail('dist/animated-background/index.html: the props table does not list `pointer`.');
 finish('built page');
 
-console.log(`check-animated-background ok: ${fromList.length} presets agree, ${fromMap.length} canvas stills drawn at 3 intensities, one live instance on the demo page.`);
+// ------------------------------------------------------------ 6. pointer stays off the canvas
+const style = src.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+if (!/\.ab\s*\{[^}]*pointer-events:\s*none/.test(style)) fail(`${file}: the element must keep pointer-events: none; the pointer is read from the host.`);
+if (/canvas\.addEventListener\(\s*['"](?:mouse|pointer)/.test(script) || /\.ab__canvas[^}]*pointer-events:\s*(?!none)/.test(style)) fail(`${file}: a mouse or pointer listener is attached to the canvas itself; listen on the host.`);
+if (!/addEventListener\('pointermove'/.test(script)) fail(`${file}: no pointermove listener at all; the pointer prop does nothing.`);
+if (!/\(hover: hover\) and \(pointer: fine\)/.test(script)) fail(`${file}: the pointer reaction must be gated on a fine pointer (hover: hover and pointer: fine).`);
+finish('pointer');
+
+console.log(`check-animated-background ok: ${fromList.length} presets agree, ${fromMap.length} canvas stills drawn at 3 intensities (and with the pointer in play), one live instance on the demo page, pointer off the canvas.`);

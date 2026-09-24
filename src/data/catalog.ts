@@ -1215,6 +1215,7 @@ import { analytics } from '../data/site';
       { name: 'speed', type: 'number', default: '1', note: 'Multiplier on the preset’s own pace; the scroll presets take 40 s per tile at 1.' },
       { name: 'minWidth', type: 'number', default: '700', note: 'Below this viewport width the still frame is drawn and nothing animates. 0 animates everywhere. Tracked live.' },
       { name: 'motion', type: "'auto' | 'off'", default: "'auto'", note: 'off draws the still frame always; such an instance does not count against one-per-page.' },
+      { name: 'pointer', type: "'drift' | 'repel' | 'none'", default: "'drift'", note: 'How the canvas presets answer the mouse: waves lean and swell toward its x, cells and bubbles lean in or away, fog slides in parallax, rings and the halo centre trail it, birds are drawn or scattered, snow gusts with a sweep. Fine pointers only (hover + pointer: fine), never on touch; no reaction under reduced motion, with motion="off" or below minWidth. Listeners sit on the host, the canvas keeps pointer-events: none. The scroll presets do not react.' },
       { name: 'texture', type: 'string', note: 'scroll-x / scroll-y only: URL of the host’s own square, seamlessly tiling image, drawn at 512 px, in place of the generated one. Never a client image on a shared page.' },
       { name: 'class', type: 'string', note: 'Class for the host to position and stack it with.' },
     ],
@@ -1227,14 +1228,15 @@ import { analytics } from '../data/site';
     ],
     a11y: [
       'Decorative: aria-hidden, no pointer events, nothing announced.',
+      'The pointer reaction is decorative and never required to reach any content; it is off on touch screens and in every still state.',
       'prefers-reduced-motion (tracked live): one still frame is drawn and the frame loop stops; the CSS presets pause their keyframe. The look survives without the movement.',
       'Pauses while off screen and while the tab is hidden; one requestAnimationFrame loop capped at 60 fps.',
       'Nothing flashes: every preset moves slowly and fades; no strobing (WCAG 2.3.1).',
       'Removed from the page (Astro view transitions, SPA swaps), it cancels its frame and frees its canvas: it is a custom element with a disconnectedCallback.',
     ],
-    usage: `<section class="hero">          <!-- position: relative; isolation: isolate -->
+    usage: `<section class="hero">          <!-- position: relative; isolation: isolate; pointermove is read here -->
   <img class="hero__bg" … />        <!-- z-index: -1 -->
-  <AnimatedBackground preset="fog" class="hero__motion" />   <!-- z-index: 1, via :global() if the host scopes styles -->
+  <AnimatedBackground preset="fog" pointer="repel" class="hero__motion" />   <!-- z-index: 1, via :global() if the host scopes styles -->
   <div class="hero__copy">…</div>   <!-- position: relative; z-index: 2 -->
 </section>
 <!-- .hero { --ab-a: var(--brand); --ab-b: var(--brand-dark); --ab-c: var(--white); } with palette="custom" -->`,
