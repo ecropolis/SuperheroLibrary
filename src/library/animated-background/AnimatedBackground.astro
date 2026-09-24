@@ -246,13 +246,17 @@ const style = [
         },
       },
       // Boids: separation, alignment and cohesion within a radius, a gentle pull to the
-      // centre so the flock stays in frame, wrapped at the edges. Drawn as triangles that
-      // point where they fly, in two of the palette's colours.
+      // centre so the flock stays in frame, wrapped at the edges. Each bird is an arrowhead
+      // pointing where it flies whose wing tips open and close on a beat of its own; size
+      // stands in for depth (small and faint is far), in three of the palette's tones.
       birds: {
         init: (o) => {
-          const n = Math.round(50 * o.level), bs = [];
-          for (let i = 0; i < n; i++) { const a = rnd(0, TAU); bs.push({ x: Math.random() * o.w, y: Math.random() * o.h, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, s: rnd(5, 9), k: i % 3 }); }
-          return { bs };
+          const n = Math.round(70 * o.level), bs = [];
+          for (let i = 0; i < n; i++) {
+            const a = rnd(0, TAU), z = rnd(3.5, 10);
+            bs.push({ x: Math.random() * o.w, y: Math.random() * o.h, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, z, k: i % 3, ph: rnd(0, TAU), beat: rnd(5, 9) });
+          }
+          return { bs, tint: mix(o.a, o.c, 0.55) };
         },
         draw(ctx, t, dt, s, o) {
           const R = 70, R2 = R * R, vmax = 110 * (0.8 + 0.2 * o.level), step = Math.min(dt, 0.05);
@@ -266,19 +270,22 @@ const style = [
               if (d2 < 400) { sx -= dx; sy -= dy; }
             }
             if (n) { b.vx += ((ax / n - b.vx) * 3 + (cx / n - b.x) * 0.6 + sx * 4) * step; b.vy += ((ay / n - b.vy) * 3 + (cy / n - b.y) * 0.6 + sy * 4) * step; }
-            b.vx += (o.w / 2 - b.x) * 0.08 * step; b.vy += (o.h / 2 - b.y) * 0.16 * step;
+            b.vx += (o.w / 2 - b.x) * 0.04 * step; b.vy += (o.h / 2 - b.y) * 0.08 * step;
             const v = Math.hypot(b.vx, b.vy) || 1, cap = Math.min(vmax, Math.max(40, v)) / v;
             b.vx *= cap; b.vy *= cap;
             b.x += b.vx * step; b.y += b.vy * step;
             wrap(b, o, 12);
           }
           for (const b of s.bs) {
-            const a = Math.atan2(b.vy, b.vx), z = b.s * (0.9 + 0.1 * o.level);
-            ctx.fillStyle = rgba(b.k ? o.c : o.a, b.k === 2 ? 0.55 : 0.85);
+            const a = Math.atan2(b.vy, b.vx), z = b.z * (0.9 + 0.1 * o.level);
+            const ca = Math.cos(a), sa = Math.sin(a), spread = 0.35 + 0.65 * Math.abs(Math.sin(t * b.beat + b.ph));
+            const pt = (fwd, side) => [b.x + ca * fwd - sa * side, b.y + sa * fwd + ca * side];
+            ctx.fillStyle = rgba(b.k === 0 ? o.a : b.k === 1 ? o.c : s.tint, 0.4 + 0.55 * (b.z - 3.5) / 6.5);
             ctx.beginPath();
-            ctx.moveTo(b.x + Math.cos(a) * z * 1.6, b.y + Math.sin(a) * z * 1.6);
-            ctx.lineTo(b.x + Math.cos(a + 2.5) * z, b.y + Math.sin(a + 2.5) * z);
-            ctx.lineTo(b.x + Math.cos(a - 2.5) * z, b.y + Math.sin(a - 2.5) * z);
+            ctx.moveTo(...pt(z * 1.5, 0));
+            ctx.lineTo(...pt(-z * 0.9, z * 1.4 * spread));
+            ctx.lineTo(...pt(-z * 0.4, 0));
+            ctx.lineTo(...pt(-z * 0.9, -z * 1.4 * spread));
             ctx.closePath(); ctx.fill();
           }
         },
