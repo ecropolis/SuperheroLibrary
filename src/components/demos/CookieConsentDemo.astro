@@ -1,0 +1,276 @@
+---
+/**
+ * Demo for `cookie-consent`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback.
+ *
+ * This is the REAL widget, not a replica, once per mode. It cannot be mounted straight into
+ * the page, for three reasons that all bite on superherotech.ai, which runs the widget itself:
+ *
+ *  1. It positions itself `fixed` to the viewport and has no inline variant.
+ *  2. It hard-codes `id="cc-banner"` and listens on `document`, so a second copy fights the
+ *     host's own bar, and the host's "Cookie settings" link would reopen the demo's bars.
+ *  3. It is live code: it pushes Consent Mode updates into the page's real dataLayer, deletes
+ *     `_ga*` cookies on Decline, and loads gtm.js. A demo click would change the visitor's
+ *     actual consent on the host site.
+ *
+ * So each copy is server-rendered into an inert <template>, and the script below moves it into
+ * a sandboxed `srcdoc` iframe: an opaque origin with its own window, where `position: fixed`
+ * means the frame. Inside the frame:
+ *  - a Content-Security-Policy allows inline code only, so gtm.js is requested but never
+ *    fetched — nothing in this demo reaches Google;
+ *  - localStorage and document.cookie are in-memory stand-ins (an opaque origin has neither),
+ *    so the widget's own storage and cookie-clearing code runs against something visible;
+ *  - when the widget requests gtm.js, the frame writes stand-ins for the cookies GA would
+ *    set, so Decline has something real to delete.
+ *
+ * Adding a `position` prop upstream would fix (1) only, so the demo does not need one. The
+ * widget's CSS comes from the synced file itself (`?raw`), never a copy.
+ */
+import CookieConsent from '../../library/cookie-consent/CookieConsent.astro';
+import widgetSource from '../../library/cookie-consent/CookieConsent.astro?raw';
+
+interface Props {
+  /** Unused: this demo has no assets. Accepted so every demo takes the same props. */
+  assetBase?: string;
+}
+
+const widgetCss = (widgetSource.match(/<style>([\s\S]*?)<\/style>/) ?? ['', ''])[1];
+
+const cases = [
+  {
+    mode: 'opt-out',
+    title: 'Opt-out mode, the default',
+    lead: 'Analytics load on the first visit. The bar says so, and Decline stops them and deletes what they wrote.',
+  },
+  {
+    mode: 'opt-in',
+    title: 'Opt-in mode',
+    lead: 'Nothing is requested from Google until the visitor presses Accept. Visitors in EEA, UK and Swiss time zones always get this.',
+  },
+] as const;
+---
+
+<div class="ccd" data-ccd data-ccd-css={widgetCss}>
+  {
+    cases.map((c) => (
+      <section class="ccd-case" aria-labelledby={`ccd-${c.mode}`}>
+        <h3 id={`ccd-${c.mode}`}>{c.title}</h3>
+        <p>{c.lead}</p>
+        <template data-ccd-widget data-ccd-mode={c.mode}>
+          <CookieConsent
+            gtmId="GTM-DEMO000"
+            gaMeasurementId="G-DEMO000"
+            mode={c.mode}
+            strictRegions={false}
+            storageKey={`demo_${c.mode}`}
+            privacyHref="#privacy"
+          />
+        </template>
+        {/* The frame and its reset button are made by the script: nothing to show without it. */}
+        <div class="ccd-stage" data-ccd-stage data-ccd-title={`Cookie consent bar, ${c.mode} mode, running in a sandbox`} />
+      </section>
+    ))
+  }
+  <p class="ccd-note">
+    Both frames run the real widget with <code>strictRegions</code> off, so each shows its own
+    mode wherever you are. On a site leave it on. Nothing here reaches Google: gtm.js is blocked
+    inside the frames, and the analytics cookies shown are stand-ins for the ones GA would set.
+  </p>
+</div>
+
+<script>
+  // Frame chrome. Inline code only (the CSP below), and the host's resolved --cc-* values so
+  // the bar wears the host's theme, as it would on a real site.
+  const FRAME_CSS = `
+    html { color-scheme: light; }
+    /* Every host site has this reset, and the bar's width: 100% on phones assumes it. */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 14px 16px; font: 14px/1.45 var(--ccd-font, system-ui, sans-serif);
+      color: #16192a; background: #fff; }
+    .site { margin: 0 0 10px; font-size: 12px; color: #565b73; }
+    .site strong { color: #16192a; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0 0 10px; }
+    dt { color: #565b73; }
+    dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+    a { color: var(--cc-link, #4526ad); }
+    /* No focus style here on purpose: the frame shows the widget's own (the browser default). */
+  `;
+
+  // Runs before the widget: in-memory storage and cookies, and a watcher for gtm.js.
+  const SHIM = `(function () {
+    var mem = {}, jar = {}, gtm = false;
+    function render() { if (window.__ccdPaint) window.__ccdPaint(mem, jar, gtm); }
+    window.__ccdRefresh = render;
+    var store = {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); render(); },
+      removeItem: function (k) { delete mem[k]; render(); },
+      clear: function () { mem = {}; render(); },
+      key: function (i) { return Object.keys(mem)[i] || null; },
+      get length() { return Object.keys(mem).length; }
+    };
+    try { Object.defineProperty(window, 'localStorage', { value: store, configurable: true }); } catch (e) {}
+    Object.defineProperty(document, 'cookie', {
+      configurable: true,
+      get: function () { return Object.keys(jar).map(function (k) { return k + '=' + jar[k]; }).join('; '); },
+      set: function (v) {
+        var pair = v.split(';')[0], i = pair.indexOf('='), name = pair.slice(0, i).trim();
+        if (/max-age=0/i.test(v)) delete jar[name]; else jar[name] = pair.slice(i + 1);
+        render();
+      }
+    });
+    new MutationObserver(function () {
+      if (gtm || !document.querySelector('script[src*="googletagmanager.com/gtm.js"]')) return;
+      gtm = true;
+      // What GA and the conversion linker would write once the container ran.
+      jar._ga = 'GA1.1.demo'; jar._ga_DEMO000 = 'GS1.1.demo'; jar._gcl_au = '1.1.demo';
+      render();
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  })();`;
+
+  const STATUS = (mode: string) => `
+    <p class="site">yoursite.example &middot; <strong>${mode}</strong> mode</p>
+    <dl aria-live="polite">
+      <dt>Stored choice</dt><dd data-s="stored">none</dd>
+      <dt>analytics_storage</dt><dd data-s="consent">&ndash;</dd>
+      <dt>gtm.js</dt><dd data-s="gtm">not requested</dd>
+      <dt>GA cookies</dt><dd data-s="cookies">none</dd>
+    </dl>
+    <p><a href="#" data-cc-reopen>Cookie settings</a> reopens the bar.</p>`;
+
+  // Runs after the widget: paints the state the shim holds, again after every click.
+  const RENDER = (mode: string) => `(function () {
+    var key = 'demo_${mode}';
+    window.__ccdPaint = function (mem, jar, gtm) {
+      var set = function (k, v) { var el = document.querySelector('[data-s="' + k + '"]'); if (el) el.textContent = v; };
+      var consent = '\\u2013';
+      (window.dataLayer || []).forEach(function (e) {
+        if (e && e[0] === 'consent' && e[2] && e[2].analytics_storage) consent = e[2].analytics_storage + ' (' + e[1] + ')';
+      });
+      var names = Object.keys(jar);
+      set('stored', mem[key] || 'none');
+      set('consent', consent);
+      set('gtm', gtm ? 'requested (blocked in this demo)' : 'not requested');
+      set('cookies', names.length ? names.join(', ') : 'none');
+    };
+    document.addEventListener('click', function () { setTimeout(window.__ccdRefresh, 0); });
+    window.__ccdRefresh();
+  })();`;
+
+  const CSP =
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'";
+
+  function themeFrom(root: HTMLElement) {
+    const cs = getComputedStyle(root);
+    const names = [
+      '--cc-bg', '--cc-border', '--cc-text', '--cc-ink', '--cc-link', '--cc-accent',
+      '--cc-accent-hover', '--cc-accent-ink', '--cc-radius', '--cc-radius-btn',
+    ];
+    const decls = names.map((n) => `${n}: ${cs.getPropertyValue(n).trim()};`);
+    decls.push(`--ccd-font: ${cs.fontFamily};`);
+    return `:root { ${decls.join(' ')} }`;
+  }
+
+  function build(root: HTMLElement, section: Element) {
+    const tpl = section.querySelector<HTMLTemplateElement>('template[data-ccd-widget]');
+    const frame = section.querySelector<HTMLIFrameElement>('iframe[data-ccd-frame]');
+    if (!tpl || !frame) return;
+    const mode = tpl.dataset.ccdMode ?? 'opt-out';
+    const script = (s: string) => `<script>${s}<\/script>`;
+    frame.srcdoc = [
+      '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+      `<meta http-equiv="Content-Security-Policy" content="${CSP}">`,
+      `<style>${root.dataset.ccdCss ?? ''}</style><style>${FRAME_CSS}</style><style>${themeFrom(root)}</style>`,
+      '</head><body>',
+      script(SHIM),
+      STATUS(mode),
+      tpl.innerHTML,
+      script(RENDER(mode)),
+      '</body></html>',
+    ].join('');
+  }
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-ccd]')) {
+    for (const section of root.querySelectorAll('.ccd-case')) {
+      const stage = section.querySelector<HTMLElement>('[data-ccd-stage]');
+      if (!stage) continue;
+      const frame = document.createElement('iframe');
+      frame.className = 'ccd-frame';
+      frame.title = stage.dataset.ccdTitle ?? 'Cookie consent bar, running in a sandbox';
+      // Scripts only. Never add allow-same-origin: the widget inside would then share the host
+      // page's cookies and localStorage, and a demo Decline would delete the visitor's real _ga.
+      frame.setAttribute('sandbox', 'allow-scripts');
+      frame.dataset.ccdFrame = '';
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'ccd-reset';
+      reset.textContent = 'Start this one over';
+      reset.addEventListener('click', () => build(root, section));
+      stage.append(frame, reset);
+      build(root, section);
+    }
+  }
+</script>
+
+<style>
+  .ccd {
+    /* The bar reads only --cc-*; these map them from the website's tokens, as its global.css does. */
+    --cc-bg: var(--tint, #f8f8fc);
+    --cc-border: var(--line, #e6e6f0);
+    --cc-text: #565b73;
+    --cc-ink: var(--ink, #16192a);
+    --cc-link: var(--purple-dark, #4526ad);
+    --cc-accent: var(--navy, #1e283c);
+    --cc-accent-hover: #141c2b;
+    --cc-accent-ink: var(--white, #fff);
+    --cc-radius: var(--radius, 14px);
+    --cc-radius-btn: 10px;
+    display: grid;
+    gap: 2rem;
+  }
+  .ccd-case h3 {
+    margin: 0 0 0.35rem;
+  }
+  .ccd-case p {
+    margin: 0 0 0.9rem;
+  }
+  /* The frame and button are made by the script, so they carry no scope attribute. */
+  .ccd :global(.ccd-frame) {
+    display: block;
+    width: 100%;
+    height: 19rem;
+    border: 1px solid var(--line, #e6e6f0);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  /* The widget goes full-width and stacks its buttons below 560px of frame width. */
+  @media (max-width: 600px) {
+    .ccd :global(.ccd-frame) {
+      height: 27rem;
+    }
+  }
+  .ccd :global(.ccd-reset) {
+    margin-top: 0.6rem;
+    font: inherit;
+    font-size: 0.9rem;
+    padding: 0.55rem 0.9rem;
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid var(--line, #e6e6f0);
+    background: var(--white, #fff);
+    color: var(--ink, #16192a);
+    cursor: pointer;
+  }
+  .ccd :global(.ccd-reset:hover) {
+    border-color: var(--ink, #16192a);
+  }
+  .ccd :global(.ccd-reset:focus-visible) {
+    outline: 2px solid var(--purple-dark, #4526ad);
+    outline-offset: 2px;
+  }
+  .ccd-note {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+</style>

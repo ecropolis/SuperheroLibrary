@@ -46,6 +46,11 @@ export interface Element {
   usedOn: { site: string; where: string }[];
   /** Path of the component in this repo — the file to copy into a client build. */
   file: string;
+  /**
+   * Set only when `file` is a synced copy of a component owned by another repo. The gallery then
+   * says to sync it rather than copy it, and the file must never be edited here.
+   */
+  source?: { repo: string; sync: string };
   added: string;
 }
 
@@ -1012,6 +1017,95 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
       { site: 'jwalktours.com', where: 'Home and tour pages, as ReviewScroller: the earlier version, with a fixed 5 s interval' },
     ],
     file: 'src/library/testimonial-carousel/TestimonialCarousel.astro',
+    added: '2026-09-23',
+  },
+  {
+    id: 'cookie-consent',
+    name: 'Cookie consent',
+    aka: ['CookieYes', 'Cookiebot', 'Complianz', 'GDPR Cookie Consent', 'cookie banner', 'consent bar', 'consent mode'],
+    summary: 'A consent bar and the Google Tag Manager loader it gates. Opt-out mode (the default) loads analytics until the visitor declines; opt-in loads nothing from Google until they accept; visitors whose browser time zone is in the EEA, UK or Switzerland get opt-in whichever mode is set. Decline stops GA and deletes the cookies it already wrote. Synced from ecropolis-consent, never edited here.',
+    pitch: 'A consent bar that is yours: no monthly CMP fee, nothing loads from Google until the visitor has said yes where the law needs a yes.',
+    // 880/mo, difficulty 34, CPC $13; variants "cookie consent" 660/47, "gdpr cookie consent"
+    // 390/43, "cookie consent wordpress" 170/30 (SE Ranking US, 2026-09-23).
+    search: { query: 'cookie banner', alsoRanks: ['cookie consent', 'gdpr cookie consent', 'cookie consent wordpress'] },
+    replaces: [
+      'CookieYes / Cookiebot / Complianz subscriptions',
+      'Osano',
+      'Termly',
+      'A hand-written cookie banner that loads Google Analytics before the visitor clicks anything: it asks, but the tracking has already happened',
+    ],
+    goodFor:
+      'A site that runs Google Analytics, or anything else, through Google Tag Manager and wants the consent choice on its own page, in its own colours, with no subscription. In opt-out mode US visitors are measured until they decline; with strictRegions on (the default), visitors in EEA, UK and Swiss time zones get prior consent, so nothing is fetched from Google until they accept. That region test reads the browser’s time zone: no IP lookup, no network call, and a VPN or a traveller can be misread either way.',
+    notFor:
+      'A site that sets no cookies and loads no third-party tags. It needs no banner at all: leave gtmId empty and this renders nothing. Its job is gating Tag Manager, not decoration. Also not for sites that need per-category toggles, a stored consent log to show an auditor, or IAB TCF signals for ad networks: it is one yes-or-no for analytics, with ad storage denied unless enableAds is set. It does not make a site compliant by itself. It implements prior consent where that is required; the privacy policy, and what the site promises in it, are the site owner’s.',
+    props: [
+      { name: 'gtmId', type: 'string', default: "''", note: 'Tag Manager container. Empty renders nothing at all: no bar, no script, no cookies.' },
+      { name: 'gaMeasurementId', type: 'string', default: "''", note: 'GA4 id. On decline sets GA’s own ga-disable-<id> kill switch, because Consent Mode denial alone still sends cookieless pings.' },
+      { name: 'mode', type: "'opt-out' | 'opt-in'", default: "'opt-out'", note: 'opt-out loads analytics until declined; opt-in loads nothing from Google until accepted.' },
+      { name: 'strictRegions', type: 'boolean', default: 'true', note: 'Forces opt-in for EEA, UK and Swiss time zones whatever `mode` says, and when the zone cannot be read. Leave it on.' },
+      { name: 'copy', type: "Partial<Record<mode, { text?, accept? }>>", default: '{}', note: 'Per-mode wording of the bar and the accept label (OK in opt-out, Accept in opt-in). Use it rather than editing the file.' },
+      { name: 'storageKey', type: 'string', default: "'cc_consent'", note: 'localStorage key for the choice. Always pass the site’s own; changing it resets every stored choice.' },
+      { name: 'privacyHref', type: 'string', default: "'/privacy'", note: 'The Privacy Policy link in the bar.' },
+      { name: 'conversions', type: '{ match, event }[]', default: '[]', note: 'Clicks on links whose href contains `match` push `event` to the dataLayer. Elements with data-analytics push their own.' },
+      { name: 'enableAds', type: 'boolean', default: 'false', note: 'Grant ad storage, ad user data and personalisation on accept. Off: analytics only.' },
+    ],
+    theming: [
+      { name: '--cc-bg', fallback: '#eef2f1', note: 'Bar ground: a tint, not white.' },
+      { name: '--cc-border', fallback: '#cfdad7', note: 'Bar edge and the Decline outline.' },
+      { name: '--cc-text', fallback: '#4c5a60', note: 'Body copy at 13.5px: needs 4.5:1 on --cc-bg (default 6.33:1).' },
+      { name: '--cc-ink', fallback: '#1d2b30', note: 'Decline label and its hover border.' },
+      { name: '--cc-link', fallback: '#1f4f55', note: 'Privacy Policy link.' },
+      { name: '--cc-accent', fallback: '#1f4f55', note: 'Accept/OK fill. Needs 4.5:1 against --cc-accent-ink (default 9.10:1): use the site’s dark surface tone, not its CTA colour.' },
+      { name: '--cc-accent-hover', fallback: '#143a3f', note: 'Accept/OK hover fill.' },
+      { name: '--cc-accent-ink', fallback: '#fff', note: 'Accept/OK label.' },
+      { name: '--cc-shadow', fallback: '0 14px 40px rgba(16, 32, 36, .18)', note: 'Bar shadow.' },
+      { name: '--cc-font', fallback: 'inherit', note: 'Bar typeface.' },
+      { name: '--cc-radius', fallback: '14px', note: 'Bar corners. Square below 560px, where the bar spans the screen.' },
+      { name: '--cc-radius-btn', fallback: '10px', note: 'Button corners.' },
+    ],
+    a11y: [
+      'Decline and Accept are native buttons, so Enter and Space work, and each is at least 44px tall. Below 560px they share the full width.',
+      'The bar is a non-modal dialog named “Cookie consent”. It does not take focus or trap it, and the page stays usable while it is open. Sites mount it at the end of the body, so keyboard users reach it after the page content.',
+      'It stays hidden (the hidden attribute) until the script has chosen the wording for the visitor’s mode, and is hidden again after a choice, so a screen reader never reads a bar that is not on screen.',
+      'Any element with data-cc-reopen (the “Cookie settings” link in a site’s footer) opens it again, so the choice can be changed at any time. There is no Escape shortcut: the choice is made with the buttons.',
+      'No movement: only 0.15s colour transitions on hover. Default text and button colours clear 4.5:1; a site that themes it must keep them there.',
+    ],
+    usage: `---
+// src/layouts/BaseLayout.astro, as on superherotech.ai. Do not copy CookieConsent.astro by hand:
+// add the site to sites.json in ecropolis/ecropolis-consent, then
+//   node bin/consent-sync.mjs update <site>
+import CookieConsent from '../components/CookieConsent.astro';
+import { analytics } from '../data/site';
+---
+<body>
+  <slot />
+  <!-- in the footer, only when there is a choice to change -->
+  {analytics.gtmId && <a href="/privacy/" data-cc-reopen>Cookie settings</a>}
+
+  <CookieConsent
+    gtmId={analytics.gtmId}
+    gaMeasurementId={analytics.ga4Id}
+    mode={analytics.consentMode}
+    strictRegions={analytics.strictRegions}
+    storageKey={analytics.consentKey}
+    privacyHref="/privacy"
+  />
+</body>
+<!-- global.css: :root { --cc-bg: var(--tint); --cc-accent: var(--navy); --cc-font: var(--font); … } -->
+<!-- The bar assumes the usual *, *::before, *::after { box-sizing: border-box } reset; without it,
+     the full-width phone layout runs off the right edge. -->
+<!-- Switching mode makes the privacy policy wrong until it is edited too: ship both together. -->`,
+    usedOn: [
+      { site: 'ecropolis.com', where: 'Every page' },
+      { site: 'growgrid.io', where: 'Every page' },
+      { site: 'superherotech.ai', where: 'Every page, with “Cookie settings” in the footer; and the demo on /elements/cookie-consent/' },
+      { site: 'compass.st', where: 'Every page' },
+      { site: 'zingfling.com', where: 'Every page' },
+      { site: 'vendorstreet.app', where: 'Every page' },
+      { site: 'apothecary.st', where: 'Every page' },
+    ],
+    file: 'src/library/cookie-consent/CookieConsent.astro',
+    source: { repo: 'ecropolis/ecropolis-consent', sync: 'node bin/consent-sync.mjs update <site>' },
     added: '2026-09-23',
   },
 ];
