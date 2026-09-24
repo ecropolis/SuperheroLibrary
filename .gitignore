@@ -1,4 +1,6 @@
-node_modules/
+# No trailing slash: `node_modules/` matches only a directory, so a symlinked node_modules
+# (as a worktree makes) was committed once. This form ignores the link too.
+node_modules
 dist/
 .astro/
 assets-prebuild/
