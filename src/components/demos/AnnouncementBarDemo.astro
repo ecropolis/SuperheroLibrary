@@ -1,0 +1,134 @@
+---
+/**
+ * Demo for `announcement-bar`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Three bars, each at the edge of a small mock page so it reads as the top or the bottom of a
+ * site: an accent bar with a link, a countdown bar, and a light bottom bar. They are static (in
+ * the flow), the default; a sticky bar here would stick to this whole gallery page.
+ *
+ * The countdown's end is computed at build: seven days after the build, at 5 PM New York time.
+ * The website rebuilds whenever this library's main changes, so it stays a week or less ahead;
+ * after a week without a rebuild the bar hides itself, which is the element working.
+ *
+ * Each bar has its own `key`, so dismissing one here never hides a real announcement bar on a
+ * site using the default key. "Bring them back" forgets the dismissals on this page.
+ */
+import AnnouncementBar from '../../library/announcement-bar/AnnouncementBar.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+const zone = 'America/New_York';
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
+const [y, m, d] = today.split('-').map(Number);
+const saleEnds = `${new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10)}T17:00`;
+---
+<div class="demo-anb">
+  <div class="demo-anb__page">
+    <AnnouncementBar
+      text="We are closed Monday for the holiday. Orders placed over the weekend ship Tuesday."
+      href="#holiday-hours"
+      linkText="Holiday hours"
+      key="demo-anb-holiday"
+    />
+    <div class="demo-anb__mock" aria-hidden="true"><span class="demo-anb__logo"></span><span></span><span></span><span></span></div>
+    <div class="demo-anb__lines" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>
+
+  <div class="demo-anb__page">
+    <AnnouncementBar theme="dark" countdown={saleEnds} timeZone={zone} key="demo-anb-sale" href="#sale" linkText="See the offers">
+      The autumn sale: 20% off every plan.
+    </AnnouncementBar>
+    <div class="demo-anb__mock" aria-hidden="true"><span class="demo-anb__logo"></span><span></span><span></span><span></span></div>
+    <div class="demo-anb__lines" aria-hidden="true"><i></i><i></i></div>
+  </div>
+
+  <div class="demo-anb__page">
+    <div class="demo-anb__lines" aria-hidden="true"><i></i><i></i><i></i></div>
+    <AnnouncementBar position="bottom" theme="light" key="demo-anb-bottom" text="New: book online, any time of day." href="#book" linkText="Book a visit" />
+  </div>
+
+  <p class="demo-anb__note">
+    <button class="demo-anb__btn" type="button" data-demo-anb-reset>Bring them back</button>
+    <span aria-live="polite" data-demo-anb-said></span>
+  </p>
+</div>
+
+<script is:inline>
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-demo-anb-reset]');
+    if (!b || !window.__superheroAnnouncementBar) return;
+    window.__superheroAnnouncementBar.reset();
+    const said = document.querySelector('[data-demo-anb-said]');
+    if (said) said.textContent = 'Dismissals forgotten.';
+  });
+</script>
+
+<style>
+  .demo-anb {
+    display: grid;
+    gap: 1.25rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-anb__page {
+    overflow: hidden;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-anb__mock {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--line, #dfe3ea);
+  }
+  .demo-anb__mock span {
+    width: 3rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--line, #dfe3ea);
+  }
+  .demo-anb__mock .demo-anb__logo {
+    width: 5rem;
+    height: 1rem;
+    margin-right: auto;
+    background: var(--tint, #f3f1fc);
+  }
+  .demo-anb__lines {
+    display: grid;
+    gap: 0.6rem;
+    padding: 1rem;
+  }
+  .demo-anb__lines i {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--tint, #f3f1fc);
+  }
+  .demo-anb__lines i:nth-child(2n) {
+    width: 75%;
+  }
+  .demo-anb__note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+  }
+  .demo-anb__btn {
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-anb__btn:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 3px;
+  }
+</style>

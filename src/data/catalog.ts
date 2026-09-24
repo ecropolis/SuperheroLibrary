@@ -1356,6 +1356,78 @@ import { analytics } from '../data/site';
     file: 'src/library/modal/Modal.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'announcement-bar',
+    name: 'Announcement bar',
+    aka: ['PowerPack Announcement Bar', 'Hello Bar', 'notification bar', 'top bar', 'promo bar', 'sticky bar', 'WP Notification Bar'],
+    summary:
+      'One line above the header (or at the end of the page) with an optional link, a dismiss that is remembered, a from/until window and a countdown in the business’s time zone. In the document flow, settled by an inline script before the first paint, so it causes no layout shift; a dismissal collapses it once, on the visitor’s action.',
+    pitch: 'One line across the top for the thing that matters this week — with a date it stops itself, and a dismiss that stays dismissed.',
+    // SE Ranking US, 2026-09-24: announcement bar 110/mo, difficulty 14; notification bar
+    // website 70/6; top bar website 70/11; hello bar alternative 20/5.
+    search: { query: 'announcement bar', alsoRanks: ['notification bar website', 'top bar website', 'hello bar alternative'] },
+    replaces: ['PowerPack announcement bar', 'Hello Bar', 'WP Notification Bar and top-bar plugins'],
+    goodFor:
+      'Something true for a while and then not: holiday hours, a sale with an end, a launch, a closure, a change of address. Give it `until` or a `countdown` and it takes itself down on time, in the business’s time zone, with no one editing the site.',
+    notFor:
+      'Permanent content: a phone number or a tagline that is always there belongs in the header. Two bars stacked on one page: say the one thing. A rolling list of headlines is news-ticker. And a sticky bar by default: a bar that follows the reader down the page covers content on a phone; ask for sticky when it earns it.',
+    props: [
+      { name: 'text', type: 'string', note: 'The announcement, when not given as the default slot. One line on a laptop; it wraps on a phone.' },
+      { name: 'href / linkText', type: 'string', default: '— / “Read more”', note: 'A normal link after the text.' },
+      { name: 'label', type: 'string', note: 'The region’s accessible name. Default: the bar’s own text.' },
+      { name: 'position', type: "'top' | 'bottom'", default: "'top'", note: 'Top: place it first in <body>, above the header. Bottom: place it last. It sits where it is put.' },
+      { name: 'sticky', type: 'boolean', default: 'false', note: 'position: sticky to the viewport edge. Publishes --anb-height (top) or --anb-height-bottom on <html> for the host’s own sticky header. A sticky bottom bar sits above the cookie-consent bar while that shows.' },
+      { name: 'dismissible', type: 'boolean', default: 'true', note: 'A dismiss button; the dismissal is stored in localStorage.' },
+      { name: 'key', type: 'string', default: '“announcement-bar” (“announcement-bar-bottom”)', note: 'localStorage key of the dismissal.' },
+      { name: 'version', type: 'string', default: 'a hash of the content', note: 'A changed announcement shows again by itself; set it by hand only to re-show the same words.' },
+      { name: 'from / until', type: "'YYYY-MM-DD' | 'YYYY-MM-DDTHH:MM'", note: 'The window, as the business’s wall clock. A date is a whole day, and `until` includes it. An offset or Z makes it an absolute instant.' },
+      { name: 'countdown', type: "'YYYY-MM-DDTHH:MM'", note: '“Ends in 2 days 4 hours” after the text, refreshed on the minute; the bar hides when it passes.' },
+      { name: 'timeZone', type: 'string (IANA)', note: 'Required with from, until or countdown: “America/Chicago”, not the visitor’s zone.' },
+      { name: 'endsIn / ends', type: 'string', default: '“Ends in” / “Ends”', note: 'Words before the countdown, and before the end date shown without JavaScript. The units (days, hours, minutes) are English.' },
+      { name: 'theme', type: "'accent' | 'dark' | 'light'", default: "'accent'", note: 'Which pair of colours.' },
+      { name: 'dismissLabel', type: 'string', default: '“Dismiss announcement”', note: 'Name of the dismiss button.' },
+      { name: 'class', type: 'string', note: 'Class on the bar.' },
+    ],
+    theming: [
+      { name: '--anb-accent-bg', fallback: '#5933d8', note: 'theme="accent" ground (7.27:1 with its text).' },
+      { name: '--anb-accent-fg', fallback: '#fff', note: 'theme="accent" text.' },
+      { name: '--anb-dark-bg', fallback: '#1e283c', note: 'theme="dark" ground (14.75:1).' },
+      { name: '--anb-dark-fg', fallback: '#fff', note: 'theme="dark" text.' },
+      { name: '--anb-light-bg', fallback: '#eef2f1', note: 'theme="light" ground (12.92:1).' },
+      { name: '--anb-light-fg', fallback: '#1d2b30', note: 'theme="light" text.' },
+      { name: '--anb-link', fallback: 'currentColor', note: 'Link colour; underlined either way. If you set it, keep 4.5:1 on the ground.' },
+      { name: '--anb-min-height', fallback: '2.75rem', note: 'Bar height: the 44px dismiss button.' },
+      { name: '--anb-font-size', fallback: '0.95rem', note: 'Text size.' },
+      { name: '--anb-focus', fallback: 'currentColor', note: 'Focus ring on the link and the dismiss button.' },
+      { name: '--anb-z', fallback: '40', note: 'Stacking of a sticky bar; below the consent bar (120).' },
+    ],
+    a11y: [
+      'A region (role="region") named by its own text, or by `label`. The link is a normal link.',
+      'The dismiss button is a real 44px <button> named “Dismiss announcement”. After a dismiss, focus moves to the next focusable thing on the page, not to nowhere.',
+      'The countdown is a <time datetime> with the absolute end, and deliberately not a live region: it changes every minute and should not be read out each time.',
+      'The fallback colours of all three themes clear 4.5:1 (7.27, 14.75 and 12.92 to 1); `npm run check` computes them.',
+      'prefers-reduced-motion: a dismissed bar disappears at once instead of collapsing.',
+      'Without JavaScript the bar shows when the build put it inside its window, the countdown gives the end date instead, and it cannot be dismissed: the button stays hidden rather than doing nothing.',
+    ],
+    usage: `<body>
+  <AnnouncementBar
+    text="Closed Monday, May 25, for Memorial Day."
+    href="/hours/" linkText="Holiday hours"
+    until="2026-05-25" timeZone="America/Chicago"
+  />
+  <Header />
+  …
+  <!-- A sale with an end: counts down, then takes itself down. -->
+  <AnnouncementBar theme="dark" countdown="2026-11-30T23:59" timeZone="America/New_York">
+    Black Friday: 30% off everything.
+  </AnnouncementBar>
+</body>
+<!-- global.css: .anb { --anb-accent-bg: var(--brand); --anb-accent-fg: var(--white); }
+     with sticky:  .site-header { position: sticky; top: var(--anb-height, 0px); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/announcement-bar/ (demo)' }],
+    file: 'src/library/announcement-bar/AnnouncementBar.astro',
+    added: '2026-09-24',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

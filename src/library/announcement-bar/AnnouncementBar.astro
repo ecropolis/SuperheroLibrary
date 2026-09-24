@@ -1,0 +1,521 @@
+---
+/**
+ * AnnouncementBar — one line across the top (or bottom) of the page for the thing that matters
+ * this week: holiday hours, a sale, a launch, a closure. PowerPack's Announcement Bar, Hello
+ * Bar, WP Notification Bar and the other top-bar plugins.
+ *
+ * No layout shift, which is the whole design:
+ *   - The bar is in the document flow, above the header, so it never jumps in over the page.
+ *     `sticky` uses position: sticky (still in the flow), never position: fixed over content.
+ *   - The static HTML renders the bar VISIBLE when the build's clock puts it inside
+ *     `from`/`until`/`countdown`, and hidden (`hidden`) when it is outside. An inline script
+ *     placed right after the bar then decides for the visitor's clock and dismissal, and runs
+ *     while the parser is still at the bar, before the first paint. So the common cases (in
+ *     window, or dismissed earlier) are settled before anything is drawn: the bar never flashes
+ *     and collapses, and never appears late. Rendering it hidden and showing it from script
+ *     would push the page down on every visit, the shift this element exists to avoid. The one
+ *     jump left is the rare one: a build made before `from` or after `until`, viewed when the
+ *     other side applies; a rebuild removes it.
+ *   - Dismissing collapses the bar with a height transition (none under reduced motion): the
+ *     page reflows once, on the visitor's own action. Dismissal is stored in localStorage as
+ *     `key` = `version`; `version` defaults to a hash of the content, so a new announcement
+ *     shows again by itself and a dismissed one stays gone.
+ *   - A sticky bar publishes its height on <html> as --anb-height (top) or --anb-height-bottom
+ *     (bottom), 0px once dismissed, so the host's own sticky header can sit under it:
+ *     `.site-header { position: sticky; top: var(--anb-height, 0px); }`.
+ *   - Never over the cookie-consent bar: a sticky bottom bar reads #cc-banner (ecropolis-consent's
+ *     fixed bottom bar; it exposes no event, so this watches its `hidden` attribute and size) and
+ *     sits above it while it shows. A top bar never meets it.
+ *
+ * Dates are wall-clock times in the business's `timeZone` (IANA), as in business-hours:
+ * `from`/`until` take "YYYY-MM-DD" (a whole day; `until` includes that day) or
+ * "YYYY-MM-DDTHH:MM"; an explicit offset or Z is taken as an absolute instant. `countdown`
+ * shows "Ends in 2 days 4 hours" in a <time datetime> (not a live region: it changes every
+ * minute and nobody wants that read out), and the bar hides when it passes.
+ *
+ * ONE copy of the date logic: `announcementTime()` is used by the build and, serialised with
+ * toString(), by the browser; scripts/check-modal-and-bar.mjs runs the source between the
+ * `<anb-time>` markers in Node. It must reference nothing but language globals.
+ *
+ * Without JavaScript: the bar shows when the build put it in its window, the countdown gives
+ * the end date and time ("Ends Sep 28, 5:00 PM EDT"), and it cannot be dismissed (the dismiss
+ * button stays hidden rather than doing nothing).
+ *
+ * Theming, from the host's tokens (each has a fallback; all three pairs are ≥ 4.5:1):
+ *   --anb-accent-bg / --anb-accent-fg   theme="accent"        (#5933d8 / #fff, 7.27:1)
+ *   --anb-dark-bg / --anb-dark-fg       theme="dark"          (#1e283c / #fff, 14.75:1)
+ *   --anb-light-bg / --anb-light-fg     theme="light"         (#eef2f1 / #1d2b30, 12.92:1)
+ *   --anb-link          link colour                           (currentColor, underlined)
+ *   --anb-min-height    the bar's height                      (2.75rem, the dismiss button)
+ *   --anb-font-size     text size                             (0.95rem)
+ *   --anb-focus         focus ring                            (currentColor)
+ *   --anb-z             stacking of a sticky bar              (40; the consent bar is 120)
+ */
+
+// <anb-time>
+export function announcementTime() {
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/i;
+  const ZONED = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+  const fmts = new Map();
+  const parts = (ms: number, tz: string) => {
+    let f = fmts.get(tz);
+    if (!f) {
+      f = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+      fmts.set(tz, f);
+    }
+    const p: Record<string, number> = {};
+    for (const x of f.formatToParts(ms)) if (x.type !== 'literal') p[x.type] = +x.value;
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute);
+  };
+  const valid = (s: string) => DATE.test(s) || DATETIME.test(s);
+  /** The instant at which `tz`'s wall clock reads `s` ("YYYY-MM-DD" = its midnight). */
+  const instant = (s: string, tz: string) => {
+    if (ZONED.test(s)) return Date.parse(s);
+    const [d, t = '00:00'] = s.split('T');
+    const [y, mo, da] = d.split('-').map(Number);
+    const [h, mi] = t.split(':').map(Number);
+    const target = Date.UTC(y, mo - 1, da, h, mi);
+    let ms = target;
+    // Walk the guess by how far tz's wall clock is from the target; twice covers a DST edge.
+    for (let i = 0; i < 3; i++) {
+      const off = parts(ms, tz) - target;
+      if (!off) break;
+      ms -= off;
+    }
+    return ms;
+  };
+  const nextDay = (d: string) => {
+    const [y, m, day] = d.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10);
+  };
+  interface Span {
+    tz: string;
+    from?: string | null;
+    until?: string | null;
+    countdown?: string | null;
+  }
+  /** Is the bar in its window at `ms`? `until` as a date includes that whole day. */
+  const inWindow = (ms: number, w: Span) => {
+    if (w.from && ms < instant(w.from, w.tz)) return false;
+    if (w.until && ms >= instant(DATE.test(w.until) ? nextDay(w.until) : w.until, w.tz)) return false;
+    if (w.countdown && ms >= instant(w.countdown, w.tz)) return false;
+    return true;
+  };
+  /** "2 days 4 hours", "3 hours 12 minutes", "40 minutes", "less than a minute". */
+  const left = (ms: number, end: number) => {
+    const m = Math.floor((end - ms) / 60000);
+    if (m < 1) return 'less than a minute';
+    const u = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const d = Math.floor(m / 1440);
+    const h = Math.floor((m % 1440) / 60);
+    const mm = m % 60;
+    if (d) return h ? `${u(d, 'day')} ${u(h, 'hour')}` : u(d, 'day');
+    if (h) return mm ? `${u(h, 'hour')} ${u(mm, 'minute')}` : u(h, 'hour');
+    return u(mm, 'minute');
+  };
+  return { valid, instant, inWindow, left };
+}
+// </anb-time>
+
+/**
+ * The browser side. Mounts one bar right after it has been parsed (before first paint), and
+ * keeps every mounted bar's window and countdown current on the minute. Serialised into the
+ * inline script together with announcementTime().
+ */
+function announcementClient(time: ReturnType<typeof announcementTime>) {
+  interface Bar extends HTMLElement {
+    anbCfg?: { key: string; version: string; tz: string; from: string | null; until: string | null; countdown: string | null; sticky: boolean; position: string; endsIn: string };
+    anbGone?: boolean;
+  }
+  const bars = new Set<Bar>();
+  let timer = 0;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const get = (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  };
+  const set = (k: string, v: string | null) => {
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+    } catch {}
+  };
+  const heightVar = (bar: Bar) => (bar.anbCfg!.position === 'bottom' ? '--anb-height-bottom' : '--anb-height');
+  const publish = (bar: Bar) => {
+    if (!bar.anbCfg!.sticky) return;
+    const h = bar.hidden || bar.anbGone ? 0 : bar.getBoundingClientRect().height;
+    document.documentElement.style.setProperty(heightVar(bar), `${Math.round(h)}px`);
+  };
+  const dismissed = (bar: Bar) => get(bar.anbCfg!.key) === bar.anbCfg!.version;
+
+  /** Show or hide for the visitor's clock and memory; write the countdown. */
+  const update = (bar: Bar, animate: boolean) => {
+    const c = bar.anbCfg!;
+    const now = Date.now();
+    const show = !bar.anbGone && !dismissed(bar) && time.inWindow(now, c);
+    const t = bar.querySelector<HTMLTimeElement>('[data-anb-countdown] time');
+    if (t && c.countdown) {
+      const lead = bar.querySelector('[data-anb-countdown-lead]');
+      if (lead) lead.textContent = c.endsIn;
+      t.textContent = time.left(now, time.instant(c.countdown, c.tz));
+    }
+    if (show && bar.hidden) bar.hidden = false;
+    else if (!show && !bar.hidden) collapse(bar, animate);
+    publish(bar);
+  };
+
+  const collapse = (bar: Bar, animate: boolean) => {
+    const done = () => {
+      bar.hidden = true;
+      bar.style.removeProperty('height');
+      bar.style.removeProperty('opacity');
+      bar.style.removeProperty('transition');
+      publish(bar);
+    };
+    if (!animate || reduce.matches) return done();
+    bar.style.height = `${bar.getBoundingClientRect().height}px`;
+    void bar.offsetHeight;
+    bar.style.transition = 'height 0.25s ease, opacity 0.2s ease';
+    bar.style.height = '0px';
+    bar.style.opacity = '0';
+    let fired = false;
+    const end = () => {
+      if (fired) return;
+      fired = true;
+      done();
+    };
+    bar.addEventListener('transitionend', (e) => e.propertyName === 'height' && end(), { once: true });
+    setTimeout(end, 400);
+  };
+
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+  /** After a dismiss, focus goes to the next thing on the page, not to nowhere. */
+  const focusAfter = (bar: Bar) => {
+    const all = document.querySelectorAll<HTMLElement>(FOCUSABLE);
+    for (const el of all) {
+      if (bar.contains(el) || !(bar.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+      if (!el.getClientRects().length) continue;
+      el.focus({ preventScroll: true });
+      return;
+    }
+    (document.activeElement as HTMLElement | null)?.blur();
+  };
+
+  const consentOffset = (bar: Bar) => {
+    const cc = document.getElementById('cc-banner');
+    const off = cc && !cc.hidden ? Math.max(0, innerHeight - cc.getBoundingClientRect().top) : 0;
+    bar.style.setProperty('--anb-consent-offset', `${Math.round(off)}px`);
+  };
+  const watchConsent = (bar: Bar) => {
+    const hook = () => {
+      const cc = document.getElementById('cc-banner');
+      consentOffset(bar);
+      if (!cc) return;
+      new MutationObserver(() => consentOffset(bar)).observe(cc, { attributes: true, attributeFilter: ['hidden', 'class', 'style'] });
+      if ('ResizeObserver' in window) new ResizeObserver(() => consentOffset(bar)).observe(cc);
+    };
+    // The consent bar is at the end of <body>; it exists once the document has been parsed.
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', hook) : hook();
+    addEventListener('resize', () => consentOffset(bar), { passive: true });
+  };
+
+  const tick = () => bars.forEach((b) => update(b, true));
+  const schedule = () => {
+    clearTimeout(timer);
+    if (document.hidden) return;
+    timer = window.setTimeout(() => {
+      tick();
+      schedule();
+    }, 60000 - (Date.now() % 60000) + 20);
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearTimeout(timer);
+    else {
+      tick();
+      schedule();
+    }
+  });
+
+  const mount = (bar: Bar | null) => {
+    if (!bar || bars.has(bar)) return;
+    try {
+      bar.anbCfg = JSON.parse(bar.dataset.anb || '{}');
+    } catch {
+      return;
+    }
+    bars.add(bar);
+    const btn = bar.querySelector<HTMLButtonElement>('[data-anb-dismiss]');
+    if (btn) {
+      btn.hidden = false;
+      btn.addEventListener('click', () => {
+        set(bar.anbCfg!.key, bar.anbCfg!.version);
+        bar.anbGone = true; // Gone for this page even where storage is blocked.
+        focusAfter(bar);
+        collapse(bar, true);
+      });
+    }
+    update(bar, false);
+    const c = bar.anbCfg!;
+    if (c.sticky) {
+      if ('ResizeObserver' in window) new ResizeObserver(() => publish(bar)).observe(bar);
+      if (c.position === 'bottom') watchConsent(bar);
+    }
+    if (c.countdown || c.until || c.from) schedule();
+  };
+
+  return {
+    mount,
+    /** Forget every dismissal on this page and show the bars again. For reviewers and tests. */
+    reset: () =>
+      bars.forEach((b) => {
+        set(b.anbCfg!.key, null);
+        b.anbGone = false;
+        update(b, false);
+      }),
+  };
+}
+
+interface Props {
+  /** The announcement, when not given as the default slot. Keep it to one line. */
+  text?: string;
+  /** A link after the text. */
+  href?: string;
+  /** The link's words. Default "Read more". */
+  linkText?: string;
+  /** The region's accessible name. Default: the bar's own text. */
+  label?: string;
+  /** Top of the page (above the header) or bottom (end of the page). Default top. */
+  position?: 'top' | 'bottom';
+  /** Stick to the viewport edge while scrolling. Default false: a bar in the flow is the honest default. */
+  sticky?: boolean;
+  /** Offer a dismiss button, remembered in localStorage. Default true. */
+  dismissible?: boolean;
+  /** Storage key of the dismissal. Default "announcement-bar" (or "announcement-bar-bottom"). */
+  key?: string;
+  /** Default: a hash of the content, so a changed announcement shows again by itself. */
+  version?: string;
+  /** Show from this date or time in `timeZone`. */
+  from?: string;
+  /** Show until this date (inclusive) or time in `timeZone`. */
+  until?: string;
+  /** Count down to this time in `timeZone`: "Ends in 2 days 4 hours". Hidden once past. */
+  countdown?: string;
+  /** IANA zone of the business, for from/until/countdown. Required when any is set. */
+  timeZone?: string;
+  /** Words before the countdown. Default "Ends in". */
+  endsIn?: string;
+  /** Words before the end date without JavaScript. Default "Ends". */
+  ends?: string;
+  /** Default accent. */
+  theme?: 'accent' | 'dark' | 'light';
+  /** Name of the dismiss button. Default "Dismiss announcement". */
+  dismissLabel?: string;
+  class?: string;
+}
+
+const {
+  text,
+  href,
+  linkText = 'Read more',
+  label,
+  position = 'top',
+  sticky = false,
+  dismissible = true,
+  key,
+  version,
+  from,
+  until,
+  countdown,
+  timeZone,
+  endsIn = 'Ends in',
+  ends = 'Ends',
+  theme = 'accent',
+  dismissLabel = 'Dismiss announcement',
+  class: className,
+} = Astro.props;
+
+const time = announcementTime();
+const slotHtml = Astro.slots.has('default') ? await Astro.slots.render('default') : '';
+if (!slotHtml.trim() && !(text && text.trim())) throw new Error('AnnouncementBar: give it `text` or a default slot.');
+if (!['top', 'bottom'].includes(position)) throw new Error(`AnnouncementBar: position "${position}" is not top or bottom.`);
+if (!['accent', 'dark', 'light'].includes(theme)) throw new Error(`AnnouncementBar: theme "${theme}" is not accent, dark or light.`);
+for (const [n, v] of [['from', from], ['until', until], ['countdown', countdown]] as const) {
+  if (v !== undefined && !time.valid(v)) throw new Error(`AnnouncementBar: ${n} "${v}" is not "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM".`);
+}
+if ((from || until || countdown) && !timeZone) throw new Error('AnnouncementBar: from/until/countdown are wall-clock times; say whose with `timeZone` (e.g. "America/New_York").');
+if (timeZone) {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+  } catch {
+    throw new Error(`AnnouncementBar: timeZone "${timeZone}" is not an IANA zone.`);
+  }
+}
+const tz = timeZone ?? 'UTC';
+if (from && until && time.instant(from, tz) >= time.instant(until, tz) && from !== until) console.warn(`AnnouncementBar: from ${from} is after until ${until}; it will never show.`);
+
+// A short, stable hash of what the bar says: a new announcement is a new version.
+const hash = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(36);
+};
+const v = version ?? hash([text, href, linkText, slotHtml, from, until, countdown].join('|'));
+
+// The build's clock decides the no-JavaScript render and the first frame; the script re-decides.
+const renderMs = Date.now();
+const inWindowAtBuild = time.inWindow(renderMs, { tz, from, until, countdown });
+const endMs = countdown ? time.instant(countdown, tz) : 0;
+const endIso = countdown ? new Date(endMs).toISOString() : '';
+const endText = countdown
+  ? new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(endMs)
+  : '';
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__anbCount as number) || 0) + 1;
+locals.__anbCount = n;
+const uid = `anb-${n}`;
+const firstOnPage = n === 1;
+const config = JSON.stringify({
+  key: key || (position === 'bottom' ? 'announcement-bar-bottom' : 'announcement-bar'),
+  version: v,
+  tz,
+  from: from ?? null,
+  until: until ?? null,
+  countdown: countdown ?? null,
+  sticky,
+  position,
+  endsIn,
+});
+// Defined once per page; each bar calls mount on itself from the script right after it, so it
+// is settled while the parser is still at the bar, before anything is painted.
+const define = `window.__superheroAnnouncementBar=window.__superheroAnnouncementBar||(${announcementClient.toString()})((${announcementTime.toString()})());`;
+const mountScript = `${firstOnPage ? define : ''}window.__superheroAnnouncementBar.mount(document.currentScript.previousElementSibling);`;
+---
+
+<div
+  class:list={['anb', `anb--${theme}`, `anb--${position}`, { 'anb--sticky': sticky }, className]}
+  role="region"
+  aria-label={label}
+  aria-labelledby={label ? undefined : `${uid}-text`}
+  data-anb={config}
+  hidden={!inWindowAtBuild}
+>
+  <div class="anb__in">
+    <div class="anb__text" id={`${uid}-text`}>
+      {slotHtml ? <Fragment set:html={slotHtml} /> : text}
+      {href && <>{' '}<a href={href}>{linkText}</a></>}
+      {
+        countdown && (
+          <span class="anb__countdown" data-anb-countdown>
+            {' '}<span data-anb-countdown-lead>{ends}</span> <time datetime={endIso}>{endText}</time>
+          </span>
+        )
+      }
+    </div>
+    {
+      dismissible && (
+        <button class="anb__dismiss" type="button" aria-label={dismissLabel} data-anb-dismiss hidden>
+          <svg viewBox="0 0 24 24" width="1.1em" height="1.1em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+        </button>
+      )
+    }
+  </div>
+</div>
+<script is:inline set:html={mountScript} />
+
+<style>
+  .anb {
+    box-sizing: border-box;
+    overflow: hidden;
+    font-size: var(--anb-font-size, 0.95rem);
+    line-height: 1.4;
+  }
+  .anb[hidden] {
+    display: none;
+  }
+  .anb--accent {
+    background: var(--anb-accent-bg, #5933d8);
+    color: var(--anb-accent-fg, #fff);
+  }
+  .anb--dark {
+    background: var(--anb-dark-bg, #1e283c);
+    color: var(--anb-dark-fg, #fff);
+  }
+  .anb--light {
+    background: var(--anb-light-bg, #eef2f1);
+    color: var(--anb-light-fg, #1d2b30);
+  }
+  .anb--sticky {
+    position: sticky;
+    z-index: var(--anb-z, 40);
+  }
+  .anb--sticky.anb--top {
+    top: 0;
+  }
+  .anb--sticky.anb--bottom {
+    bottom: var(--anb-consent-offset, 0px);
+  }
+  .anb__in {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 0.75rem;
+    min-height: var(--anb-min-height, 2.75rem);
+    padding: 0.35rem 0.25rem 0.35rem 1rem;
+  }
+  .anb__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .anb__text :global(p) {
+    margin: 0;
+  }
+  .anb__text :global(a) {
+    color: var(--anb-link, currentColor);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .anb__text :global(a:focus-visible),
+  .anb__dismiss:focus-visible {
+    outline: 2px solid var(--anb-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .anb__countdown {
+    white-space: nowrap;
+  }
+  .anb__countdown time {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  .anb__dismiss {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .anb__dismiss[hidden] {
+    display: none;
+  }
+  .anb__dismiss:hover {
+    background: rgb(127 127 127 / 0.18);
+  }
+  /* Without a dismiss button, keep the text centred with even padding. */
+  .anb__in:not(:has(.anb__dismiss:not([hidden]))) {
+    padding-right: 1rem;
+  }
+</style>
