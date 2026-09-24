@@ -352,19 +352,22 @@ const {
       if (!playing || held || !onScreen || document.hidden || !canMove()) return;
       timer = window.setTimeout(advance, dwell(cards[index]));
     };
+    // A function declaration is hoisted above the null check, so TypeScript cannot carry
+    // the narrowing of `track` into it; `el` is the same element, known to be there.
+    const el = track;
     function advance() {
       timer = undefined;
       if (atEnd()) {
-        track.classList.add('is-rewinding');
+        el.classList.add('is-rewinding');
         timer = window.setTimeout(() => {
-          track.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior });
-          track.classList.remove('is-rewinding');
+          el.scrollTo({ left: 0, behavior: 'instant' as ScrollBehavior });
+          el.classList.remove('is-rewinding');
           schedule(0);
         }, 400);
         return;
       }
       const index = firstShown() + 1;
-      track.scrollBy({ left: step() });
+      el.scrollBy({ left: step() });
       schedule(index);
     }
 
