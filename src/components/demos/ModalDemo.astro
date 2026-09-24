@@ -1,0 +1,198 @@
+---
+/**
+ * Demo for `modal`. The website renders this too (see README, "Consumed by superherotech.ai"),
+ * so assets go through `asset()` and every host token has a fallback.
+ *
+ * Four modals: one opened by a click, holding a form; one that opens by itself after a delay or
+ * a scroll, once per session; one on exit intent; one full-screen image. The two automatic ones
+ * are live on this page, so they obey every gate the element has (3 s of visible time first,
+ * never while the consent bar is waiting, never twice). "Forget" clears their memory so a
+ * reviewer can see them again without a new session.
+ *
+ * The form closes the dialog on submit (method="dialog") and sends nothing anywhere.
+ */
+import Modal from '../../library/modal/Modal.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+---
+<div class="demo-md">
+  <div class="demo-md__item">
+    <p class="demo-md__label">On click, a form</p>
+    <p>
+      Any element with <code>data-modal-open</code> opens it: a button, a link, an image. So does a link
+      ending <a href="#demo-modal-ask">#demo-modal-ask</a>, as from an email.
+    </p>
+    <button class="demo-md__btn" type="button" data-modal-open="demo-modal-ask">Ask a question</button>
+  </div>
+
+  <div class="demo-md__item">
+    <p class="demo-md__label">After 20 seconds or half the page, once a session</p>
+    <p>
+      Opens by itself when either comes first, but never in the first 3 seconds, never while a consent
+      bar is waiting and never again this session once closed.
+    </p>
+    <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-offer">Forget it, arm it again</button>
+    <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-offer"></p>
+  </div>
+
+  <div class="demo-md__item">
+    <p class="demo-md__label">Exit intent</p>
+    <p>
+      Move the pointer out through the top of the window, towards the tabs. Mouse and trackpad only: on a
+      phone or tablet exit intent never fires, because there is no pointer to leave.
+    </p>
+    <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-exit">Forget it, arm it again</button>
+    <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-exit"></p>
+  </div>
+
+  <div class="demo-md__item">
+    <p class="demo-md__label">Full screen, an image</p>
+    <button class="demo-md__thumb" type="button" data-modal-open="demo-modal-image">
+      <img src={asset('hills.svg')} alt="Open the full-size illustration: hills under an evening sky" width="1600" height="1000" loading="lazy" decoding="async" />
+    </button>
+  </div>
+</div>
+
+<Modal id="demo-modal-ask" title="Ask a question" openOnHash>
+  <p>We answer within one working day. Nothing here is sent anywhere: it is a demo.</p>
+  <form method="dialog" class="demo-md__form">
+    <label>Name <input name="name" autocomplete="name" required /></label>
+    <label>Email <input name="email" type="email" autocomplete="email" required /></label>
+    <label>Question <textarea name="question" rows="3"></textarea></label>
+    <button class="demo-md__btn" type="submit">Send</button>
+  </form>
+</Modal>
+
+<Modal id="demo-modal-offer" title="Before you go further" size="sm" delay={20000} scroll={50} once="session" version="demo-1">
+  <p>This opened by itself, after 20 seconds on the page or half of it scrolled. Close it and it stays closed this session.</p>
+  <form method="dialog"><button class="demo-md__btn">Fine, thanks</button></form>
+</Modal>
+
+<Modal id="demo-modal-exit" title="Leaving already?" size="sm" exit once="session" version="demo-1">
+  <p>The pointer left through the top of the window. This fires once, and only with a mouse or trackpad.</p>
+</Modal>
+
+<Modal id="demo-modal-image" title="Hills under an evening sky" hideTitle size="full" closeLabel="Close the image" class="demo-md-dark">
+  <img class="demo-md__full" src={asset('hills.svg')} alt="Illustrated hills under a sky fading from navy to purple to orange" width="1600" height="1000" />
+</Modal>
+
+<script is:inline>
+  (() => {
+    const say = (id, text) => {
+      const el = document.querySelector('[data-demo-md-status="' + id + '"]');
+      if (el) el.textContent = text;
+    };
+    document.addEventListener('click', (e) => {
+      const f = e.target.closest && e.target.closest('[data-demo-md-forget]');
+      if (f && window.__superheroModal) {
+        const id = f.getAttribute('data-demo-md-forget');
+        window.__superheroModal.reset(id);
+        say(id, 'Forgotten. It can open again on this page.');
+      }
+    });
+  })();
+</script>
+
+<style>
+  .demo-md {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 1.25rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-md__item {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-md__item p {
+    margin: 0 0 0.75rem;
+  }
+  .demo-md__label {
+    font-weight: 700;
+  }
+  .demo-md__btn {
+    min-height: 2.75rem;
+    padding: 0.6rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-md__btn--quiet {
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+  }
+  .demo-md__btn:focus-visible,
+  .demo-md__thumb:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 3px;
+  }
+  .demo-md__status {
+    min-height: 1.5em;
+    font-size: 0.9em;
+  }
+  .demo-md__thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius, 14px);
+    overflow: hidden;
+    background: none;
+    cursor: zoom-in;
+  }
+  .demo-md__thumb img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .demo-md__form {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .demo-md__form label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+  .demo-md__form input,
+  .demo-md__form textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line, #c9cfda);
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 400;
+  }
+  .demo-md__form button {
+    justify-self: start;
+  }
+  /* Theming through the element's variables: a dark stage for the image. The class lands on the
+     <dialog> inside Modal.astro, outside this file's scope, hence :global. */
+  :global(.demo-md-dark) {
+    --md-surface: var(--navy, #1e283c);
+    --md-text: var(--white, #fff);
+    --md-close-bg: rgb(255 255 255 / 0.12);
+    --md-focus: var(--white, #fff);
+  }
+  .demo-md__full {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+</style>

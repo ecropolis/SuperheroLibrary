@@ -1,0 +1,539 @@
+---
+/**
+ * Modal — a box that opens over the page when it is asked for: a click on anything carrying
+ * `data-modal-open="<id>"`, a link to `#<id>`, or (opt-in, and gated) a delay, a scroll depth or
+ * a pointer leaving through the top of the window. PowerPack's and UABB's "Modal Box" / "Modal
+ * Popup", Elementor Pro's Popup, OptinMonster and the lightbox plugins people use for content.
+ *
+ * The dialog is a native <dialog> opened with showModal(): the browser traps focus, Escape
+ * closes it, the rest of the page is inert. On top of that, as in video-player's lightbox:
+ * a backdrop click closes it (`closeOnBackdrop`), the close button is a real 44px <button>
+ * named by `closeLabel`, focus returns to the opener (or, for an automatic open, to whatever
+ * had focus), and the page does not scroll underneath, with the scrollbar's width kept so
+ * nothing shifts. The dialog is named by its title (`aria-labelledby`); `hideTitle` hides the
+ * title visually and keeps the name.
+ *
+ * Automatic opens (`delay`, `scroll`, `exit`) are the part that put popups out of favour, so
+ * they are fenced. One never fires:
+ *   - before the page has been VISIBLE for `minDwell` ms (default 3000; hidden-tab time does
+ *     not count), nor while the tab is hidden;
+ *   - while another <dialog> is open (any: another modal, a video lightbox);
+ *   - while the cookie-consent bar is waiting for a choice. The consent element exposes no
+ *     event, so this reads its DOM: `#cc-banner` present and not `hidden` means pending. That is
+ *     a coupling to ecropolis-consent's markup; if that id changes, change CONSENT_ID below;
+ *   - while printing;
+ *   - twice on one page view, and more than once per page view across ALL modals: the first
+ *     automatic open disarms every other automatic trigger on the page;
+ *   - once the visitor has closed this modal in this browser session (sessionStorage, always),
+ *     and, by `once`: 'session' (default) also once it has been shown this session; 'visitor'
+ *     once it has been shown or closed ever (localStorage); 'never' remembers nothing but the
+ *     session's dismissal. Memory is `key` (default "modal:<id>") = `version`: change `version`
+ *     and a changed offer is shown again.
+ * `delay` and `scroll` wait out a gate (the modal opens as soon as it lifts); `exit` does not:
+ * a pointer that left the window while the consent bar was up is not queued for later.
+ * Exit intent listens for the pointer leaving through the TOP edge, and only where the primary
+ * pointer is fine and can hover (a mouse or trackpad). On a phone or tablet it never fires:
+ * there is no pointer to leave. Clicks and `#<id>` links are requests, not interruptions: they
+ * open at once, whatever the memory says, and the hash is removed on close.
+ *
+ * Without JavaScript the <dialog> stays closed and nothing opens by itself. A trigger that is a
+ * link still goes to its href, so point it at a page that holds the same content (the form's
+ * own page); a trigger that is a <button> does nothing. Non-interactive triggers (an <img>) are
+ * given role="button" and tabindex="0" by the script, so the keyboard reaches them; prefer a
+ * real <button> or <a> around the image.
+ *
+ * prefers-reduced-motion: no fade or scale; the dialog appears at once.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --md-backdrop       behind the box                        (rgb(15 20 35 / 0.6))
+ *   --md-surface        the box                               (#fff)
+ *   --md-text           text in the box                       (#1e283c)
+ *   --md-radius         corners of the box                    (12px; 0 for size="full")
+ *   --md-padding        inside the box                        (clamp(1.25rem, 4vw, 2rem))
+ *   --md-shadow         the box's shadow                      (0 1.5rem 4rem rgb(0 0 0 / 0.3))
+ *   --md-close-bg / --md-close-fg   the close button          (transparent / currentColor)
+ *   --md-focus          focus ring on the close button        (currentColor)
+ *   --md-width-sm / --md-width-md / --md-width-lg   max width per size   (24rem / 36rem / 56rem)
+ */
+interface Props {
+  /** The dialog's id: `data-modal-open="<id>"` opens it, and `#<id>` with `openOnHash`. Required. */
+  id: string;
+  /** The dialog's accessible name. Required, even when hidden. */
+  title: string;
+  /** Hide the title visually; it still names the dialog. */
+  hideTitle?: boolean;
+  /** Max width: sm 24rem, md 36rem, lg 56rem, full the whole viewport. Default md. */
+  size?: 'sm' | 'md' | 'lg' | 'full';
+  /** Name of the close button. Default "Close". */
+  closeLabel?: string;
+  /** Open this many ms after load (never before `minDwell`). */
+  delay?: number;
+  /** Open when this percent of the page has been scrolled (0–100). */
+  scroll?: number;
+  /** Open when the pointer leaves through the top edge. Mouse and trackpad only. */
+  exit?: boolean;
+  /** Open when the URL's hash is `#<id>` (on load and on hashchange): links in emails. */
+  openOnHash?: boolean;
+  /** How long an automatic open is remembered. Default 'session'. */
+  once?: 'session' | 'visitor' | 'never';
+  /** Storage key for the memory. Default "modal:<id>". */
+  key?: string;
+  /** Bump it and the modal is shown again to people who have seen or closed it. Default "1". */
+  version?: string;
+  /** Close on a click outside the box. Default true. */
+  closeOnBackdrop?: boolean;
+  /** Visible time (ms) before any automatic open. Default 3000. */
+  minDwell?: number;
+  class?: string;
+}
+
+const {
+  id,
+  title,
+  hideTitle = false,
+  size = 'md',
+  closeLabel = 'Close',
+  delay,
+  scroll,
+  exit = false,
+  openOnHash = false,
+  once = 'session',
+  key,
+  version = '1',
+  closeOnBackdrop = true,
+  minDwell = 3000,
+  class: className,
+} = Astro.props;
+
+if (!id || !/^[A-Za-z][\w-]*$/.test(id)) throw new Error(`Modal: \`id\` "${id}" must start with a letter and hold only letters, digits, - and _ (it is used in #<id> links).`);
+if (!title || !String(title).trim()) throw new Error(`Modal "${id}": \`title\` is required; it is the dialog's accessible name (hide it with hideTitle).`);
+if (!['sm', 'md', 'lg', 'full'].includes(size)) throw new Error(`Modal "${id}": size "${size}" is not sm, md, lg or full.`);
+if (!['session', 'visitor', 'never'].includes(once)) throw new Error(`Modal "${id}": once "${once}" is not session, visitor or never.`);
+if (delay !== undefined && !(Number.isFinite(delay) && delay >= 0)) throw new Error(`Modal "${id}": delay must be a number of milliseconds.`);
+if (scroll !== undefined && !(Number.isFinite(scroll) && scroll >= 0 && scroll <= 100)) throw new Error(`Modal "${id}": scroll must be a percentage, 0 to 100.`);
+
+const titleId = `${id}-title`;
+const config = JSON.stringify({
+  delay: delay ?? null,
+  scroll: scroll ?? null,
+  exit,
+  hash: openOnHash,
+  once,
+  key: key || `modal:${id}`,
+  version: String(version),
+  dwell: Math.max(0, minDwell),
+  backdrop: closeOnBackdrop,
+});
+
+// The runtime goes out once per page; every modal on the page is mounted by it.
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__modalScript;
+locals.__modalScript = true;
+---
+
+<dialog id={id} class:list={['md', `md--${size}`, className]} aria-labelledby={titleId} data-md={config}>
+  <div class="md__box">
+    <div class="md__head">
+      <h2 id={titleId} class:list={['md__title', { 'md__sr': hideTitle }]}>{title}</h2>
+      <button class="md__close" type="button" aria-label={closeLabel} data-md-close>
+        <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+    <div class="md__body">
+      <slot />
+    </div>
+  </div>
+</dialog>
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroModal) return;
+        const CONSENT_ID = 'cc-banner';
+        const modals = new Map(); // id -> state
+        let autoDone = false; // one automatic open per page view, across every modal
+        let poll = 0;
+
+        // ---- visible time: only time the page was actually on screen counts toward minDwell.
+        let visibleAcc = 0;
+        let visibleSince = document.hidden ? null : 0; // performance.now() origin = navigation start
+        document.addEventListener('visibilitychange', () => {
+          const now = performance.now();
+          if (document.hidden && visibleSince !== null) {
+            visibleAcc += now - visibleSince;
+            visibleSince = null;
+          } else if (!document.hidden && visibleSince === null) visibleSince = now;
+          if (!document.hidden) tryPending();
+        });
+        const visibleMs = () => visibleAcc + (visibleSince === null ? 0 : performance.now() - visibleSince);
+
+        // ---- memory. Storage can throw (privacy modes, blocked cookies): then it is this page only.
+        const mem = {};
+        const store = (kind) => {
+          try {
+            return window[kind];
+          } catch {
+            return null;
+          }
+        };
+        const get = (kind, k) => {
+          try {
+            return store(kind)?.getItem(k) ?? mem[kind + k] ?? null;
+          } catch {
+            return mem[kind + k] ?? null;
+          }
+        };
+        const set = (kind, k, v) => {
+          mem[kind + k] = v;
+          try {
+            store(kind)?.setItem(k, v);
+          } catch {}
+        };
+        const drop = (kind, k) => {
+          delete mem[kind + k];
+          try {
+            store(kind)?.removeItem(k);
+          } catch {}
+        };
+        const remembered = (s) =>
+          get('sessionStorage', s.cfg.key) === s.cfg.version || (s.cfg.once === 'visitor' && get('localStorage', s.cfg.key) === s.cfg.version);
+
+        // ---- scroll lock, as in video-player: keep the scrollbar's width so nothing shifts.
+        let locked = 0;
+        let saved = null;
+        const lock = (on) => {
+          const html = document.documentElement;
+          if (on) {
+            if (locked++) return;
+            saved = [html.style.overflow, html.style.paddingRight];
+            const bar = window.innerWidth - html.clientWidth;
+            html.style.overflow = 'hidden';
+            if (bar > 0) html.style.paddingRight = bar + 'px';
+          } else if (locked && !--locked) {
+            [html.style.overflow, html.style.paddingRight] = saved;
+          }
+        };
+
+        // ---- the gates an automatic open must pass.
+        const consentPending = () => {
+          const cc = document.getElementById(CONSENT_ID);
+          return !!cc && !cc.hidden;
+        };
+        const blocked = (s) =>
+          document.hidden ||
+          matchMedia('print').matches ||
+          !!document.querySelector('dialog[open]') ||
+          consentPending() ||
+          visibleMs() < s.cfg.dwell;
+
+        const open = (s, opener, how) => {
+          const d = s.dialog;
+          if (d.open) return;
+          s.returnTo = opener || (document.activeElement !== document.body ? document.activeElement : null);
+          s.how = how;
+          d.showModal();
+          lock(true);
+          if (how === 'auto') {
+            autoDone = true;
+            if (s.cfg.once === 'session') set('sessionStorage', s.cfg.key, s.cfg.version);
+            if (s.cfg.once === 'visitor') set('localStorage', s.cfg.key, s.cfg.version);
+          }
+        };
+
+        const tryAuto = (s) => {
+          if (!s.pending || autoDone || s.dialog.open) return false;
+          if (remembered(s)) {
+            s.pending = false;
+            return false;
+          }
+          if (blocked(s)) return false;
+          s.pending = false;
+          open(s, null, 'auto');
+          return true;
+        };
+        const tryPending = () => {
+          let waiting = false;
+          modals.forEach((s) => {
+            if (!tryAuto(s) && s.pending && !autoDone) waiting = true;
+          });
+          clearInterval(poll);
+          poll = waiting ? setInterval(tryPending, 400) : 0;
+        };
+        const want = (s) => {
+          if (autoDone || remembered(s)) return;
+          s.pending = true;
+          tryPending();
+        };
+
+        const arm = (s) => {
+          const c = s.cfg;
+          clearTimeout(s.timer);
+          if (c.delay !== null) s.timer = setTimeout(() => want(s), c.delay);
+          if (c.scroll !== null) s.scrolled = false;
+        };
+
+        const mount = (d) => {
+          if (modals.has(d.id)) return;
+          let cfg;
+          try {
+            cfg = JSON.parse(d.dataset.md || '{}');
+          } catch {
+            return;
+          }
+          const s = { dialog: d, cfg, pending: false, timer: 0, returnTo: null, how: '' };
+          modals.set(d.id, s);
+          const box = d.querySelector('.md__box');
+          d.querySelector('[data-md-close]').addEventListener('click', () => d.close());
+          // Backdrop: the dialog fills the viewport, so a press AND release on the dialog itself,
+          // outside the box, is a click on the backdrop. (A text selection dragged out of the box
+          // ends on the dialog too; checking where the press began keeps that from closing it.)
+          let downOnBackdrop = false;
+          d.addEventListener('pointerdown', (e) => {
+            downOnBackdrop = e.target === d;
+          });
+          d.addEventListener('click', (e) => {
+            if (cfg.backdrop && e.target === d && downOnBackdrop && !box.contains(e.target)) d.close();
+            downOnBackdrop = false;
+          });
+          d.addEventListener('close', () => {
+            lock(false);
+            // A visitor who closed it does not get it again this session; with once="visitor", ever.
+            set('sessionStorage', cfg.key, cfg.version);
+            if (cfg.once === 'visitor') set('localStorage', cfg.key, cfg.version);
+            if (cfg.hash && location.hash === '#' + d.id) history.replaceState(history.state, '', location.pathname + location.search);
+            const back = s.returnTo;
+            s.returnTo = null;
+            if (back && back.isConnected && typeof back.focus === 'function') back.focus();
+            tryPending();
+          });
+          arm(s);
+        };
+
+        // ---- triggers shared by every modal.
+        document.addEventListener('click', (e) => {
+          const t = e.target.closest && e.target.closest('[data-modal-open]');
+          if (!t) return;
+          const s = modals.get(t.getAttribute('data-modal-open'));
+          if (!s) return; // Unknown id: let a link be a link.
+          e.preventDefault();
+          open(s, t, 'click');
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          const t = e.target.closest && e.target.closest('[data-modal-open][data-md-upgraded]');
+          if (!t) return;
+          e.preventDefault();
+          t.click();
+        });
+
+        let ticking = false;
+        addEventListener(
+          'scroll',
+          () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+              ticking = false;
+              const room = document.documentElement.scrollHeight - innerHeight;
+              const pct = room > 0 ? (scrollY / room) * 100 : 100;
+              modals.forEach((s) => {
+                if (s.cfg.scroll !== null && !s.scrolled && pct >= s.cfg.scroll) {
+                  s.scrolled = true;
+                  want(s);
+                }
+              });
+            });
+          },
+          { passive: true },
+        );
+
+        const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+        document.addEventListener('mouseout', (e) => {
+          if (e.relatedTarget || e.clientY > 0 || !finePointer.matches || autoDone) return;
+          modals.forEach((s) => {
+            if (!s.cfg.exit || autoDone || remembered(s) || blocked(s)) return;
+            s.pending = true;
+            tryAuto(s);
+            s.pending = false; // Exit intent is a moment; it is not queued behind a gate.
+          });
+        });
+
+        const fromHash = () => {
+          const s = location.hash.length > 1 && modals.get(decodeURIComponent(location.hash.slice(1)));
+          if (s && s.cfg.hash) open(s, null, 'hash');
+        };
+        addEventListener('hashchange', fromHash);
+
+        const boot = () => {
+          document.querySelectorAll('dialog[data-md]').forEach(mount);
+          document.querySelectorAll('[data-modal-open]').forEach((t) => {
+            if (!modals.has(t.getAttribute('data-modal-open'))) return;
+            if (!t.hasAttribute('aria-haspopup')) t.setAttribute('aria-haspopup', 'dialog');
+            // An <img> or <div> trigger: make it reachable and operable from the keyboard.
+            if (!t.matches('a[href], button, input, select, textarea, summary, [tabindex]')) {
+              t.setAttribute('role', 'button');
+              t.setAttribute('tabindex', '0');
+              t.setAttribute('data-md-upgraded', '');
+            }
+          });
+          fromHash();
+        };
+
+        window.__superheroModal = {
+          /** Open a modal by id, as a click would. */
+          open: (id) => modals.has(id) && open(modals.get(id), null, 'click'),
+          /** Forget what this browser remembers about a modal (or all) and re-arm its triggers. For reviewers and tests. */
+          reset: (id) => {
+            autoDone = false;
+            modals.forEach((s, k) => {
+              if (id && k !== id) return;
+              drop('sessionStorage', s.cfg.key);
+              drop('localStorage', s.cfg.key);
+              s.pending = false;
+              arm(s);
+            });
+          },
+        };
+        document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+      })();
+    </script>
+  )
+}
+
+<style>
+  /* The dialog is the backdrop and fills the viewport; the box is centred in it. */
+  .md {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: clamp(0.75rem, 3vw, 2rem);
+    border: 0;
+    background: var(--md-backdrop, rgb(15 20 35 / 0.6));
+    color: var(--md-text, #1e283c);
+    overscroll-behavior: contain;
+  }
+  .md[open] {
+    display: grid;
+    place-items: center;
+  }
+  .md::backdrop {
+    background: transparent;
+  }
+  .md__box {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    width: 100%;
+    max-width: var(--md-width-md, 36rem);
+    max-height: 100%;
+    overflow: hidden;
+    border-radius: var(--md-radius, 12px);
+    background: var(--md-surface, #fff);
+    box-shadow: var(--md-shadow, 0 1.5rem 4rem rgb(0 0 0 / 0.3));
+  }
+  .md--sm .md__box {
+    max-width: var(--md-width-sm, 24rem);
+  }
+  .md--lg .md__box {
+    max-width: var(--md-width-lg, 56rem);
+  }
+  .md--full {
+    padding: 0;
+  }
+  .md--full .md__box {
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+  }
+  .md__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: calc(var(--md-padding, clamp(1.25rem, 4vw, 2rem)) - 0.5rem) calc(var(--md-padding, clamp(1.25rem, 4vw, 2rem)) - 0.5rem) 0
+      var(--md-padding, clamp(1.25rem, 4vw, 2rem));
+  }
+  .md__title {
+    margin: 0.5rem 0 0;
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+  /* Hidden visually, still the dialog's name. */
+  .md__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .md__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--md-close-bg, transparent);
+    color: var(--md-close-fg, currentColor);
+    cursor: pointer;
+  }
+  .md__close:hover {
+    background: var(--md-close-bg, rgb(0 0 0 / 0.06));
+  }
+  .md__close:focus-visible {
+    outline: 3px solid var(--md-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .md__body {
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem var(--md-padding, clamp(1.25rem, 4vw, 2rem)) var(--md-padding, clamp(1.25rem, 4vw, 2rem));
+  }
+  /* One definite cell, so an image inside can be max-height: 100% and fit the screen. */
+  .md--full .md__body {
+    display: grid;
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+    place-items: center;
+  }
+  .md__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .md__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .md[open] {
+      animation: md-fade 0.18s ease-out;
+    }
+    .md[open] .md__box {
+      animation: md-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+  }
+  @keyframes md-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes md-rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem) scale(0.97);
+    }
+  }
+  @media print {
+    .md {
+      display: none !important;
+    }
+  }
+</style>

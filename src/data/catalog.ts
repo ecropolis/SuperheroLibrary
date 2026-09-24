@@ -1286,6 +1286,76 @@ import { analytics } from '../data/site';
     file: 'src/library/animated-background/AnimatedBackground.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'modal',
+    name: 'Modal box',
+    aka: ['PowerPack Modal Box', 'UABB Modal Popup', 'Elementor Popup', 'popup', 'lightbox', 'exit-intent popup', 'OptinMonster'],
+    summary:
+      'A native <dialog> over the page, opened by any element with data-modal-open, by a #<id> link, or (opt-in) after a delay, a scroll depth or exit intent. Focus trapped, Escape and backdrop close it, focus returns to the opener, the page does not scroll underneath. Automatic opens wait for 3 s of visible time and for the consent bar, happen once per page view across all modals, and are remembered per session or per visitor.',
+    pitch: "A box that opens when it is asked for — a click, a scroll, a hand leaving for the tab bar — and stays gone once it's been closed.",
+    // SE Ranking US, 2026-09-24: website popup 170/mo, difficulty 24; modal popup 390/46;
+    // html modal 590/47; exit intent popup 320/52. The higher-volume three are harder; the page
+    // is written for "website popup" and should pick them up as variants.
+    search: { query: 'website popup', alsoRanks: ['modal popup', 'html modal', 'exit intent popup'] },
+    replaces: ['PowerPack / UABB / Elementor popup modules', 'OptinMonster and popup plugins', 'Magnific Popup / Fancybox for content'],
+    goodFor:
+      'Something the visitor asked for: a form behind a “Get a quote” button, a video or a large image on request, a link in an email that opens the offer (#<id>). Or one offer after real engagement: half the page read, or a mouse heading for the tab bar. A popup is a tool with a cost, so use it where the content is worth the interruption.',
+    notFor:
+      'Opening on arrival. A popup that covers the content the moment the page loads is what put popups out of favour: people leave, and Google’s guidance on intrusive interstitials says a mobile page whose content is blocked on arrival can rank lower. That is why automatic opens here wait for 3 s of visible time at the least. Also not for every page, not for more than one automatic popup per page (the element opens only the first anyway), and not for content people need in order to use the page, which belongs on the page. Exit intent works with a mouse or trackpad only: on a phone or tablet it never fires, so a mobile audience needs a scroll or delay trigger or none.',
+    props: [
+      { name: 'id', type: 'string', note: 'Required. The dialog’s id: any element with data-modal-open="<id>" opens it, and with openOnHash so does #<id> in the URL.' },
+      { name: 'title', type: 'string', note: 'Required. The dialog’s accessible name, shown as its heading (aria-labelledby).' },
+      { name: 'hideTitle', type: 'boolean', default: 'false', note: 'Hide the heading visually; it still names the dialog. For an image or a video that speaks for itself.' },
+      { name: 'size', type: "'sm' | 'md' | 'lg' | 'full'", default: "'md'", note: 'Max width 24rem, 36rem, 56rem, or the whole viewport with no corners.' },
+      { name: 'closeLabel', type: 'string', default: '“Close”', note: 'Name of the close button.' },
+      { name: 'delay', type: 'number (ms)', note: 'Open this long after load. Combinable with scroll and exit: the first to fire opens it.' },
+      { name: 'scroll', type: 'number (0–100)', note: 'Open once this percent of the page has been scrolled. A page too short to scroll counts as 100.' },
+      { name: 'exit', type: 'boolean', default: 'false', note: 'Open when the pointer leaves through the top edge. Only where the primary pointer is a mouse or trackpad; never on touch.' },
+      { name: 'openOnHash', type: 'boolean', default: 'false', note: 'Open when the URL is …#<id>, on load and on hashchange: a link in an email. Treated as a request: no dwell, no memory. The hash is removed on close.' },
+      { name: 'once', type: "'session' | 'visitor' | 'never'", default: "'session'", note: 'How long an automatic open is remembered: this browser session, this browser for good (localStorage), or not at all. A modal the visitor closed never comes back by itself in the same session, whatever this says.' },
+      { name: 'key', type: 'string', default: '“modal:<id>”', note: 'The storage key of that memory.' },
+      { name: 'version', type: 'string', default: '“1”', note: 'Change it when the offer changes, and people who closed the old one see the new one.' },
+      { name: 'closeOnBackdrop', type: 'boolean', default: 'true', note: 'Close on a click outside the box. Turn off for a long form someone could lose with a stray click.' },
+      { name: 'minDwell', type: 'number (ms)', default: '3000', note: 'Visible time before any automatic open. Time in a background tab does not count.' },
+      { name: 'class', type: 'string', note: 'Class on the <dialog>, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--md-backdrop', fallback: 'rgb(15 20 35 / 0.6)', note: 'Behind the box.' },
+      { name: '--md-surface', fallback: '#fff', note: 'The box.' },
+      { name: '--md-text', fallback: '#1e283c', note: 'Text in the box (14.75:1 on the fallback surface).' },
+      { name: '--md-radius', fallback: '12px', note: 'Box corners; size="full" has none.' },
+      { name: '--md-padding', fallback: 'clamp(1.25rem, 4vw, 2rem)', note: 'Inside the box.' },
+      { name: '--md-shadow', fallback: '0 1.5rem 4rem rgb(0 0 0 / 0.3)', note: 'Box shadow.' },
+      { name: '--md-close-bg', fallback: 'transparent', note: 'Close button fill (a faint grey on hover).' },
+      { name: '--md-close-fg', fallback: 'currentColor', note: 'Close icon.' },
+      { name: '--md-focus', fallback: 'currentColor', note: 'Focus ring on the close button.' },
+      { name: '--md-width-sm', fallback: '24rem', note: 'Max width of size="sm".' },
+      { name: '--md-width-md', fallback: '36rem', note: 'Max width of size="md".' },
+      { name: '--md-width-lg', fallback: '56rem', note: 'Max width of size="lg".' },
+    ],
+    a11y: [
+      'A native modal <dialog> opened with showModal(): the rest of the page is inert, Tab stays inside, Escape closes it. Named by its title through aria-labelledby, also when the title is hidden visually.',
+      'The close button is a real 44px <button> named by closeLabel, first in the dialog, so it has focus on open unless the content has an autofocus field. A backdrop click closes too; a text selection dragged out of the box does not.',
+      'Focus returns to the element that opened it, or after an automatic open to whatever had focus. Triggers get aria-haspopup="dialog"; a trigger that is not a button or link (an <img>) gets role="button" and tabindex="0" and opens on Enter or Space.',
+      'The page underneath does not scroll while it is open, and the scrollbar’s width is kept so nothing shifts.',
+      'prefers-reduced-motion: no fade or rise; it appears at once. Nothing else moves.',
+      'Without JavaScript the dialog stays closed and nothing opens by itself. A link trigger still goes to its href (point it at a page with the same content); a button trigger does nothing.',
+    ],
+    usage: `<!-- A click: any element with data-modal-open. A link keeps working without JavaScript. -->
+<a href="/contact/" data-modal-open="quote">Get a quote</a>
+<Modal id="quote" title="Get a quote">
+  <ContactForm />            <!-- anything: a form embed, a video-player, an image -->
+</Modal>
+
+<!-- One offer after engagement: half the page or 30 s, once a session, never in the first 3 s. -->
+<Modal id="guide" title="The free planting guide" size="sm" scroll={50} delay={30000} version="2026-spring">
+  …
+</Modal>
+<!-- .site { --md-surface: var(--white); --md-text: var(--ink); --md-radius: var(--radius); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/modal/ (demo)' }],
+    file: 'src/library/modal/Modal.astro',
+    added: '2026-09-24',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
