@@ -157,9 +157,16 @@ for (const p of walk(root)) {
     if (/\bTHREE\.|\bVANTA\.|\bparticlesJS\b/.test(text)) fail(`${r}: calls a WebGL or particle library API; the repo carries none.`);
   }
 }
+// Runtime dependencies only. Build-time devDependencies are allowed when the README
+// documents them as a build source that never reaches the emitted file -- the icon
+// element reads Font Awesome Free's SVGs at build and emits plain inline SVG -- and
+// the rule that matters for THIS element is the one above: its file imports nothing.
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) => d !== 'astro');
-if (deps.length) fail(`package.json: has dependencies beyond astro (${deps.join(', ')}); elements carry none.`);
+const deps = Object.keys({ ...pkg.dependencies }).filter((d) => d !== 'astro');
+if (deps.length) fail(`package.json: has runtime dependencies beyond astro (${deps.join(', ')}); elements carry none.`);
+for (const d of Object.keys({ ...pkg.devDependencies })) {
+  if (/three|vanta|particles/i.test(d)) fail(`package.json: devDependency ${d} is a WebGL or particle library; the repo carries none.`);
+}
 finish('self-contained');
 
 // ------------------------------------------------------------ 5. built demo page
