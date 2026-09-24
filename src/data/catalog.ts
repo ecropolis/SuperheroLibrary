@@ -1234,6 +1234,58 @@ import { analytics } from '../data/site';
     source: { repo: 'ecropolis/ecropolis-consent', sync: 'node bin/consent-sync.mjs update <site>' },
     added: '2026-09-23',
   },
+  {
+    id: 'animated-background',
+    name: 'Animated background',
+    aka: ['Vanta.js', 'Vanta backgrounds', 'UABB Animated Background', 'PowerPack animated background', 'animated hero background', 'waves background', 'fog background', 'birds background'],
+    summary:
+      'A moving background behind a hero: waves, cells, fog, rings, bubbles, birds, snow, a breathing halo, or a scrolling texture. One 2D canvas (or, for the scrolling ones, CSS alone) in one file, with no WebGL and no dependency. Still under reduced motion, below `minWidth` or with `motion="off"`; paused off screen and in hidden tabs; one per page.',
+    pitch: 'The moving hero background people ask for — waves, cells, fog, birds — in one small file, no WebGL, and it holds still for anyone who asked for less motion.',
+    // 260/mo, difficulty 22; "website background animation" 260/22, "css animated background"
+    // 320/30, "vanta js" 320/14 (SE Ranking US, 2026-09-24). "animated background" 6,600/71
+    // is out of reach (wallpapers and video), so it stays in aka. "vanta js" is people looking
+    // for exactly this: the Vanta looks without three.js, which the page says plainly.
+    search: { query: 'animated website background', alsoRanks: ['website background animation', 'css animated background', 'vanta js'] },
+    replaces: ['Vanta.js + three.js (≈600 KB, WebGL)', 'UABB / PowerPack animated background rows', 'video loops used for ambience'],
+    goodFor: 'A hero band, or a section divider on a brand with room for motion.',
+    notFor:
+      'Under body text; more than one per page (the second instance draws only its still frame and warns: two moving layers fight for attention and for the main thread); a page that already has video-background or particle-field; and any look that needs dots joined by lines — that is particle-field.',
+    props: [
+      { name: 'preset', type: "'waves' | 'cells' | 'fog' | 'rings' | 'bubbles' | 'birds' | 'snow' | 'halo' | 'scroll-x' | 'scroll-y'", default: "'waves'", note: 'The look. The first eight are drawn on one canvas; scroll-x and scroll-y are CSS only (a tiling texture moving on a keyframe). Watched live as `data-preset`, so a picker can swap it.' },
+      { name: 'palette', type: "'superhero' | 'custom'", default: "'superhero'", note: 'superhero pins the house purple, ink and white on the element; custom reads the host’s `--ab-a/b/c`, with the same fallbacks.' },
+      { name: 'intensity', type: "'low' | 'medium' | 'high'", default: "'medium'", note: 'Element count, amplitude and pace: 0.6×, 1×, 1.6×. High on a canvas larger than 800×450 drops itself to 30 fps if a frame costs more than about 12 ms (measured, logged once).' },
+      { name: 'speed', type: 'number', default: '1', note: 'Multiplier on the preset’s own pace; the scroll presets take 40 s per tile at 1.' },
+      { name: 'minWidth', type: 'number', default: '700', note: 'Below this viewport width the still frame is drawn and nothing animates. 0 animates everywhere. Tracked live.' },
+      { name: 'motion', type: "'auto' | 'off'", default: "'auto'", note: 'off draws the still frame always; such an instance does not count against one-per-page.' },
+      { name: 'pointer', type: "'drift' | 'repel' | 'none'", default: "'drift'", note: 'How the canvas presets answer the mouse: waves lean and swell toward its x, cells and bubbles lean in or away, fog slides in parallax, rings and the halo centre trail it, birds are drawn or scattered, snow gusts with a sweep. Fine pointers only (hover + pointer: fine), never on touch; no reaction under reduced motion, with motion="off" or below minWidth. Listeners sit on the host, the canvas keeps pointer-events: none. The scroll presets do not react.' },
+      { name: 'texture', type: 'string', note: 'scroll-x / scroll-y only: URL of the host’s own square, seamlessly tiling image, drawn at 512 px, in place of the generated one. Never a client image on a shared page.' },
+      { name: 'class', type: 'string', note: 'Class for the host to position and stack it with.' },
+    ],
+    theming: [
+      { name: '--ab-a', fallback: '#5933d8', note: 'First palette stop: the body of waves and cells, the fog’s midtone, the glow, a third of the birds, the scroll texture.' },
+      { name: '--ab-b', fallback: '#1e283c', note: 'Second stop: the deep end of waves and cells, the fog’s lowlight.' },
+      { name: '--ab-c', fallback: '#fff', note: 'Third stop: highlights, bubbles, snow, rings, the rest of the birds, the scroll presets’ fine layer.' },
+      { name: '--ab-bg', fallback: 'transparent', note: 'Base fill under the drawing. Leave transparent when the host has its own background layer.' },
+      { name: '--ab-opacity', fallback: '1', note: 'Opacity of the whole layer, the easy way to sit it further behind the copy.' },
+    ],
+    a11y: [
+      'Decorative: aria-hidden, no pointer events, nothing announced.',
+      'The pointer reaction is decorative and never required to reach any content; it is off on touch screens and in every still state.',
+      'prefers-reduced-motion (tracked live): one still frame is drawn and the frame loop stops; the CSS presets pause their keyframe. The look survives without the movement.',
+      'Pauses while off screen and while the tab is hidden; one requestAnimationFrame loop capped at 60 fps.',
+      'Nothing flashes: every preset moves slowly and fades; no strobing (WCAG 2.3.1).',
+      'Removed from the page (Astro view transitions, SPA swaps), it cancels its frame and frees its canvas: it is a custom element with a disconnectedCallback.',
+    ],
+    usage: `<section class="hero">          <!-- position: relative; isolation: isolate; pointermove is read here -->
+  <img class="hero__bg" … />        <!-- z-index: -1 -->
+  <AnimatedBackground preset="fog" pointer="repel" class="hero__motion" />   <!-- z-index: 1, via :global() if the host scopes styles -->
+  <div class="hero__copy">…</div>   <!-- position: relative; z-index: 2 -->
+</section>
+<!-- .hero { --ab-a: var(--brand); --ab-b: var(--brand-dark); --ab-c: var(--white); } with palette="custom" -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/animated-background/ (demo)' }],
+    file: 'src/library/animated-background/AnimatedBackground.astro',
+    added: '2026-09-24',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

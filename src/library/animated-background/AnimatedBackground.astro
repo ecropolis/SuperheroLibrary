@@ -1,0 +1,530 @@
+---
+/**
+ * AnimatedBackground — the moving hero background page builders sell as a row setting:
+ * waves, cells, fog, rings, bubbles, birds, snow, a breathing halo, and two scrolling
+ * textures. The page-builder versions run a WebGL scene library for it (about 600 KB of
+ * script and a GPU context for a decorative layer). This is the same family of looks on a 2D
+ * canvas and CSS, in one file, with no dependency. Inspired by, not parity: the palette is
+ * the house purple, ink and white until the host maps `--ab-*`.
+ *
+ * Presets. Canvas: `waves` (layered sine bands), `cells` (a drifting Voronoi field), `fog`
+ * (three octaves of value noise, scrolled), `rings` (ripples from one or two centres),
+ * `bubbles` (rising translucent circles), `birds` (a flock of boids), `snow` (falling flakes),
+ * `halo` (a slow breathing glow, the cheapest). CSS only, no canvas: `scroll-x`, `scroll-y`
+ * (a seamlessly tiling texture, masked from the palette, moving on a keyframe; `texture`
+ * supplies the host's own square tile instead). For dots joined by lines use particle-field.
+ *
+ * Behaviour: decorative (aria-hidden, no pointer events); one requestAnimationFrame loop
+ * capped at 60 fps, dropping to 30 when `intensity="high"` on a large canvas costs more than
+ * ~12 ms a frame (measured, logged once); paused while off screen and while the tab is hidden;
+ * `prefers-reduced-motion` (tracked live) and `motion="off"` draw one still frame and stop the
+ * loop (the CSS presets pause their keyframe); `minWidth` tracked live; one per page — a
+ * second live instance warns and draws only its still; a custom element, so removal (Astro view
+ * transitions, SPA swaps) cancels the frame and frees the canvas. `pointer` (drift, repel or
+ * none) lets the canvas presets lean toward or away from the mouse, on fine pointers only,
+ * never on touch, and never in a still state; the pointer is two eased numbers the frame
+ * already reads, so an idle pointer costs nothing.
+ *
+ * Stacking is the host's: it fills its nearest positioned ancestor, between the background
+ * and the copy in z order (see the catalogue's usage block).
+ *
+ *   <AnimatedBackground preset="waves" class="hero__bg" />
+ *   <AnimatedBackground preset="fog" intensity="low" palette="custom" minWidth={0} />
+ */
+const PRESETS = ['waves', 'cells', 'fog', 'rings', 'bubbles', 'birds', 'snow', 'halo', 'scroll-x', 'scroll-y'] as const;
+type Preset = (typeof PRESETS)[number];
+interface Props {
+  preset?: Preset;
+  /** `superhero` pins the house palette; `custom` reads the host's `--ab-a/b/c` (same fallbacks). */
+  palette?: 'superhero' | 'custom';
+  /** Element count, amplitude and speed scale. */
+  intensity?: 'low' | 'medium' | 'high';
+  /** Multiplier on the preset's own pace. */
+  speed?: number;
+  /** Viewport width (px) below which the still is drawn and nothing animates. 0 animates everywhere. */
+  minWidth?: number;
+  /** `off` draws the still frame always. */
+  motion?: 'auto' | 'off';
+  /** How the canvas presets answer the mouse: lean toward it, away from it, or not at all. Fine pointers only. */
+  pointer?: 'drift' | 'repel' | 'none';
+  /** scroll-x / scroll-y only: URL of the host's own square, seamlessly tiling image (drawn at 512 px). */
+  texture?: string;
+  class?: string;
+}
+const { preset = 'waves', palette = 'superhero', intensity = 'medium', speed = 1, minWidth = 700, motion = 'auto', pointer = 'drift', texture, class: className } = Astro.props;
+if (!PRESETS.includes(preset)) throw new Error(`AnimatedBackground: unknown preset "${preset}". One of: ${PRESETS.join(', ')}.`);
+const css = preset === 'scroll-x' || preset === 'scroll-y';
+
+// The scroll texture: soft blobs on a 512 px tile that wraps at every edge, used as an alpha
+// mask so the colour stays a CSS variable. Seeded, so every build draws the same tile.
+const tile = (seed: number, n: number, rMin: number, rMax: number) => {
+  let s = seed;
+  const rnd = () => ((s = (s * 1664525 + 1013904223) % 4294967296) / 4294967296);
+  const T = 512;
+  let out = '';
+  for (let i = 0; i < n; i++) {
+    const x = rnd() * T, y = rnd() * T, r = rMin + rnd() * (rMax - rMin), o = 0.5 + rnd() * 0.5;
+    for (const dx of [-T, 0, T]) for (const dy of [-T, 0, T]) {
+      if (x + dx < -r || x + dx > T + r || y + dy < -r || y + dy > T + r) continue;
+      out += `<circle cx="${(x + dx).toFixed(1)}" cy="${(y + dy).toFixed(1)}" r="${r.toFixed(1)}" fill="url(#g)" opacity="${o.toFixed(2)}"/>`;
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${T} ${T}"><defs><radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>${out}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+};
+// The tiles ride along on every instance (about 5 KB), so a preset can be switched to
+// scroll-x/y at runtime, as the demo does.
+const style = [
+  palette === 'superhero' ? '--ab-a:#5933d8;--ab-b:#1e283c;--ab-c:#fff' : '',
+  `--ab-dur:${(40 / Math.max(0.05, speed)).toFixed(1)}s;--ab-tile-a:${texture ? `url("${texture}")` : tile(7, 14, 70, 150)};--ab-tile-b:${tile(23, 22, 12, 40)}`,
+].join(';');
+---
+
+<animated-background
+  class:list={['ab', { 'ab--scroll': css, 'ab--x': preset === 'scroll-x', 'ab--y': preset === 'scroll-y', 'ab--texture': !!texture }, className]}
+  aria-hidden="true"
+  data-preset={preset}
+  data-intensity={intensity}
+  data-speed={speed}
+  data-min-width={minWidth}
+  data-motion={motion}
+  data-pointer={pointer}
+  data-still={motion === 'off' ? '' : undefined}
+  style={style}
+>
+  {css ? <><div class="ab__layer ab__layer--a"></div><div class="ab__layer ab__layer--b"></div></> : <canvas class="ab__canvas"></canvas>}
+</animated-background>
+
+<script is:inline>
+  (() => {
+    if (customElements.get('animated-background')) return;
+    const LEVEL = { low: 0.6, medium: 1, high: 1.6 };
+
+    // <ab-presets>
+    // Each preset is { init(o) -> state, draw(ctx, t, dt, state, o) }. `o` is { w, h, level,
+    // pace, a, b, c } with the palette as [r, g, b]. `t` is seconds (already scaled by
+    // `speed`), `dt` the seconds since the last frame (0 for a still). A still frame is
+    // draw(T0) on a fresh state, so every preset spreads its elements at init. The pointer is
+    // o.px, o.py (0–1 across the box, eased, 0.5 when idle or absent), o.pm (+1 drift, -1
+    // repel, 0 none) and o.pvx (how far the eased x still trails the real one: a gust).
+    const T0 = 10;
+    const TAU = Math.PI * 2;
+    const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+    const mix = (p, q, k) => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k, p[2] + (q[2] - p[2]) * k];
+    const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+    const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+    // Value noise, three octaves at most. Integer lattice hashed to [0, 1), smoothstep between.
+    const hash = (x, y) => {
+      let n = Math.imul(x, 374761393) + Math.imul(y, 668265263);
+      n = Math.imul(n ^ (n >>> 13), 1274126177);
+      return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+    };
+    const noise = (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+      const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    };
+    const fbm = (x, y, octaves) => {
+      let sum = 0, amp = 0.5, tot = 0;
+      for (let i = 0; i < octaves; i++, x *= 2, y *= 2, amp *= 0.5) { sum += amp * noise(x, y); tot += amp; }
+      return sum / tot;
+    };
+    // A per-pixel shader at low resolution, scaled up with the browser's smoothing: that is
+    // the softening. `px(x, y, data, i)` writes one rgba pixel of the small image.
+    const raster = (ctx, s, o, cols, px) => {
+      const w = Math.max(2, Math.min(cols, o.w)), h = Math.max(2, Math.round((w * o.h) / o.w));
+      if (!s.off || s.off.width !== w || s.off.height !== h) {
+        s.off = document.createElement('canvas');
+        s.off.width = w; s.off.height = h;
+        s.octx = s.off.getContext('2d');
+        s.img = s.octx.createImageData(w, h);
+      }
+      const d = s.img.data;
+      for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i += 4) px(x / w, y / h, d, i);
+      s.octx.putImageData(s.img, 0, 0);
+      ctx.drawImage(s.off, 0, 0, o.w, o.h);
+    };
+    // Force on a point from the pointer: toward it for drift, away for repel, fading to
+    // nothing at `radius` (in box heights). Returns [fx, fy] in box units.
+    const poke = (o, x, y, radius) => {
+      if (!o.pm) return [0, 0];
+      const ex = o.px - x / o.w, ey = o.py - y / o.h, d = Math.hypot(ex * (o.w / o.h), ey) || 1;
+      const f = d < radius ? ((radius - d) / radius) * o.pm / d : 0;
+      return [ex * f, ey * f];
+    };
+    const wrap = (p, o, m) => {
+      if (p.x < -m) p.x += o.w + 2 * m; else if (p.x > o.w + m) p.x -= o.w + 2 * m;
+      if (p.y < -m) p.y += o.h + 2 * m; else if (p.y > o.h + m) p.y -= o.h + 2 * m;
+    };
+
+    const PRESETS = {
+      // Three to five sine bands, each the sum of two waves drifting at different rates, filled a → b
+      // and stacked with rising opacity, so the front band reads darkest, like water.
+      waves: {
+        init: (o) => ({ bands: [0.4, 0.52, 0.64, 0.76, 0.86].slice(0, o.level < 1 ? 3 : o.level > 1 ? 5 : 4) }),
+        draw(ctx, t, dt, s, o) {
+          const lean = (o.px - 0.5) * 2 * o.pm; // the bands lean and swell toward the cursor's x
+          const amp = o.h * 0.06 * (0.7 + 0.3 * o.level) * (1 + 0.3 * Math.abs(lean));
+          s.bands.forEach((base, i) => {
+            const g = ctx.createLinearGradient(0, o.h * base - amp, 0, o.h);
+            g.addColorStop(0, rgba(mix(o.a, o.c, 0.15 * (3 - i)), 0.35 + i * 0.18));
+            g.addColorStop(1, rgba(o.b, 0.55 + i * 0.12));
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(0, o.h);
+            for (let x = 0; x <= o.w + 8; x += 8) {
+              const k = x / o.w;
+              const y = o.h * base + amp * Math.sin(k * 5.2 + t * (0.5 + i * 0.12) + i + lean) + amp * 0.5 * Math.sin(k * 11 - t * (0.32 + i * 0.08) + i * 2.1);
+              ctx.lineTo(x, y);
+            }
+            ctx.lineTo(o.w + 8, o.h);
+            ctx.closePath();
+            ctx.fill();
+          });
+        },
+      },
+      // A Voronoi field: seeds wander, each pixel is shaded by its distance to the nearest
+      // seed (bright at the centre, dark at the edge) and lit where two cells meet.
+      cells: {
+        init: (o) => {
+          const n = Math.round(36 * o.level);
+          const seeds = [];
+          for (let i = 0; i < n; i++) seeds.push({ x: Math.random(), y: Math.random(), px: rnd(0, TAU), py: rnd(0, TAU), fx: rnd(0.2, 0.6), fy: rnd(0.2, 0.6), ox: 0, oy: 0 });
+          return { seeds, r: Math.sqrt(1 / n) };
+        },
+        draw(ctx, t, dt, s, o) {
+          const asp = o.w / o.h, r = s.r, R = 1 / (r * r * 1.4);
+          for (const p of s.seeds) {
+            p.ox = p.x + 0.05 * Math.sin(t * p.fx + p.px); p.oy = p.y + 0.05 * Math.sin(t * p.fy + p.py);
+            const [fx, fy] = poke(o, p.ox * o.w, p.oy * o.h, 0.35); p.ox += fx * 0.08; p.oy += fy * 0.08; // seeds near the cursor lean in or away
+          }
+          raster(ctx, s, o, 150, (x, y, d, i) => {
+            let d1 = 9, d2 = 9;
+            for (const p of s.seeds) {
+              const dx = (x - p.ox) * asp, dy = y - p.oy, q = dx * dx + dy * dy;
+              if (q < d1) { d2 = d1; d1 = q; } else if (q < d2) d2 = q;
+            }
+            const shade = clamp01(d1 * R), edge = clamp01(1 - (Math.sqrt(d2) - Math.sqrt(d1)) / (r * 0.28));
+            const c = mix(mix(o.a, o.b, Math.pow(shade, 1.5)), o.c, edge * edge * edge * 0.4);
+            d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+          });
+        },
+      },
+      // Two layers of value noise scrolled past each other; the noise picks the colour
+      // (lowlight b → midtone a → highlight c) and the alpha, so it thins to the background.
+      fog: {
+        init: () => ({}),
+        draw(ctx, t, dt, s, o) {
+          const asp = o.w / o.h, f = 2.2, depth = 0.5 + 0.5 * o.level;
+          const ox = (o.px - 0.5) * 0.4 * o.pm, oy = (o.py - 0.5) * 0.4 * o.pm; // parallax: the field slides with the cursor
+          raster(ctx, s, o, 120, (x, y, d, i) => {
+            const n1 = fbm((x + ox) * f * asp + t * 0.06, (y + oy) * f + t * 0.015, 3);
+            const n2 = fbm(x * f * 1.9 * asp - t * 0.04 + 40, y * f * 1.9 + 40, 2);
+            const n = clamp01((n1 * 0.7 + n2 * 0.3 - 0.3) * 2.2);
+            const c = n < 0.5 ? mix(o.b, o.a, n * 2) : mix(o.a, o.c, (n - 0.5) * 2);
+            d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255 * clamp01(0.15 + n * depth);
+          });
+        },
+      },
+      // Ripples: each centre emits a ring every `every` seconds; a ring grows at `v` px/s and
+      // fades out over `life`. Pure in t, so the still is the same picture at any t.
+      rings: {
+        init: (o) => ({ centres: [{ x: 0.36, y: 0.55 }, { x: 0.72, y: 0.35 }].slice(0, o.level < 1 ? 1 : 2), every: 1.4 / o.level, v: 42, life: 8 }),
+        draw(ctx, t, dt, s, o) {
+          ctx.lineWidth = 1.5;
+          s.centres.forEach((c, ci) => {
+            const cx = (c.x + (o.px - 0.5) * 0.3 * o.pm) * o.w, cy = (c.y + (o.py - 0.5) * 0.3 * o.pm) * o.h, t1 = t + ci * 0.7; // centres trail the cursor
+            for (let k = Math.max(0, Math.floor((t1 - s.life) / s.every)); k * s.every <= t1; k++) {
+              const age = t1 - k * s.every, r = age * s.v * (0.8 + 0.2 * o.level);
+              if (age <= 0) continue;
+              const fade = 1 - age / s.life;
+              ctx.strokeStyle = rgba(k % 3 ? o.c : o.a, 0.75 * fade * fade);
+              ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+            }
+          });
+        },
+      },
+      // Translucent circles rising with a wobble; each has its own size, pace and phase, and
+      // re-enters from below.
+      bubbles: {
+        init: (o) => {
+          const n = Math.round(22 * o.level), bs = [];
+          for (let i = 0; i < n; i++) bs.push({ x: Math.random() * o.w, y: Math.random() * o.h, r: rnd(6, 26), v: rnd(14, 34), ph: rnd(0, TAU), w: rnd(0.6, 1.4) });
+          return { bs };
+        },
+        draw(ctx, t, dt, s, o) {
+          ctx.lineWidth = 1.2;
+          for (const b of s.bs) {
+            b.y -= b.v * dt * (0.7 + 0.3 * o.level);
+            const [fx, fy] = poke(o, b.x, b.y, 0.3); b.x += fx * o.w * 0.6 * dt; b.y += fy * o.h * 0.6 * dt; // a gentle push
+            if (b.y < -b.r * 2) { b.y = o.h + b.r * 2; b.x = Math.random() * o.w; }
+            const x = b.x + Math.sin(t * b.w + b.ph) * 9;
+            ctx.fillStyle = rgba(o.c, 0.1); ctx.strokeStyle = rgba(o.c, 0.35);
+            ctx.beginPath(); ctx.arc(x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = rgba(o.c, 0.35);
+            ctx.beginPath(); ctx.arc(x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.2, 0, TAU); ctx.fill();
+          }
+        },
+      },
+      // Boids: separation, alignment and cohesion within a radius, a gentle pull to the
+      // centre so the flock stays in frame, wrapped at the edges. Each bird is an arrowhead
+      // pointing where it flies whose wing tips open and close on a beat of its own; size
+      // stands in for depth (small and faint is far), in three of the palette's tones.
+      birds: {
+        init: (o) => {
+          const n = Math.round(70 * o.level), bs = [];
+          for (let i = 0; i < n; i++) {
+            const a = rnd(0, TAU), z = rnd(3.5, 10);
+            bs.push({ x: Math.random() * o.w, y: Math.random() * o.h, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, z, k: i % 3, ph: rnd(0, TAU), beat: rnd(5, 9) });
+          }
+          return { bs, tint: mix(o.a, o.c, 0.55) };
+        },
+        draw(ctx, t, dt, s, o) {
+          const R = 70, R2 = R * R, vmax = 110 * (0.8 + 0.2 * o.level), step = Math.min(dt, 0.05);
+          for (const b of s.bs) {
+            let sx = 0, sy = 0, ax = 0, ay = 0, cx = 0, cy = 0, n = 0;
+            for (const q of s.bs) {
+              if (q === b) continue;
+              const dx = q.x - b.x, dy = q.y - b.y, d2 = dx * dx + dy * dy;
+              if (d2 > R2) continue;
+              n++; ax += q.vx; ay += q.vy; cx += q.x; cy += q.y;
+              if (d2 < 400) { sx -= dx; sy -= dy; }
+            }
+            if (n) { b.vx += ((ax / n - b.vx) * 3 + (cx / n - b.x) * 0.6 + sx * 4) * step; b.vy += ((ay / n - b.vy) * 3 + (cy / n - b.y) * 0.6 + sy * 4) * step; }
+            b.vx += (o.w / 2 - b.x) * 0.04 * step; b.vy += (o.h / 2 - b.y) * 0.08 * step;
+            const [fx, fy] = poke(o, b.x, b.y, 0.45); b.vx += fx * o.w * 1.2 * step; b.vy += fy * o.h * 1.2 * step; // drawn to the cursor, or scattered
+            const v = Math.hypot(b.vx, b.vy) || 1, cap = Math.min(vmax, Math.max(40, v)) / v;
+            b.vx *= cap; b.vy *= cap;
+            b.x += b.vx * step; b.y += b.vy * step;
+            wrap(b, o, 12);
+          }
+          for (const b of s.bs) {
+            const a = Math.atan2(b.vy, b.vx), z = b.z * (0.9 + 0.1 * o.level);
+            const ca = Math.cos(a), sa = Math.sin(a), spread = 0.35 + 0.65 * Math.abs(Math.sin(t * b.beat + b.ph));
+            const pt = (fwd, side) => [b.x + ca * fwd - sa * side, b.y + sa * fwd + ca * side];
+            ctx.fillStyle = rgba(b.k === 0 ? o.a : b.k === 1 ? o.c : s.tint, 0.4 + 0.55 * (b.z - 3.5) / 6.5);
+            ctx.beginPath();
+            ctx.moveTo(...pt(z * 1.5, 0));
+            ctx.lineTo(...pt(-z * 0.9, z * 1.4 * spread));
+            ctx.lineTo(...pt(-z * 0.4, 0));
+            ctx.lineTo(...pt(-z * 0.9, -z * 1.4 * spread));
+            ctx.closePath(); ctx.fill();
+          }
+        },
+      },
+      // Flakes falling at their own pace with a sideways sway and a shared drift; the small,
+      // faint ones read as far away. Unlinked, unlike the particle field.
+      snow: {
+        init: (o) => {
+          const n = Math.round((o.w * o.h) / 6000 * o.level), fs = [];
+          for (let i = 0; i < n; i++) fs.push({ x: Math.random() * o.w, y: Math.random() * o.h, r: rnd(0.8, 3), v: rnd(18, 50), ph: rnd(0, TAU), sw: rnd(0.4, 1.2) });
+          return { fs };
+        },
+        draw(ctx, t, dt, s, o) {
+          const drift = Math.sin(t * 0.2) * 12 + o.pvx * o.pm * 600; // a sweep of the cursor is a gust
+          for (const f of s.fs) {
+            f.y += f.v * dt * (0.7 + 0.3 * o.level); f.x += (Math.sin(t * f.sw + f.ph) * 10 + drift) * dt;
+            wrap(f, o, 4);
+            ctx.fillStyle = rgba(o.c, 0.35 + f.r * 0.2);
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, TAU); ctx.fill();
+          }
+        },
+      },
+      // Two radial glows, one in a and one in c, breathing out of phase. Three gradient fills.
+      halo: {
+        init: () => ({ hx: 0.5, hy: 0.5 }),
+        draw(ctx, t, dt, s, o) {
+          s.hx += (o.px - s.hx) * Math.min(1, dt * 0.8); s.hy += (o.py - s.hy) * Math.min(1, dt * 0.8); // a long lag behind the cursor
+          const glow = (x, y, r, c, a) => {
+            const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+            g.addColorStop(0, rgba(c, a)); g.addColorStop(1, rgba(c, 0));
+            ctx.fillStyle = g; ctx.fillRect(0, 0, o.w, o.h);
+          };
+          const base = Math.max(o.w, o.h) * (0.35 + 0.1 * o.level);
+          glow(o.w * (0.5 + (s.hx - 0.5) * 0.4 * o.pm), o.h * (0.55 + (s.hy - 0.5) * 0.4 * o.pm), base * (1 + 0.12 * Math.sin(t * 0.5)), o.a, 0.55);
+          glow(o.w * 0.35, o.h * 0.4, base * 0.6 * (1 + 0.15 * Math.sin(t * 0.37 + 2)), o.c, 0.22);
+          glow(o.w * 0.7, o.h * 0.65, base * 0.5 * (1 + 0.15 * Math.sin(t * 0.43 + 4)), o.a, 0.35);
+        },
+      },
+    };
+    // </ab-presets>
+
+    let live = null; // the one instance allowed to animate
+    const warned = new Set();
+    const once = (key, msg) => { if (!warned.has(key)) { warned.add(key); console.warn(`animated-background: ${msg}`); } };
+    // Any CSS colour → [r, g, b], by drawing it: the canvas is the parser.
+    const swatch = document.createElement('canvas');
+    swatch.width = swatch.height = 1;
+    const parse = (str, fallback) => {
+      const c = swatch.getContext('2d');
+      c.clearRect(0, 0, 1, 1); c.fillStyle = fallback; c.fillStyle = str; c.fillRect(0, 0, 1, 1);
+      return Array.from(c.getImageData(0, 0, 1, 1).data.slice(0, 3));
+    };
+
+    class AnimatedBackground extends HTMLElement {
+      static observedAttributes = ['data-preset', 'data-intensity', 'data-speed', 'data-motion', 'data-pointer'];
+      connectedCallback() { this.frames = 0; this.ms = 0; this.setup(); }
+      disconnectedCallback() { this.teardown(); }
+      attributeChangedCallback() { if (this.isConnected && this.ctx !== undefined) this.setup(); }
+      get preset() { return PRESETS[this.dataset.preset] ? this.dataset.preset : null; }
+      /** The eased pointer, for checks. */
+      get cursor() { return this.o ? [this.o.px, this.o.py] : null; }
+      get stillOnly() { return this.dataset.motion === 'off' || (live && live !== this && live.isConnected) || this.reduced?.matches || (this.small && this.small.matches); }
+
+      setup() {
+        this.teardown();
+        const preset = this.preset;
+        const minWidth = parseFloat(this.dataset.minWidth) || 0;
+        this.small = minWidth ? matchMedia(`(max-width: ${minWidth - 1}px)`) : null;
+        this.reduced = matchMedia('(prefers-reduced-motion: reduce)');
+        if (this.dataset.motion !== 'off') {
+          if (live && live !== this && live.isConnected) once('one', 'one per page; a second instance draws only its still frame. Use one hero band, not several.');
+          else live = this;
+        }
+        // CSS presets: paused by [data-still]; the keyframe does the rest.
+        this.classList.toggle('ab--scroll', !preset);
+        this.classList.toggle('ab--x', this.dataset.preset === 'scroll-x');
+        this.classList.toggle('ab--y', this.dataset.preset === 'scroll-y');
+        // Children made here need the component's scope attribute, or its scoped CSS misses them.
+        const make = (tag, cls) => { const el = document.createElement(tag); el.className = cls; for (const a of this.attributes) if (a.name.startsWith('data-astro-cid-')) el.setAttribute(a.name, ''); return el; };
+        if (!preset) {
+          if (!this.querySelector('.ab__layer')) this.replaceChildren(make('div', 'ab__layer ab__layer--a'), make('div', 'ab__layer ab__layer--b'));
+          this.ctx = null;
+          this.sync = () => this.toggleAttribute('data-still', !!this.stillOnly);
+          this.sync();
+          this.listen();
+          return;
+        }
+        let canvas = this.querySelector('canvas');
+        if (!canvas) { canvas = make('canvas', 'ab__canvas'); this.replaceChildren(canvas); }
+        const ctx = (this.ctx = canvas.getContext('2d'));
+        if (!ctx) return;
+        const p = PRESETS[preset], level = LEVEL[this.dataset.intensity] || 1, pace = parseFloat(this.dataset.speed) || 1;
+        const cs = getComputedStyle(this), v = (n, f) => parse(cs.getPropertyValue(n).trim() || f, f);
+        const o = (this.o = { w: 0, h: 0, level, pace, a: v('--ab-a', '#5933d8'), b: v('--ab-b', '#1e283c'), c: v('--ab-c', '#fff'), px: 0.5, py: 0.5, pm: 0, pvx: 0 });
+        let state, raf = 0, last = 0, t = T0, visible = true, ema = 0, n = 0, interval = 1000 / 60;
+        // The pointer: fine pointers only, never touch. Listeners on the host (the hero), not
+        // the canvas, which keeps pointer-events: none. They only store the last position;
+        // the frame samples it once and eases toward it, so an idle pointer costs two lerps.
+        const mode = { drift: 1, repel: -1 }[this.dataset.pointer] || 0;
+        let tx = 0.5, ty = 0.5, mx = 0, my = 0, moved = false;
+        if (mode && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+          this.host = this.parentElement || window;
+          this.onMove = (e) => { mx = e.clientX; my = e.clientY; moved = true; };
+          this.onLeave = () => { tx = ty = 0.5; moved = false; }; // eases back to neutral in about a second
+          this.host.addEventListener('pointermove', this.onMove);
+          this.host.addEventListener('pointerleave', this.onLeave);
+        }
+        const resize = () => {
+          const box = this.getBoundingClientRect();
+          o.w = Math.max(1, Math.round(box.width)); o.h = Math.max(1, Math.round(box.height));
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          canvas.width = o.w * dpr; canvas.height = o.h * dpr;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          state = p.init(o);
+        };
+        const frame = (dt) => { ctx.clearRect(0, 0, o.w, o.h); p.draw(ctx, t, dt, state, o); this.frames++; };
+        // A still never depends on the pointer or on where a run left things.
+        const still = () => { t = T0; o.px = o.py = 0.5; o.pm = o.pvx = 0; state = p.init(o); frame(0); };
+        const step = (now) => {
+          raf = 0;
+          if (last && now - last < interval - 2) return schedule();
+          const dt = last ? Math.min(0.1, (now - last) / 1000) * pace : 0;
+          last = now;
+          t += dt;
+          if (moved) { moved = false; const r = this.getBoundingClientRect(); tx = clamp01((mx - r.left) / r.width); ty = clamp01((my - r.top) / r.height); }
+          const k = Math.min(1, dt * 3);
+          o.pm = mode; o.pvx = tx - o.px; o.px += o.pvx * k; o.py += (ty - o.py) * k;
+          const t0 = performance.now();
+          frame(dt);
+          // Adapt: a large canvas at high intensity that costs more than ~12 ms a frame drops
+          // to 30 fps rather than stuttering at 60. Measured over the first ~90 frames.
+          ema = ema ? ema * 0.9 + (performance.now() - t0) * 0.1 : performance.now() - t0;
+          this.ms = ema; // exposed for checks: the smoothed draw time per frame
+          if (++n === 90 && level > 1 && o.w * o.h > 800 * 450 && ema > 12) {
+            interval = 1000 / 30;
+            console.info(`animated-background: ${preset} at high intensity costs ${ema.toFixed(1)} ms a frame on this canvas; dropping to 30 fps.`);
+          }
+          schedule();
+        };
+        const schedule = () => { if (raf || !visible || document.hidden || this.stillOnly) return; raf = requestAnimationFrame(step); };
+        const halt = () => { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; };
+        this.sync = () => { const s = this.toggleAttribute('data-still', !!this.stillOnly); if (s) { halt(); still(); } else schedule(); };
+        this.halt = halt;
+        // Setting canvas.width wipes the bitmap, so every resize redraws: a paused or still
+        // frame must not go blank because the box changed.
+        this.ro = new ResizeObserver(() => { resize(); this.stillOnly ? still() : frame(0); });
+        this.ro.observe(this);
+        this.io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; visible ? schedule() : halt(); });
+        this.io.observe(this);
+        resize();
+        this.sync();
+        this.listen();
+      }
+      listen() {
+        this.onVis = () => (document.hidden ? this.halt?.() : this.sync());
+        document.addEventListener('visibilitychange', this.onVis);
+        this.small?.addEventListener('change', this.sync);
+        this.reduced.addEventListener('change', this.sync);
+      }
+      teardown() {
+        this.halt?.();
+        this.ro?.disconnect(); this.io?.disconnect();
+        if (this.onVis) document.removeEventListener('visibilitychange', this.onVis);
+        if (this.host) { this.host.removeEventListener('pointermove', this.onMove); this.host.removeEventListener('pointerleave', this.onLeave); this.host = null; }
+        this.small?.removeEventListener('change', this.sync);
+        this.reduced?.removeEventListener('change', this.sync);
+        this.ro = this.io = this.onVis = this.halt = null;
+        if (live === this) live = null;
+        // Free the bitmap; a re-insert sizes it again.
+        if (this.ctx && !this.isConnected) this.ctx.canvas.width = this.ctx.canvas.height = 0;
+      }
+    }
+    customElements.define('animated-background', AnimatedBackground);
+  })();
+</script>
+
+<style>
+  .ab {
+    position: absolute;
+    inset: 0;
+    display: block;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--ab-bg, transparent);
+    opacity: var(--ab-opacity, 1);
+  }
+  .ab__canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  /* The scroll presets: two masked colour layers, one tile (512 px) wider or taller than the
+     box, translated by exactly one tile so the loop is seamless. Layer b uses a smaller tile
+     and takes twice as long, for depth. */
+  .ab__layer {
+    position: absolute;
+    inset: 0;
+    background: var(--ab-a, #5933d8);
+    mask: var(--ab-tile-a) 0 0 / 512px 512px repeat;
+    animation: var(--ab-dur, 40s) linear infinite;
+  }
+  .ab__layer--b {
+    background: var(--ab-c, #fff);
+    opacity: 0.35;
+    mask: var(--ab-tile-b) 0 0 / 256px 256px repeat;
+    animation-duration: calc(var(--ab-dur, 40s) * 2);
+  }
+  .ab--x .ab__layer { width: calc(100% + 512px); animation-name: ab-scroll-x; }
+  .ab--y .ab__layer { height: calc(100% + 512px); animation-name: ab-scroll-y; }
+  /* A host texture is the picture itself, not a mask; layer b stands down. */
+  .ab--texture .ab__layer--a { mask: none; background: var(--ab-tile-a) 0 0 / 512px 512px repeat; }
+  .ab--texture .ab__layer--b { display: none; }
+  .ab[data-still] .ab__layer { animation-play-state: paused; }
+  @media (prefers-reduced-motion: reduce) {
+    .ab__layer { animation-play-state: paused; }
+  }
+  @keyframes ab-scroll-x { to { transform: translateX(-512px); } }
+  @keyframes ab-scroll-y { to { transform: translateY(-512px); } }
+</style>

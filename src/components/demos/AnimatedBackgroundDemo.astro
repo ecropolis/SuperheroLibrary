@@ -1,0 +1,168 @@
+---
+/**
+ * Demo for `animated-background`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * One live instance, in the hero recipe with copy over it; the picker and the intensity
+ * buttons write its `data-preset` / `data-intensity` / `data-pointer`, which the element watches.
+ * The pointer toggle does nothing on a touch screen (the element ignores coarse pointers). The second
+ * instance is `motion="off"`: the still frame, which is also what a visitor who asked for
+ * reduced motion gets from the live one.
+ */
+import AnimatedBackground from '../../library/animated-background/AnimatedBackground.astro';
+const presets = [
+  ['waves', 'Waves'], ['cells', 'Cells'], ['fog', 'Fog'], ['rings', 'Rings'], ['bubbles', 'Bubbles'],
+  ['birds', 'Birds'], ['snow', 'Snow'], ['halo', 'Halo'], ['scroll-x', 'Scroll ←'], ['scroll-y', 'Scroll ↑'],
+];
+---
+<div class="demo-ab" data-ab-demo>
+  <div class="demo-ab__controls">
+    <div class="demo-ab__group" role="group" aria-label="Preset">
+      {presets.map(([id, label], i) => (
+        <button type="button" data-preset={id} aria-pressed={i === 0 ? 'true' : 'false'}>{label}</button>
+      ))}
+    </div>
+    <div class="demo-ab__group" role="group" aria-label="Intensity">
+      {['low', 'medium', 'high'].map((v) => (
+        <button type="button" data-intensity={v} aria-pressed={v === 'medium' ? 'true' : 'false'}>{v}</button>
+      ))}
+    </div>
+    <div class="demo-ab__group" role="group" aria-label="Pointer">
+      <span class="demo-ab__label">Pointer</span>
+      {['drift', 'repel', 'none'].map((v) => (
+        <button type="button" data-pointer={v} aria-pressed={v === 'drift' ? 'true' : 'false'}>{v}</button>
+      ))}
+    </div>
+  </div>
+  <section class="demo-ab__hero" aria-label="Example hero">
+    <AnimatedBackground class="demo-ab__bg" preset="waves" minWidth={0} />
+    <div class="demo-ab__copy">
+      <p class="demo-ab__eyebrow">The look of a WebGL background, in one small file</p>
+      <p class="demo-ab__title">Copy sits above it.<br /><span>The motion stays behind.</span></p>
+    </div>
+  </section>
+  <p class="demo-ab__note">
+    Asked your device for less motion? Then the band above holds one still frame, and so does this one:
+    the same element with <code>motion="off"</code>.
+  </p>
+  <section class="demo-ab__hero demo-ab__hero--still" aria-label="Still frame">
+    <AnimatedBackground class="demo-ab__bg" preset="cells" motion="off" minWidth={0} />
+    <div class="demo-ab__copy"><p class="demo-ab__title demo-ab__title--small">Still frame (cells)</p></div>
+  </section>
+</div>
+
+<script is:inline>
+  (() => {
+    for (const demo of document.querySelectorAll('[data-ab-demo]')) {
+      if (demo.dataset.ready) continue;
+      demo.dataset.ready = '1';
+      const el = demo.querySelector('animated-background:not([data-motion="off"])');
+      if (!el) continue;
+      for (const key of ['preset', 'intensity', 'pointer']) {
+        const buttons = demo.querySelectorAll(`button[data-${key}]`);
+        buttons.forEach((b) =>
+          b.addEventListener('click', () => {
+            el.dataset[key] = b.dataset[key];
+            buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+          }),
+        );
+      }
+    }
+  })();
+</script>
+
+<style>
+  .demo-ab {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .demo-ab__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: space-between;
+  }
+  .demo-ab__group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .demo-ab__label {
+    font-size: 0.85rem;
+    align-self: center;
+    color: var(--ink, #1b1c22);
+    opacity: 0.7;
+  }
+  .demo-ab__group button {
+    font: inherit;
+    font-size: 0.85rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--line, #d9dbe3);
+    background: var(--white, #fff);
+    color: var(--ink, #1b1c22);
+    cursor: pointer;
+    text-transform: capitalize;
+  }
+  .demo-ab__group button[aria-pressed='true'] {
+    background: var(--purple, #5933d8);
+    border-color: var(--purple, #5933d8);
+    color: var(--white, #fff);
+  }
+  .demo-ab__group button:focus-visible {
+    outline: 2px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+  /* The hero recipe: positioned host, isolated; background at -1, the element at 1, copy at 2. */
+  .demo-ab__hero {
+    position: relative;
+    isolation: isolate;
+    min-height: 22rem;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--navy, #1e283c), var(--purple-dark, #4526ad));
+    border-radius: var(--radius, 14px);
+    overflow: hidden;
+  }
+  .demo-ab__hero--still {
+    min-height: 12rem;
+  }
+  .demo-ab__hero :global(.demo-ab__bg) {
+    z-index: 1;
+  }
+  .demo-ab__copy {
+    position: relative;
+    z-index: 2;
+    padding: 1rem;
+    text-align: center;
+    color: var(--white, #fff);
+  }
+  .demo-ab__eyebrow {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+  .demo-ab__title {
+    margin: 0;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: -0.02em;
+    text-shadow: 0 1px 12px rgb(0 0 0 / 0.3);
+  }
+  .demo-ab__title span {
+    font-weight: 400;
+    font-size: 1rem;
+    opacity: 0.85;
+  }
+  .demo-ab__title--small {
+    font-size: 1.1rem;
+  }
+  .demo-ab__note {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--ink, #1b1c22);
+    opacity: 0.8;
+  }
+</style>
