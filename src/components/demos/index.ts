@@ -26,6 +26,7 @@ import VideoPlayerDemo from './VideoPlayerDemo.astro';
 import TestimonialCarouselDemo from './TestimonialCarouselDemo.astro';
 import AnimatedTextDemo from './AnimatedTextDemo.astro';
 import CookieConsentDemo from './CookieConsentDemo.astro';
+import AnimatedBackgroundDemo from './AnimatedBackgroundDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -50,4 +51,5 @@ export const demos: Record<string, AstroComponent> = {
   'testimonial-carousel': TestimonialCarouselDemo,
   'animated-text': AnimatedTextDemo,
   'cookie-consent': CookieConsentDemo,
+  'animated-background': AnimatedBackgroundDemo,
 };
