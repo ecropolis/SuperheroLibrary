@@ -1,0 +1,902 @@
+---
+/**
+ * AnimatedText — one line of text that moves the way you would say it. Six effects:
+ *
+ *   build       the phrase arrives a piece at a time (a word, or a part you mark), rising,
+ *               fading or coming out of a blur, then holds.
+ *   typewriter  letters appear behind a caret; given several lines, it deletes back and types
+ *               the next.
+ *   rotate      one slot in a fixed sentence turns over: "We build {websites|shops}."
+ *   distil      the whole phrase, then some words fall away and the rest close up into a
+ *               shorter one: "[Let] Go. [Let] Be. [Let] Me." → "Go. Be. Me."
+ *   highlight   the sentence is already there; a marker or underline sweeps the words that
+ *               carry it: "Every page {one click} away."
+ *   strike      one word is struck through and its replacement written after it:
+ *               "We sell {software|outcomes}."
+ *
+ * WordPress and the page builders call it an animated headline (Elementor Pro's "Animated
+ * Headline" widget, with its highlighted and rotating modes), a text rotator, or a typing
+ * effect (Typed.js). Generalised from Nicole Lawton's "Let Go. Let Be. Let Me." band
+ * (nicolelawton.com, 21–23 Sep 2026), which is where distil and the rules below come from.
+ *
+ * THE TEXT IS ONE STRING, with three marks: `|` between parts (build, distil) or lines
+ * (typewriter); `[…]` round the words that fall away (distil); `{…}` round the slot (rotate:
+ * `{a|b|c}`), the marked words (highlight) or the change (strike: `{old|new}`).
+ *
+ * NOTHING REFLOWS. Every piece is laid out once, where it ends up, and moves only by opacity,
+ * transform, clip or background — so the words cannot jitter and nothing around them jumps.
+ *   - Distil takes the falling words out of flow, so the document's layout is always the
+ *     resolved line; the open state is each kept word translated back to where the whole
+ *     sentence has it. Both layouts are measured every cycle (sub-pixel, after web fonts
+ *     load, again if the width changes), so the close-up lands exactly.
+ *   - Typewriter lays every line out in full and reveals its letters in place: a centred line
+ *     does not creep sideways as it types. The lines share one grid cell, sized by the
+ *     longest.
+ *   - Rotate stacks the options in one inline grid cell, sized by the widest, so the sentence
+ *     around the slot never moves. Put the slot at the end of the line, or a short option
+ *     leaves a gap before what follows. In a centred line, give the slot a line of its own
+ *     (`--at-slot-display: grid; --at-slot-align: center`), or a short option sits off-centre.
+ *   - Strike reserves the replacement's room from the start and reveals it with a clip;
+ *     whatever follows the change fades in with it, so no full stop sits stranded.
+ *   - A stagger's delay is on opacity (and the entrance), never on the close-up transform, or
+ *     the later words would also close up late.
+ *
+ * SCREEN READERS HEAR THE WHOLE SENTENCE ONCE, AND NOTHING WHILE IT MOVES. The DOM text never
+ * changes, only opacity and position. Build, distil and highlight are plain text in spans.
+ * Typewriter (split into letters) is hidden from assistive technology and its lines are given
+ * once in a visually hidden copy; rotate's slot reads as its options joined ("websites,
+ * shops, and booking pages"); strike's change reads as the replacement. `label` replaces all
+ * of that with a sentence of your own.
+ *
+ * STILL, IT IS STILL COMPLETE. With no JavaScript, under prefers-reduced-motion (tracked
+ * live), or paused, it shows one finished state: build, the whole phrase; typewriter, its
+ * first line; rotate, the first option; distil, the whole phrase before anything falls away;
+ * highlight, the marks drawn; strike, the old word struck and the new one written.
+ *
+ * IT MOVES ONLY WHEN SEEN: from 60% on screen, never in a hidden tab. Going off screen
+ * mid-run rests it; coming back starts it again from the top. A single run that has finished
+ * stays finished.
+ *
+ * WCAG 2.2.2: anything that loops, or runs longer than five seconds, gets a pause button.
+ * `pause="visible"` (the default) shows it under the text; `pause="focus"` keeps it in the
+ * page but shows it only when it has keyboard focus, like a skip link, so keyboard and
+ * screen-reader visitors can stop it and nobody else sees it. The trade-off of "focus": a
+ * mouse or touch visitor who wants it still, and has not set reduced motion, has no control.
+ * No flashing (2.3.1): every change is a fade, a slide or a sweep, and the caret blinks
+ * about once a second.
+ *
+ * TYPE comes from `--at-*`, and otherwise from where the element sits, not from the host's
+ * h1/h2 rules: `as` sets only the semantics. Size a looping line by its WIDEST state so it
+ * fits a 320px phone, as Nicole's does: `--at-size: clamp(1.4rem, 7.6vw, 3.4rem)` with
+ * `--at-wrap: nowrap`.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --at-font / --at-size / --at-weight     typeface, size, weight        (inherit)
+ *   --at-line-height / --at-tracking        line height, letter spacing   (inherit)
+ *   --at-ink / --at-align / --at-wrap       text colour, alignment, wrap  (inherit)
+ *   --at-slot-display / --at-slot-align     rotate's slot: inline or own line, option alignment
+ *                                                                         (inline-grid / start)
+ *   --at-accent                             caret, underline, strike line (currentColor)
+ *   --at-mark                               highlight marker fill         (rgb(255 205 0 / 0.45))
+ *   --at-control-fg / -bg / -border         pause button                  (inherit / transparent / currentColor)
+ *   --at-focus                              pause button focus ring       (currentColor)
+ *   --at-pause-align                        pause button placement        (flex-end)
+ */
+type Effect = 'build' | 'typewriter' | 'rotate' | 'distil' | 'highlight' | 'strike';
+type Entrance = 'rise' | 'fade' | 'blur';
+interface Props {
+  /** Which of the six. */
+  effect?: Effect;
+  /** The words, with `|`, `[…]` and `{…}` marks as the effect needs (see the header). */
+  text: string;
+  /** The element the text is. Semantics only: the type comes from `--at-*`. */
+  as?: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'div';
+  /** How long one piece takes to arrive, in ms. For typewriter, ms per letter. */
+  speed?: number;
+  /** The cadence, in ms: from one piece starting to the next (build, distil); how long
+   *  each option or line rests (rotate, typewriter); before each mark (highlight); from the
+   *  strike to the replacement (strike). */
+  gap?: number;
+  /** How long the finished line holds before it goes round again, in ms. */
+  hold?: number;
+  /** 'once', 'loop', or a number of times. */
+  repeat?: 'once' | 'loop' | number;
+  /** How pieces arrive in build and distil, and how rotate's options change. */
+  entrance?: Entrance;
+  /** Highlight only: a marker behind the words, or an underline under them. */
+  mark?: 'marker' | 'underline';
+  /** The pause button: always visible while it can move, or only on keyboard focus. */
+  pause?: 'visible' | 'focus';
+  /** What assistive technology reads instead of the defaults described in the header. */
+  label?: string;
+  pauseLabel?: string;
+  playLabel?: string;
+  class?: string;
+}
+const {
+  effect = 'build',
+  text,
+  as: Tag = 'p',
+  mark = 'marker',
+  pause = 'visible',
+  label,
+  pauseLabel = 'Pause the animation',
+  playLabel = 'Play the animation',
+  class: className,
+} = Astro.props;
+
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean);
+const parts = (s: string) => s.split('|').map((p) => p.trim()).filter(Boolean);
+const fail = (why: string) => {
+  throw new Error(`AnimatedText (effect="${effect}"): ${why} Got: "${text}"`);
+};
+
+// Defaults per effect: each is what looks right out of the box, not a compromise between
+// them. Distil's are Nicole's: a second between parts, ten seconds on the resolved line.
+const byParts = text.includes('|');
+const DEFAULTS: Record<Effect, { speed: number; gap: number; hold: number; repeat: 'once' | 'loop'; entrance: Entrance }> = {
+  build: { speed: 700, gap: byParts ? 900 : 160, hold: 6000, repeat: 'once', entrance: 'rise' },
+  typewriter: { speed: 60, gap: 1800, hold: 1800, repeat: 'loop', entrance: 'fade' },
+  rotate: { speed: 600, gap: 2200, hold: 2200, repeat: 'loop', entrance: 'rise' },
+  distil: { speed: 900, gap: 1000, hold: 10000, repeat: 'once', entrance: 'fade' },
+  highlight: { speed: 900, gap: 1200, hold: 6000, repeat: 'once', entrance: 'fade' },
+  strike: { speed: 600, gap: 900, hold: 6000, repeat: 'once', entrance: 'fade' },
+};
+const d = DEFAULTS[effect as Effect];
+const speed = Astro.props.speed ?? d.speed;
+const gap = Astro.props.gap ?? d.gap;
+const hold = Astro.props.hold ?? d.hold;
+const repeat = Astro.props.repeat ?? d.repeat;
+const entrance = Astro.props.entrance ?? d.entrance;
+
+// ---- Parse the text for the one effect in use.
+// build: parts if there are any `|`, otherwise words.
+const pieces = effect === 'build' ? (byParts ? parts(text) : words(text)) : [];
+
+// typewriter: lines, each as words of letters.
+const lines = effect === 'typewriter' ? parts(text).map((l) => words(l).map((w) => Array.from(w))) : [];
+
+// rotate: before {a|b|c} after. With no braces, the whole text is the options.
+let before = '';
+let after = '';
+let options: string[] = [];
+if (effect === 'rotate') {
+  const m = text.match(/^([\s\S]*?)\{([^}]*)\}([\s\S]*)$/);
+  [before, after] = m ? [m[1], m[3]] : ['', ''];
+  options = parts(m ? m[2] : text);
+  if (options.length < 2) fail('needs at least two options, as {a|b}.');
+}
+
+// distil: tokens, each kept or dropped, with the part it arrives in. A dropped token carries
+// the space after it, so taking it out of flow leaves exactly one space between kept words.
+interface Tok { t: string; drop: boolean; part: number; space: boolean }
+const toks: Tok[] = [];
+if (effect === 'distil') {
+  parts(text).forEach((p, part) => {
+    for (const m of p.matchAll(/(\[[^\]]+\]|[^\s[]+)(\s*)/g)) {
+      const drop = m[1].startsWith('[');
+      toks.push({ t: drop ? m[1].slice(1, -1).trim() : m[1], drop, part, space: m[2].length > 0 });
+    }
+    if (toks.length) toks[toks.length - 1].space = true; // a part boundary is a space
+  });
+  if (toks.length) toks[toks.length - 1].space = false;
+  if (!toks.some((t) => t.drop)) fail('needs the words that fall away in [brackets].');
+  if (!toks.some((t) => !t.drop)) fail('must keep at least one word outside the brackets.');
+}
+
+// highlight: odd segments are the marked words. With no braces, the whole text is marked.
+const segs = effect === 'highlight' ? (text.includes('{') ? text.split(/\{([^}]*)\}/) : ['', text, '']) : [];
+
+// strike: before {old|new} after.
+let oldWord = '';
+let newWord = '';
+if (effect === 'strike') {
+  const m = text.match(/^([\s\S]*?)\{([^|}]+)\|([^}]+)\}([\s\S]*)$/);
+  if (!m) fail('needs the change as {old|new}.');
+  [before, oldWord, newWord, after] = [m![1], m![2].trim(), m![3].trim(), m![4]];
+}
+
+// What assistive technology reads when the visible text is not the sentence.
+const list = new Intl.ListFormat('en', { type: 'conjunction' });
+const hideVisual = Boolean(label) || effect === 'typewriter';
+const said = label ?? (effect === 'typewriter' ? parts(text).join(' ') : '');
+---
+
+<div
+  class:list={['at', `at--${effect}`, className]}
+  data-at
+  data-effect={effect}
+  data-speed={speed}
+  data-gap={gap}
+  data-hold={hold}
+  data-repeat={String(repeat)}
+  data-entrance={entrance}
+  data-mark={mark}
+  data-pause={pause}
+>
+  <Tag class="at__text">{hideVisual && <span class="at__sr">{said}</span>}<span class="at__vis" aria-hidden={hideVisual ? 'true' : undefined}>{
+    effect === 'build' &&
+      pieces.map((p, i) => <Fragment>{i > 0 && ' '}<span class="at__piece" style={`--at-i:${i}`}>{p}</span></Fragment>)
+  }{
+    effect === 'distil' &&
+      toks.map((t) =>
+        t.drop
+          ? <span class="at__piece at__drop" style={`--at-i:${t.part}`}>{t.t}{t.space && ' '}</span>
+          : <Fragment><span class="at__piece at__w" style={`--at-i:${t.part}`}>{t.t}</span>{t.space && ' '}</Fragment>
+      )
+  }{
+    effect === 'highlight' &&
+      segs.map((s: string, i: number) => (i % 2 ? <mark class="at__mark" style={`--at-i:${(i - 1) / 2}`}>{s}</mark> : s))
+  }{
+    effect === 'rotate' &&
+      <Fragment>{before}{!label && <span class="at__sr">{list.format(options)}</span>}<span class="at__slot" aria-hidden="true">{options.map((o) => <span class="at__opt">{o}</span>)}</span>{after}</Fragment>
+  }{
+    effect === 'strike' &&
+      <Fragment>{before}{!label && <span class="at__sr">{newWord}</span>}<span aria-hidden="true"><span class="at__old">{oldWord}</span> <span class="at__new">{newWord}</span></span>{after && <span class="at__after">{after}</span>}</Fragment>
+  }{
+    effect === 'typewriter' &&
+      <span class="at__lines">{lines.map((line) => <span class="at__line">{line.map((w, wi) => <Fragment>{wi > 0 && <span class="at__ch"> </span>}<span class="at__word">{w.map((ch) => <span class="at__ch">{ch}</span>)}</span></Fragment>)}</span>)}</span>
+  }</span></Tag>
+  <button
+    type="button"
+    class="at__toggle"
+    data-at-toggle
+    data-pause-label={pauseLabel}
+    data-play-label={playLabel}
+    aria-label={pauseLabel}
+    hidden
+  >
+    <span class="at__glyph" aria-hidden="true"></span><span data-at-toggle-text>Pause</span>
+  </button>
+</div>
+
+<style>
+  .at {
+    --_ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --_sweep: cubic-bezier(0.65, 0, 0.35, 1);
+    --_dy: 0em;
+    --_blur: 0em;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .at[data-entrance='rise'] {
+    --_dy: 0.45em;
+  }
+  .at[data-entrance='blur'] {
+    --_blur: 0.28em;
+  }
+  .at__text {
+    margin: 0;
+    font-family: var(--at-font, inherit);
+    font-size: var(--at-size, inherit);
+    font-weight: var(--at-weight, inherit);
+    line-height: var(--at-line-height, inherit);
+    letter-spacing: var(--at-tracking, inherit);
+    color: var(--at-ink, inherit);
+    text-align: var(--at-align, inherit);
+    white-space: var(--at-wrap, normal);
+  }
+  .at__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* ---- Armed: the start of a cycle, set with every transition off. ---- */
+  .at.is-armed .at__text,
+  .at.is-armed .at__text * {
+    transition: none !important;
+  }
+  .at.is-leaving .at__text {
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  /* ---- Pieces: build's words or parts, distil's words. They arrive in turn. ---- */
+  .at__piece {
+    display: inline-block;
+  }
+  /* The stagger delays the arrival only. The close-up transform (distil) has none, or the
+   * later words would close up a gap or two late. */
+  .at.is-anim .at__piece {
+    --_d: calc(var(--at-i, 0) * var(--at-gap, 0ms));
+    transition:
+      opacity var(--at-speed) ease var(--_d),
+      translate var(--at-speed) var(--_ease) var(--_d),
+      filter var(--at-speed) ease var(--_d),
+      transform var(--at-speed) var(--_ease) 0ms;
+  }
+  .at.is-armed .at__piece {
+    opacity: 0;
+    translate: 0 var(--_dy);
+    filter: blur(var(--_blur));
+  }
+
+  /* ---- Distil. Animating, the dropped words leave flow: the layout is the resolved line,
+   * and each kept word is translated to where the whole sentence has it. ---- */
+  .at__drop {
+    white-space: pre;
+  }
+  .at--distil.is-anim .at__text {
+    position: relative;
+  }
+  .at--distil.is-anim .at__drop {
+    position: absolute;
+    left: var(--at-l, 0);
+    top: var(--at-t, 0);
+  }
+  .at--distil.is-anim .at__w {
+    transform: translate(var(--at-x, 0), var(--at-y, 0));
+  }
+  .at--distil.is-dropping .at__drop {
+    opacity: 0;
+    transition: opacity var(--at-speed) ease;
+  }
+  .at--distil.is-closed .at__w {
+    transform: none;
+  }
+  .at--distil.is-measuring .at__piece {
+    transform: none !important;
+    translate: none !important;
+  }
+
+  /* ---- Highlight. The marks are backgrounds, so they sweep across a line break too. ---- */
+  .at__mark {
+    --_h: 0.5em;
+    --_y: 84%;
+    background: none;
+    color: inherit;
+    background-image: linear-gradient(var(--at-mark, rgb(255 205 0 / 0.45)), var(--at-mark, rgb(255 205 0 / 0.45)));
+    background-repeat: no-repeat;
+    background-position: 0 var(--_y);
+    background-size: 100% var(--_h);
+    padding-inline: 0.06em;
+  }
+  .at[data-mark='underline'] .at__mark {
+    --_h: max(2px, 0.09em);
+    --_y: 92%;
+    background-image: linear-gradient(var(--at-accent, currentColor), var(--at-accent, currentColor));
+  }
+  .at--highlight.is-anim .at__mark {
+    transition: background-size var(--at-speed) var(--_sweep) calc((var(--at-i, 0) + 1) * var(--at-gap, 0ms));
+  }
+  .at--highlight.is-armed .at__mark {
+    background-size: 0% var(--_h);
+  }
+  /* Erasing retracts toward the end, so the mark leaves in the direction it came. */
+  .at--highlight.is-erasing .at__mark {
+    background-size: 0% var(--_h);
+    background-position: 100% var(--_y);
+    transition: background-size 0.5s var(--_sweep);
+  }
+
+  /* ---- Strike. The replacement's room is reserved; a clip reveals it. ---- */
+  .at__old {
+    background-image: linear-gradient(var(--at-accent, currentColor), var(--at-accent, currentColor));
+    background-repeat: no-repeat;
+    background-position: 0 58%;
+    background-size: 100% max(2px, 0.075em);
+  }
+  .at__new {
+    display: inline-block;
+    clip-path: inset(-0.3em -0.2em);
+  }
+  .at--strike.is-anim .at__old {
+    transition: background-size var(--at-speed) var(--_sweep);
+  }
+  .at--strike.is-anim .at__new {
+    transition:
+      clip-path var(--at-speed) var(--_sweep) var(--at-gap),
+      opacity var(--at-speed) ease var(--at-gap);
+  }
+  .at--strike.is-armed .at__old {
+    background-size: 0% max(2px, 0.075em);
+  }
+  .at--strike.is-armed .at__new {
+    clip-path: inset(-0.3em 100% -0.3em -0.2em);
+    opacity: 0;
+  }
+  /* What follows the change arrives with the replacement, so the line opens as a whole
+   * phrase ("…is a brochure") rather than with its full stop stranded past the empty room. */
+  .at--strike.is-anim .at__after {
+    transition: opacity var(--at-speed) ease calc(var(--at-gap) + var(--at-speed) / 2);
+  }
+  .at--strike.is-armed .at__after {
+    opacity: 0;
+  }
+
+  /* ---- Rotate. The options share one cell, so the slot is as wide as the widest. ---- */
+  /* Inline by default, as wide as the widest option. `--at-slot-display: grid` gives the slot
+   * a line of its own ("We build" / "websites"), which a centred headline usually wants. */
+  .at__slot {
+    display: var(--at-slot-display, inline-grid);
+  }
+  /* Each option starts where the slot starts, so a short one leaves its spare room after it
+   * rather than a gap before it. On a line of its own, `--at-slot-align: center`. */
+  .at__opt {
+    grid-area: 1 / 1;
+    white-space: nowrap;
+    text-align: var(--at-slot-align, start);
+  }
+  .at__opt:not(:first-child) {
+    visibility: hidden;
+  }
+  /* Waiting below (or blurred, or just transparent), current in place, gone above. The slot
+   * clips top and bottom while it turns, so a rising word rolls within its own line instead
+   * of passing over the line above. */
+  .at--rotate.is-anim .at__slot {
+    overflow-y: clip;
+    overflow-clip-margin: 0.1em;
+  }
+  .at--rotate.is-anim .at__opt {
+    visibility: hidden;
+    opacity: 0;
+    translate: 0 var(--_dy);
+    filter: blur(var(--_blur));
+  }
+  .at--rotate.is-anim .at__opt.is-current {
+    visibility: visible;
+    opacity: 1;
+    translate: none;
+    filter: none;
+    transition:
+      opacity var(--at-speed) ease,
+      translate var(--at-speed) var(--_ease),
+      filter var(--at-speed) ease;
+  }
+  .at--rotate.is-anim .at__opt.is-gone {
+    translate: 0 calc(-1 * var(--_dy));
+    transition:
+      opacity var(--at-speed) ease,
+      translate var(--at-speed) var(--_ease),
+      filter var(--at-speed) ease,
+      visibility 0s linear var(--at-speed);
+  }
+
+  /* ---- Typewriter. Every line is laid out in full; letters appear in place. ---- */
+  .at__lines {
+    display: inline-grid;
+  }
+  .at__line {
+    grid-area: 1 / 1;
+  }
+  .at__line:not(:first-child) {
+    visibility: hidden;
+  }
+  .at__word {
+    white-space: nowrap;
+  }
+  .at--typewriter.is-anim .at__line,
+  .at--typewriter.is-anim .at__ch {
+    visibility: hidden;
+  }
+  .at--typewriter.is-anim .at__line.is-current,
+  .at--typewriter.is-anim .at__line.is-current .at__ch.is-typed {
+    visibility: visible;
+  }
+  /* The caret is a pseudo-element of the letter it follows, so it stays with the text even
+   * across a line break. Visibility, not opacity, hides the letters: a pseudo-element can
+   * be visible inside a hidden parent, but not inside a transparent one. */
+  .at__ch.is-caret,
+  .at__ch.is-caret-before {
+    position: relative;
+  }
+  .at__ch.is-caret::after,
+  .at__ch.is-caret-before::before {
+    content: '';
+    position: absolute;
+    top: 0.1em;
+    bottom: 0.02em;
+    width: max(2px, 0.07em);
+    background: var(--at-accent, currentColor);
+    visibility: visible;
+  }
+  .at__ch.is-caret::after {
+    left: calc(100% + 0.03em);
+  }
+  .at__ch.is-caret-before::before {
+    right: calc(100% + 0.03em);
+  }
+  /* Solid while typing, blinking (about once a second) while it rests. */
+  .at--typewriter:not(.is-typing) .at__ch.is-caret::after,
+  .at--typewriter:not(.is-typing) .at__ch.is-caret-before::before {
+    animation: at-caret-blink 1.1s steps(1, end) infinite;
+  }
+  @keyframes at-caret-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  /* ---- The pause button. ---- */
+  .at__toggle {
+    align-self: var(--at-pause-align, flex-end);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    min-height: 32px;
+    padding: 0.25rem 0.85rem;
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    color: var(--at-control-fg, inherit);
+    background: var(--at-control-bg, transparent);
+    border: 1px solid var(--at-control-border, currentColor);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .at__toggle[hidden] {
+    display: none;
+  }
+  .at__toggle:focus-visible {
+    outline: 2px solid var(--at-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .at__glyph {
+    width: 0.62em;
+    height: 0.7em;
+    border-left: 0.2em solid currentColor;
+    border-right: 0.2em solid currentColor;
+  }
+  .at__toggle[data-playing='false'] .at__glyph {
+    width: 0;
+    height: 0;
+    border: 0.36em solid transparent;
+    border-left: 0.6em solid currentColor;
+    border-right-width: 0;
+  }
+  /* Hidden until it has keyboard focus, like a skip link. It then sits just under the text,
+   * over whatever follows, so showing it moves nothing. */
+  .at[data-pause='focus'] .at__toggle {
+    position: absolute;
+    top: 100%;
+    inset-inline-end: 0;
+    margin-top: 0.25rem;
+    background: var(--at-control-bg, Canvas);
+  }
+  .at[data-pause='focus'] .at__toggle:not(:focus-visible) {
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+</style>
+
+<script>
+  type Cfg = { speed: number; gap: number; hold: number; repeat: number };
+  type At = (ms: number, fn: () => void) => void;
+  interface Fx {
+    /** Set up the start of a cycle. Runs with every transition off. */
+    prepare?(c: Cfg, first: boolean): void;
+    /** Schedule the arrival; return when it is complete, in ms. */
+    play(c: Cfg, at: At): number;
+    /** Take the finished line away before the next cycle; return how long that takes. */
+    leave?(c: Cfg, at: At): number;
+    /** A single run has completed. */
+    finish?(at: At): void;
+    /** Back to the still state. */
+    rest?(): void;
+  }
+
+  const STATES = ['is-anim', 'is-armed', 'is-in', 'is-measuring', 'is-dropping', 'is-closed', 'is-leaving', 'is-erasing', 'is-typing'];
+  const all = <T extends HTMLElement>(el: HTMLElement, sel: string) => Array.from(el.querySelectorAll<T>(sel));
+  const index = (el: HTMLElement) => Number(el.style.getPropertyValue('--at-i')) || 0;
+
+  const EFFECTS: Record<string, (root: HTMLElement, text: HTMLElement) => Fx> = {
+    build: (_root, text) => {
+      const n = all(text, '.at__piece').length;
+      return { play: (c) => (n - 1) * c.gap + c.speed };
+    },
+
+    distil: (root, text) => {
+      const kept = all(text, '.at__w');
+      const drops = all(text, '.at__drop');
+      const nParts = Math.max(...kept.map(index), ...drops.map(index)) + 1;
+      return {
+        // Measured every cycle, not once: the type can scale with the viewport, and a phone
+        // turned sideways between loops would otherwise close up by the wrong distance.
+        prepare() {
+          text.style.minHeight = '';
+          root.classList.add('is-measuring');
+          root.classList.remove('is-anim');
+          const whole = [...kept, ...drops].map((el) => el.getBoundingClientRect());
+          const height = text.getBoundingClientRect().height;
+          root.classList.add('is-anim');
+          const box = text.getBoundingClientRect();
+          kept.forEach((el, i) => {
+            const r = el.getBoundingClientRect();
+            el.style.setProperty('--at-x', `${whole[i].left - r.left}px`);
+            el.style.setProperty('--at-y', `${whole[i].top - r.top}px`);
+          });
+          drops.forEach((el, j) => {
+            const r = whole[kept.length + j];
+            el.style.setProperty('--at-l', `${r.left - box.left - text.clientLeft}px`);
+            el.style.setProperty('--at-t', `${r.top - box.top - text.clientTop}px`);
+          });
+          // If the whole sentence wraps to more lines than the resolved one, keep its height.
+          text.style.minHeight = `${height}px`;
+          root.classList.remove('is-measuring');
+        },
+        play(c, at) {
+          const dropAt = (nParts - 1) * c.gap + c.speed + c.gap / 2;
+          const closeAt = dropAt + c.speed + 100;
+          at(dropAt, () => root.classList.add('is-dropping'));
+          at(closeAt, () => root.classList.add('is-closed'));
+          return closeAt + c.speed;
+        },
+        rest() {
+          text.style.minHeight = '';
+        },
+      };
+    },
+
+    highlight: (root, text) => {
+      const n = all(text, '.at__mark').length;
+      return {
+        play: (c) => n * c.gap + c.speed,
+        leave() {
+          root.classList.add('is-erasing');
+          return 900;
+        },
+      };
+    },
+
+    strike: () => ({ play: (c) => c.gap + c.speed }),
+
+    rotate: (_root, text) => {
+      const opts = all(text, '.at__opt');
+      let cur = 0;
+      const show = (i: number) => {
+        if (i === cur) return;
+        // The incoming option must be waiting below before it moves, not wherever it left.
+        opts.forEach((o, k) => k !== cur && o.classList.remove('is-gone'));
+        void text.offsetWidth;
+        opts[cur].classList.replace('is-current', 'is-gone');
+        opts[i].classList.add('is-current');
+        cur = i;
+      };
+      const clear = () => opts.forEach((o) => o.classList.remove('is-current', 'is-gone'));
+      return {
+        prepare(_c, first) {
+          if (!first) return; // carry on from the last option, which turns back to the first
+          clear();
+          opts[0].classList.add('is-current');
+          cur = 0;
+        },
+        play(c, at) {
+          at(0, () => show(0));
+          for (let k = 1; k < opts.length; k++) at(k * c.gap, () => show(k));
+          return (opts.length - 1) * c.gap;
+        },
+        leave: () => 0,
+        rest() {
+          clear();
+          cur = 0;
+        },
+      };
+    },
+
+    typewriter: (root, text) => {
+      const lines = all(text, '.at__line').map((el) => ({ el, chars: all(el, '.at__ch') }));
+      let caret: HTMLElement | null = null;
+      let last = 0;
+      const setCaret = (el: HTMLElement | null, before = false) => {
+        caret?.classList.remove('is-caret', 'is-caret-before');
+        caret = el;
+        el?.classList.add(before ? 'is-caret-before' : 'is-caret');
+      };
+      const setLine = (i: number) => lines.forEach((l, k) => l.el.classList.toggle('is-current', k === i));
+      const type = (li: number, k: number, on: boolean) => {
+        const { chars } = lines[li];
+        chars[k].classList.toggle('is-typed', on);
+        if (on) setCaret(chars[k]);
+        else setCaret(k > 0 ? chars[k - 1] : chars[0], k === 0);
+      };
+      /** Delete line `li` from `t`, at twice the typing speed; return when it is gone. */
+      const erase = (li: number, t: number, c: Cfg, at: At) => {
+        const n = lines[li].chars.length;
+        const step = c.speed / 2;
+        at(t, () => root.classList.add('is-typing'));
+        for (let k = n - 1; k >= 0; k--) at(t + (n - k) * step, () => type(li, k, false));
+        at(t + n * step, () => root.classList.remove('is-typing'));
+        return t + n * step + 350;
+      };
+      const reset = () => lines.forEach((l) => l.chars.forEach((ch) => ch.classList.remove('is-typed')));
+      return {
+        prepare() {
+          reset();
+          setLine(0);
+          setCaret(lines[0].chars[0], true);
+        },
+        play(c, at) {
+          let t = 0;
+          lines.forEach((l, i) => {
+            at(t, () => {
+              setLine(i);
+              setCaret(l.chars[0], true);
+              root.classList.add('is-typing');
+            });
+            l.chars.forEach((ch, k) => {
+              t += c.speed;
+              at(t, () => type(i, k, true));
+              // A beat after punctuation, as a person typing would take.
+              if (/[.,;:!?]/.test(ch.textContent ?? '')) t += c.speed * 4;
+            });
+            at(t, () => root.classList.remove('is-typing'));
+            if (i < lines.length - 1) t = erase(i, t + c.gap, c, at);
+          });
+          last = lines.length - 1;
+          return t;
+        },
+        leave(c, at) {
+          return erase(last, 0, c, at);
+        },
+        finish(at) {
+          at(1600, () => setCaret(null));
+        },
+        rest() {
+          reset();
+          lines.forEach((l) => l.el.classList.remove('is-current'));
+          setCaret(null);
+        },
+      };
+    },
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-at]').forEach((root) => {
+    const text = root.querySelector<HTMLElement>('.at__text');
+    const toggle = root.querySelector<HTMLButtonElement>('[data-at-toggle]');
+    const toggleText = root.querySelector<HTMLElement>('[data-at-toggle-text]');
+    const make = EFFECTS[root.dataset.effect ?? ''];
+    if (!text || !toggle || !toggleText || !make) return;
+    const fx = make(root, text);
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    let timers: number[] = [];
+    let running = false;
+    let userPaused = false;
+    let onScreen = false;
+    let done = false; // a single run has finished; it stays finished
+    let needsControl = false;
+    let cycles = 0;
+
+    const at: At = (ms, fn) => {
+      timers.push(window.setTimeout(fn, ms));
+    };
+    const clearTimers = () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      timers = [];
+    };
+    const num = (v: string | undefined, fallback: number) => {
+      const n = Number(v);
+      return v !== undefined && v !== '' && Number.isFinite(n) && n >= 0 ? n : fallback;
+    };
+    const cfg = (): Cfg => {
+      const r = root.dataset.repeat;
+      return {
+        speed: num(root.dataset.speed, 700),
+        gap: num(root.dataset.gap, 1000),
+        hold: num(root.dataset.hold, 6000),
+        repeat: r === 'loop' ? Infinity : r === 'once' ? 1 : Math.max(1, Math.round(num(r, 1))),
+      };
+    };
+
+    /** The button shows while it can move (or has been paused), for anything that loops or
+     *  runs past five seconds. Its name says what it will do. */
+    const label = () => {
+      const show = !reduced.matches && needsControl && (running || userPaused || toggle === document.activeElement);
+      toggle.hidden = !show;
+      toggle.dataset.playing = String(running);
+      toggleText.textContent = running ? 'Pause' : 'Play';
+      toggle.setAttribute('aria-label', (running ? toggle.dataset.pauseLabel : toggle.dataset.playLabel) ?? '');
+    };
+
+    /** Back to the still, whole state. */
+    const rest = () => {
+      clearTimers();
+      root.classList.remove(...STATES);
+      fx.rest?.();
+      running = false;
+    };
+
+    function cycle(first: boolean) {
+      clearTimers();
+      const c = cfg();
+      root.style.setProperty('--at-speed', `${c.speed}ms`);
+      root.style.setProperty('--at-gap', `${c.gap}ms`);
+      root.classList.remove(...STATES);
+      root.classList.add('is-anim', 'is-armed');
+      fx.prepare?.(c, first);
+      void root.offsetWidth; // commit the armed state before anything transitions
+      root.classList.replace('is-armed', 'is-in');
+      const end = fx.play(c, at);
+      cycles += 1;
+      needsControl = c.repeat > 1 || end > 5000;
+      label();
+      if (cycles >= c.repeat) {
+        at(end, () => {
+          running = false;
+          done = true;
+          fx.finish?.(at);
+          label();
+        });
+        return;
+      }
+      at(end + c.hold, () => {
+        let leaving = 600;
+        if (fx.leave) leaving = fx.leave(c, at);
+        else root.classList.add('is-leaving');
+        at(leaving + 200, () => cycle(false));
+      });
+    }
+
+    /** Run only when someone can see it and has not asked it to stop. */
+    const sync = () => {
+      const should = !reduced.matches && onScreen && !document.hidden && !userPaused && !done;
+      if (should && !running) {
+        running = true;
+        cycles = 0;
+        cycle(true);
+      } else if (!should && running) {
+        rest();
+      }
+      label();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (running) {
+        userPaused = true;
+        rest();
+      } else {
+        userPaused = false;
+        done = false;
+      }
+      sync();
+    });
+    reduced.addEventListener('change', () => {
+      if (reduced.matches) rest();
+      sync();
+    });
+    document.addEventListener('visibilitychange', sync);
+
+    // A host (or the demo) that changes a timing attribute sees it straight away.
+    new MutationObserver(() => {
+      done = false;
+      rest();
+      sync();
+    }).observe(root, { attributes: true, attributeFilter: ['data-speed', 'data-gap', 'data-hold', 'data-repeat', 'data-entrance', 'data-mark'] });
+
+    // Distil's offsets are measurements; if the width changes mid-cycle, measure again.
+    if (root.dataset.effect === 'distil') {
+      let width = text.clientWidth;
+      new ResizeObserver(() => {
+        if (text.clientWidth === width) return;
+        width = text.clientWidth;
+        if (running) {
+          rest();
+          sync();
+        }
+      }).observe(text);
+    }
+
+    // Web fonts change every width; start only once they have loaded.
+    (document.fonts?.ready ?? Promise.resolve()).then(() => {
+      new IntersectionObserver(
+        (entries) => {
+          onScreen = entries.some((e) => e.isIntersecting);
+          sync();
+        },
+        { threshold: 0.6 },
+      ).observe(text);
+    });
+  });
+</script>

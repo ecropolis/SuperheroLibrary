@@ -1,0 +1,412 @@
+---
+/**
+ * Demo for `animated-text`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. There are no assets.
+ *
+ * The point of this page is range: one element, six effects, and settings a client can
+ * change. So all six are rendered (only the chosen one is shown, and a hidden one never
+ * runs), the controls write the element's own data attributes, which it watches, and the
+ * code under the stage is rebuilt from whatever is set, so what you see is what you would
+ * paste. Replay sets an attribute to its own value, which restarts the element the same way.
+ *
+ * The lines are neutral on purpose: this page is published, and a client's words (Nicole's
+ * "Let Go. Let Be. Let Me." is the distil original) are theirs, not our demo copy.
+ */
+import AnimatedText from '../../library/animated-text/AnimatedText.astro';
+interface Props {
+  /** Unused: this demo has no assets. Accepted so every demo takes the same props. */
+  assetBase?: string;
+}
+const effects = [
+  {
+    id: 'build',
+    name: 'Build',
+    text: 'Every word arrives when you would say it.',
+    note: 'The phrase arrives a word, or a part, at a time. Rise, fade or blur is how each piece comes in.',
+  },
+  {
+    id: 'typewriter',
+    name: 'Typewriter',
+    text: 'Book a call.|Ask a question.|See the work.',
+    note: 'Letter by letter behind a caret, then deleted back for the next line. Each line is laid out in full first, so it never creeps sideways.',
+  },
+  {
+    id: 'rotate',
+    name: 'Rotate',
+    text: 'We build {websites|online shops|booking pages}',
+    note: 'One slot in a fixed sentence turns over. The slot is as wide as its widest option, so nothing around it moves.',
+  },
+  {
+    id: 'distil',
+    name: 'Distil',
+    text: '[Be] Clear. | [Be] Kind. | [Be] Brief.',
+    note: 'The whole phrase, then some words fall away and the rest close up into a shorter one.',
+  },
+  {
+    id: 'highlight',
+    name: 'Highlight',
+    text: 'Say {what you do}, and {who it is for}.',
+    note: 'The sentence is readable from the first frame; only the emphasis moves, so it is the one for a hero headline.',
+  },
+  {
+    id: 'strike',
+    name: 'Strike',
+    text: 'Your website is a {brochure|salesperson}.',
+    note: 'One word is struck through and its replacement written after it: not this, this. Once, not on a loop.',
+  },
+] as const;
+const fonts = [
+  { label: 'The site’s own', value: '' },
+  { label: 'Serif', value: "Georgia, 'Times New Roman', serif" },
+  { label: 'Rounded', value: "ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, sans-serif" },
+  { label: 'Monospace', value: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
+];
+---
+<div class="demo-at" data-demo-at>
+  <fieldset class="demo-at__effects">
+    <legend class="demo-at__legend">Effect</legend>
+    {
+      effects.map((e, i) => (
+        <label class="demo-at__pill">
+          <input type="radio" name="demo-at-effect" value={e.id} checked={i === 0} />
+          <span>{e.name}</span>
+        </label>
+      ))
+    }
+  </fieldset>
+
+  <div class="demo-at__stage" data-demo-at-stage>
+    {
+      effects.map((e, i) => (
+        <div class="demo-at__one" data-demo-at-one={e.id} data-text={e.text} data-note={e.note} hidden={i !== 0}>
+          <AnimatedText effect={e.id} text={e.text} as="p" />
+        </div>
+      ))
+    }
+  </div>
+  <p class="demo-at__note" data-demo-at-note aria-live="polite">{effects[0].note}</p>
+
+  <div class="demo-at__controls">
+    <label class="demo-at__field">
+      <span>Speed <output data-out="speed"></output></span>
+      <input type="range" data-ctl="speed" />
+    </label>
+    <label class="demo-at__field">
+      <span>Gap <output data-out="gap"></output></span>
+      <input type="range" min="0" max="4000" step="20" data-ctl="gap" />
+    </label>
+    <label class="demo-at__field">
+      <span>Hold <output data-out="hold"></output></span>
+      <input type="range" min="0" max="12000" step="100" data-ctl="hold" />
+    </label>
+    <label class="demo-at__field">
+      <span>Repeat</span>
+      <select data-ctl="repeat">
+        <option value="once">Once</option>
+        <option value="loop">Loop</option>
+        <option value="2">Twice</option>
+        <option value="3">Three times</option>
+      </select>
+    </label>
+    <label class="demo-at__field" data-for="build distil rotate">
+      <span>Entrance</span>
+      <select data-ctl="entrance">
+        <option value="rise">Rise</option>
+        <option value="fade">Fade</option>
+        <option value="blur">Blur</option>
+      </select>
+    </label>
+    <label class="demo-at__field" data-for="highlight" hidden>
+      <span>Mark</span>
+      <select data-ctl="mark">
+        <option value="marker">Marker</option>
+        <option value="underline">Underline</option>
+      </select>
+    </label>
+    <label class="demo-at__field">
+      <span>Font</span>
+      <select data-ctl="font">
+        {fonts.map((f) => <option value={f.value}>{f.label}</option>)}
+      </select>
+    </label>
+    <label class="demo-at__field">
+      <span>Pause button</span>
+      <select data-ctl="pause">
+        <option value="visible">Visible</option>
+        <option value="focus">On keyboard focus only</option>
+      </select>
+    </label>
+    <button type="button" class="demo-at__replay" data-demo-at-replay>Replay</button>
+  </div>
+
+  <pre class="demo-at__code"><code data-demo-at-code></code></pre>
+</div>
+
+<style>
+  .demo-at {
+    display: grid;
+    gap: 1rem;
+    padding: 1.25rem;
+    border-radius: var(--radius, 14px);
+    background: var(--tint, #f8f8fc);
+    border: 1px solid var(--line, #e6e6f0);
+    min-width: 0;
+  }
+  .demo-at__effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .demo-at__legend {
+    width: 100%;
+    margin-bottom: 0.4rem;
+    padding: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink, #16192a);
+  }
+  .demo-at__pill {
+    position: relative;
+  }
+  /* The radio stays a real radio (arrow keys move between effects); the pill is its label. */
+  .demo-at__pill input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .demo-at__pill span {
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--line, #e6e6f0);
+    border-radius: 999px;
+    background: var(--white, #fff);
+    color: var(--ink, #16192a);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .demo-at__pill input:checked + span {
+    background: var(--purple, #5933d8);
+    border-color: var(--purple, #5933d8);
+    color: var(--white, #fff);
+  }
+  .demo-at__pill input:focus-visible + span {
+    outline: 2px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+
+  .demo-at__stage {
+    --at-size: clamp(1.45rem, 5.6vw, 2.5rem);
+    --at-weight: 800;
+    --at-line-height: 1.2;
+    --at-tracking: -0.02em;
+    --at-ink: var(--navy, #1e283c);
+    --at-align: center;
+    --at-accent: var(--purple, #5933d8);
+    --at-mark: color-mix(in srgb, var(--purple, #5933d8) 20%, transparent);
+    --at-control-fg: var(--ink, #16192a);
+    --at-focus: var(--purple, #5933d8);
+    --at-pause-align: center;
+    container-type: inline-size;
+    display: grid;
+    align-items: center;
+    min-height: 11rem;
+    padding: 1.5rem 1rem;
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+    border: 1px solid var(--line, #e6e6f0);
+    overflow: hidden;
+  }
+  /* Distil is one line, sized by its widest state, as its notes say. The whole phrase is
+   * about 12em wide at this weight, so 8% of the stage keeps it inside at 320px. */
+  .demo-at__one[data-demo-at-one='distil'] {
+    --at-wrap: nowrap;
+    --at-size: clamp(1rem, 8cqi, 2.5rem);
+  }
+  /* Rotate in a centred line: the slot gets a line of its own, so each option is centred. */
+  .demo-at__one[data-demo-at-one='rotate'] {
+    --at-slot-display: grid;
+    --at-slot-align: center;
+  }
+  .demo-at__one[hidden] {
+    display: none;
+  }
+  .demo-at__note {
+    margin: 0;
+    color: var(--ink, #16192a);
+  }
+
+  .demo-at__controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.75rem 1rem;
+    align-items: end;
+  }
+  .demo-at__field {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink, #16192a);
+  }
+  .demo-at__field[hidden] {
+    display: none;
+  }
+  .demo-at__field output {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  .demo-at__field input[type='range'] {
+    width: 100%;
+    accent-color: var(--purple, #5933d8);
+  }
+  .demo-at__field select {
+    font: inherit;
+    font-weight: 400;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--line, #e6e6f0);
+    border-radius: 8px;
+    background: var(--white, #fff);
+    color: var(--ink, #16192a);
+  }
+  .demo-at__replay {
+    justify-self: start;
+    min-height: 36px;
+    padding: 0.4rem 1.1rem;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border: 0;
+    border-radius: 999px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    cursor: pointer;
+  }
+  .demo-at__replay:hover {
+    background: var(--purple-dark, #4526ad);
+  }
+  .demo-at__replay:focus-visible {
+    outline: 2px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+  .demo-at__code {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-demo-at]').forEach((demo) => {
+    const ones = Array.from(demo.querySelectorAll<HTMLElement>('[data-demo-at-one]'));
+    const stage = demo.querySelector<HTMLElement>('[data-demo-at-stage]');
+    const note = demo.querySelector<HTMLElement>('[data-demo-at-note]');
+    const code = demo.querySelector<HTMLElement>('[data-demo-at-code]');
+    const replay = demo.querySelector<HTMLButtonElement>('[data-demo-at-replay]');
+    const ctl = (k: string) => demo.querySelector<HTMLInputElement & HTMLSelectElement>(`[data-ctl="${k}"]`)!;
+    const out = (k: string) => demo.querySelector<HTMLOutputElement>(`[data-out="${k}"]`)!;
+    if (!stage || !note || !code || !replay) return;
+
+    let current = ones[0];
+    const el = () => current.querySelector<HTMLElement>('[data-at]')!;
+    // Setting an attribute to its own value still counts as a change to the element.
+    const restart = () => el().setAttribute('data-speed', el().dataset.speed!);
+    const secs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(ms % 1000 ? 2 : 0).replace(/0$/, '')} s` : `${ms} ms`);
+
+    function showCode() {
+      const at = el().dataset;
+      const effect = at.effect!;
+      const repeat = at.repeat!;
+      const lines = [
+        `<AnimatedText`,
+        `  effect="${effect}"`,
+        `  text="${current.dataset.text}"`,
+        `  speed={${at.speed}}`,
+        `  gap={${at.gap}}`,
+        `  hold={${at.hold}}`,
+        `  repeat=${repeat === 'once' || repeat === 'loop' ? `"${repeat}"` : `{${repeat}}`}`,
+      ];
+      if (['build', 'distil', 'rotate'].includes(effect)) lines.push(`  entrance="${at.entrance}"`);
+      if (effect === 'highlight') lines.push(`  mark="${at.mark}"`);
+      lines.push(`  pause="${at.pause}"`, `/>`);
+      const css = [];
+      const font = ctl('font').value;
+      if (font) css.push(`--at-font: ${font};`);
+      if (effect === 'rotate') css.push('--at-slot-display: grid;  /* the slot on a line of its own */', '--at-slot-align: center;');
+      if (effect === 'distil') css.push('--at-wrap: nowrap;  /* one line, sized by the whole phrase */');
+      if (css.length) lines.push('', '/* In the site’s CSS, on a parent: */', ...css);
+      if (code) code.textContent = lines.join('\n');
+    }
+
+    function outputs() {
+      const typing = el().dataset.effect === 'typewriter';
+      out('speed').textContent = typing ? `${ctl('speed').value} ms a letter` : secs(Number(ctl('speed').value));
+      out('gap').textContent = secs(Number(ctl('gap').value));
+      out('hold').textContent = secs(Number(ctl('hold').value));
+    }
+
+    /** Load the chosen effect's own settings into the controls. */
+    function load() {
+      const at = el().dataset;
+      const speed = ctl('speed');
+      const typing = at.effect === 'typewriter';
+      speed.min = typing ? '20' : '200';
+      speed.max = typing ? '200' : '2000';
+      speed.step = typing ? '5' : '50';
+      speed.value = at.speed!;
+      ctl('gap').value = at.gap!;
+      ctl('hold').value = at.hold!;
+      ctl('repeat').value = at.repeat!;
+      ctl('entrance').value = at.entrance!;
+      ctl('mark').value = at.mark!;
+      ctl('pause').value = at.pause!;
+      demo.querySelectorAll<HTMLElement>('[data-for]').forEach((f) => {
+        f.hidden = !f.dataset.for!.split(' ').includes(at.effect!);
+      });
+      note!.textContent = current.dataset.note ?? '';
+      outputs();
+      showCode();
+    }
+
+    demo.querySelectorAll<HTMLInputElement>('input[name="demo-at-effect"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        current = ones.find((o) => o.dataset.demoAtOne === radio.value) ?? ones[0];
+        ones.forEach((o) => (o.hidden = o !== current));
+        load();
+      });
+    });
+
+    // Sliders show their value as they move, and set it (which restarts the element) on release.
+    (['speed', 'gap', 'hold'] as const).forEach((k) => {
+      const input = ctl(k);
+      input.addEventListener('input', outputs);
+      input.addEventListener('change', () => {
+        el().dataset[k] = input.value;
+        showCode();
+      });
+    });
+    (['repeat', 'entrance', 'mark', 'pause'] as const).forEach((k) => {
+      ctl(k).addEventListener('change', () => {
+        el().dataset[k] = ctl(k).value;
+        showCode();
+      });
+    });
+    ctl('font').addEventListener('change', () => {
+      const font = ctl('font').value;
+      if (font) stage.style.setProperty('--at-font', font);
+      else stage.style.removeProperty('--at-font');
+      restart(); // new widths: distil measures again at the start of a cycle
+      showCode();
+    });
+    replay.addEventListener('click', restart);
+
+    load();
+  });
+</script>

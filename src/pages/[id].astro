@@ -46,7 +46,16 @@ const Demo = demos[e.id];
     <ul>{e.usedOn.map((u) => <li><strong>{u.site}</strong>: {u.where}</li>)}</ul>
 
     <h2>For builders</h2>
-    <p>Copy <code>{e.file}</code> into the site's <code>src/components/</code>. Added {e.added}.</p>
+    {
+      e.source ? (
+        <p>
+          Do not copy or edit <code>{e.file}</code>: it is synced from <code>{e.source.repo}</code>, which
+          owns it. Register the site there and run <code>{e.source.sync}</code>. Added {e.added}.
+        </p>
+      ) : (
+        <p>Copy <code>{e.file}</code> into the site's <code>src/components/</code>. Added {e.added}.</p>
+      )
+    }
     <pre><code>{e.usage}</code></pre>
 
     <h3>Props</h3>

@@ -24,6 +24,8 @@ import TabsDemo from './TabsDemo.astro';
 import InfoListDemo from './InfoListDemo.astro';
 import VideoPlayerDemo from './VideoPlayerDemo.astro';
 import TestimonialCarouselDemo from './TestimonialCarouselDemo.astro';
+import AnimatedTextDemo from './AnimatedTextDemo.astro';
+import CookieConsentDemo from './CookieConsentDemo.astro';
 import IconDemo from './IconDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
@@ -47,5 +49,7 @@ export const demos: Record<string, AstroComponent> = {
   'info-list': InfoListDemo,
   'video-player': VideoPlayerDemo,
   'testimonial-carousel': TestimonialCarouselDemo,
+  'animated-text': AnimatedTextDemo,
+  'cookie-consent': CookieConsentDemo,
   icon: IconDemo,
 };

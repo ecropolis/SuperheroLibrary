@@ -104,6 +104,30 @@ a push to `main` that passes it calls the `superherotech` Pages deploy hook (rep
 Copy the file into `src/components/`, set its theming variables from the site's tokens, and
 follow the element's page for any stacking or sizing rule. The skill says the same, for agents.
 
+## Synced, not copied: cookie-consent
+
+One element is not owned here. `src/library/cookie-consent/CookieConsent.astro` is a synced copy
+of `src/CookieConsent.astro` in [ecropolis/ecropolis-consent](https://github.com/ecropolis/ecropolis-consent),
+which runs on seven sites and keeps one version number for all of them. This repo is one more
+sync target in that repo's `sites.json`, exactly like a site:
+
+```bash
+# in ecropolis-consent
+node bin/consent-sync.mjs check                     # reports SuperheroLibrary with the sites
+node bin/consent-sync.mjs update SuperheroLibrary   # refreshes this copy
+```
+
+**Never edit the file here.** Fix it upstream, bump its version, sync, and commit the refreshed
+copy in a PR of its own. `scripts/check-cookie-consent.mjs` fails `npm run check` if the header
+naming the canonical source is gone, and, when ecropolis-consent is checked out beside this repo,
+if the copy is behind its version or differs from it byte for byte. CI has no checkout of that
+repo, so there it holds the header only.
+
+Its catalogue entry carries `source`, which makes the gallery say "sync", not "copy". Its demo
+runs the real widget inside sandboxed frames rather than on the page, because the widget is live
+code: on superherotech.ai, which runs it too, a demo click would otherwise change the visitor's
+real consent. The demo's header comment has the detail.
+
 ## Licence
 
 MIT, Ecropolis LLC. Elements are copied into client sites; see `LICENSE`.

@@ -178,6 +178,7 @@ try {
 if (tracked) {
   for (const rel of tracked) {
     if (rel.startsWith('node_modules/') || rel === 'package-lock.json') continue;
+    if (rel === 'scripts/check-icon.mjs') continue; // names the strings it hunts for
     const path = join(root, rel);
     if (!existsSync(path)) continue;
     let text;
