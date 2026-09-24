@@ -75,6 +75,7 @@ const items = [
         <p><strong>New this month</strong><br />Reports now arrive as a one-page summary.</p>
         <a href="#reports">See a sample report</a>
       </div>
+      <a slot="end" href="#start" class="demo-mm__cta">Start free</a>
     </MegaMenu>
   </header>
   <div class="demo-mm__page" aria-hidden="true">
@@ -127,6 +128,18 @@ const items = [
   .demo-mm__promo a {
     color: var(--purple-dark, #4526ad);
     font-weight: 600;
+  }
+  .demo-mm__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
   }
   .demo-mm__page {
     display: grid;

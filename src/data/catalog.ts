@@ -149,7 +149,8 @@ export const catalog: Element[] = [
       { name: 'breakpoint', type: 'number', default: '960', note: 'Viewport width (px) below which the menu collapses behind the Menu button and panels become an accordion. Tracked live. 0 never collapses.' },
       { name: 'label', type: 'string', default: '“Main”', note: 'Accessible name of the nav landmark.' },
       { name: 'menuLabel', type: 'string', default: '“Menu”', note: 'Text of the mobile disclosure button.' },
-      { name: 'current', type: 'string', note: 'The current page’s href; matching links get `aria-current="page"`.' },
+      { name: 'current', type: 'string', note: 'The current page’s href; matching links get `aria-current="page"`, and so does the top button of an item whose own `href` matches.' },
+      { name: 'slot end', type: 'slot', note: 'Placed after the top items: at the right end of the bar, and at the foot of the list behind the Menu button. For a call to action that must stay reachable on a phone. Arrow keys skip it; Tab reaches it.' },
       { name: 'class', type: 'string', note: 'Class on the nav, for the host to theme and place it.' },
     ],
     theming: [
@@ -171,6 +172,7 @@ export const catalog: Element[] = [
       '← → move across the top items (↑ ↓ in the mobile list), Home and End jump to the ends, ↓ on a top button opens its panel and moves into it.',
       'Without JavaScript every top item is a plain link and a panel shows on hover or when focus is inside it, so every link is reachable.',
       'Below `breakpoint` the list sits behind a “Menu” disclosure button (`aria-expanded`), and panels become an accordion in the same order.',
+      'The current page is marked on the top item as well as in its panel: once the item is a button, the button carries `aria-current="page"`.',
       'Column headings label their lists (`aria-labelledby`) rather than adding headings to the page outline. prefers-reduced-motion removes the panel’s fade.',
     ],
     usage: `<header class="site-header">   <!-- position: relative; no overflow: hidden -->
@@ -183,6 +185,7 @@ export const catalog: Element[] = [
     { label: 'Pricing', href: '/pricing/' },
   ]}>
     <div slot="promo-services">…</div>
+    <a slot="end" href="/quote/" class="button">Get a quote</a>
   </MegaMenu>
 </header>
 <!-- .site-nav { --mm-anchor: static; --mm-accent: var(--blue); } spans the header -->`,

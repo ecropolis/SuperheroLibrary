@@ -25,6 +25,12 @@
  *
  * Promo: give an item `promo: 'promo-products'` and pass `<div slot="promo-products">…</div>`.
  *
+ * End: `<a slot="end" …>` is placed after the top items, at the right end of the bar and at
+ * the foot of the list behind the Menu button. It is for a call to action that must stay
+ * reachable on a phone once the list has folded away. It is not a top item: the arrow keys
+ * skip it and Tab reaches it. A host that shows its own button on wide screens can hide
+ * this one there with a media query at the same `breakpoint`.
+ *
  * Theming, from the host's tokens (each has a fallback):
  *   --mm-fg / --mm-accent          top bar text / hover, open and current colour
  *   --mm-panel-bg / --mm-panel-fg  panel background / text
@@ -59,7 +65,10 @@ interface Props {
   label?: string;
   /** Text of the mobile disclosure button. */
   menuLabel?: string;
-  /** The current page's href; the matching link gets aria-current="page". */
+  /**
+   * The current page's href. Matching links get aria-current="page", and so does the top
+   * button of an item whose own href matches, so the bar shows where the visitor is.
+   */
   current?: string;
   class?: string;
 }
@@ -86,7 +95,15 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
               {item.label}
             </a>
             {hasPanel && (
-              <button class="mm__top" type="button" aria-expanded="false" aria-controls={pid} hidden data-mm-button>
+              <button
+                class="mm__top"
+                type="button"
+                aria-expanded="false"
+                aria-controls={pid}
+                aria-current={cur(item.href)}
+                hidden
+                data-mm-button
+              >
                 {item.label}
                 <span class="mm__caret" aria-hidden="true" />
               </button>
@@ -126,6 +143,13 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
         );
       })
     }
+    {
+      Astro.slots.has('end') && (
+        <li class="mm__end">
+          <slot name="end" />
+        </li>
+      )
+    }
   </ul>
 </nav>
 
@@ -144,7 +168,8 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
       const narrow = matchMedia(`(max-width: ${bp - 0.02}px)`);
       const compact = () => bp > 0 && narrow.matches;
       const toggle = nav.querySelector('[data-mm-toggle]');
-      const items = [...nav.querySelector('[data-mm-list]').children];
+      // Top items only: the `end` slot's <li> sits in the same list but is not one of them.
+      const items = [...nav.querySelector('[data-mm-list]').children].filter((li) => li.classList.contains('mm__item'));
       const buttons = [];
       for (const li of items) {
         const btn = li.querySelector(':scope > [data-mm-button]');
@@ -299,6 +324,11 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     outline: 3px solid var(--mm-focus, currentColor);
     outline-offset: 2px;
   }
+  .mm__end {
+    display: flex;
+    align-items: center;
+    margin-inline-start: 0.5rem;
+  }
   .mm__caret {
     width: 0.45em;
     height: 0.45em;
@@ -426,6 +456,9 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     inset-inline: 0;
     z-index: var(--mm-z, 50);
     flex-direction: column;
+    /* The bar's wrap would turn a list taller than max-height into side-by-side columns
+       the moment an accordion opens; the list scrolls instead. */
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 0;
     max-height: 80vh;
@@ -442,6 +475,9 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
   .mm--compact .mm__top {
     width: 100%;
     justify-content: space-between;
+  }
+  .mm--compact .mm__end {
+    margin: 0.5rem 0.85rem 0.35rem;
   }
   .mm--compact .mm__panel,
   .mm--compact .mm__top[aria-expanded='true'] + .mm__panel {
