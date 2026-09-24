@@ -1,0 +1,135 @@
+---
+/**
+ * Icon — one glyph from Font Awesome Free, inlined as an SVG at build time. WordPress calls
+ * this a Beaver Builder or UABB icon module, an Elementor icon widget, or "Font Awesome" as a
+ * web font loaded on every page; this ships none of that: no icon font, no CSS sprite, no
+ * client-side JavaScript, one `<svg>` per use.
+ *
+ * Licensing, which is why this file only ever draws from Font Awesome FREE:
+ *
+ *   Font Awesome's Pro license ("What Creators May Not Do — Distribute to Non-Creators")
+ *   says: "Making, sharing, or publishing copies of Pro Icons or Pro Software in a
+ *   non-transformative way or in a manner where the Pro Icons or Pro Software are the primary
+ *   part of what is being made, shared, or published is expressly prohibited." A public icon
+ *   gallery whose entire content is icons is exactly that.
+ *
+ *   The same license ("Pass on Permission to Embed") says: "Creators may not give
+ *   non-Creators permission to Embed Pro Icons in new Projects of their own... Creators may
+ *   not give non-Creators permission to use Pro Icons or Projects that embed Pro Icons for
+ *   further use or resale." A copy of this repo, or of a client site built from it, would
+ *   hand every reader exactly that permission if a Pro icon were embedded in it.
+ *
+ *   So: this public repo and its gallery carry only Font Awesome Free (CC BY 4.0 icons,
+ *   `@fortawesome/fontawesome-free` on public npm). A client who wants a Pro style (thin,
+ *   light, sharp, duotone, or a Pro-only glyph) is told it exists and browses it themselves at
+ *   fontawesome.com/search; we license and embed it directly in their site when they ask by
+ *   name, never here.
+ *
+ * Copying this element into a client site: copy this file AND add
+ * `@fortawesome/fontawesome-free` as a devDependency (`npm i -D @fortawesome/fontawesome-free`)
+ * — it supplies the SVG source at build time only; the built site ships none of the package,
+ * just the one inline `<svg>` each `<Icon>` call produces. If a client build has no devDependency
+ * step at all, paste the one `<path d="…">` from the package's `svgs/<style>/<name>.svg` instead.
+ *
+ * Build-time only: an unknown `name` or `style` fails the build with a sentence and the three
+ * nearest names, so a typo is caught before it ships, never rendered as a blank box.
+ *
+ * Theming: `--ic-color`, fallback `currentColor` — the icon already follows the surrounding
+ * text colour, so most call sites need no theming at all; set `--ic-color` only to break from
+ * that.
+ */
+import { createRequire } from 'node:module';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+export type IconStyle = 'solid' | 'regular' | 'brands';
+const STYLES: IconStyle[] = ['solid', 'regular', 'brands'];
+
+interface Props {
+  /** Font Awesome Free icon name, kebab-case, e.g. "house", "user", "phone". */
+  name: string;
+  /** Which Free style to draw it from. Free ships solid, regular and brands only. */
+  style?: IconStyle;
+  /** Any CSS length. The icon is a square of this size. */
+  size?: string;
+  /** Accessible name. Without it the icon is decorative (`aria-hidden`) — the right default,
+   * since most icons sit next to text that already says what they mean. Set it when the icon
+   * is the only content conveying meaning, such as an icon-only button. */
+  label?: string;
+  /** Optional native tooltip text (an SVG `<title>`), independent of `label`. */
+  title?: string;
+  class?: string;
+}
+
+// <icon-parse>
+function levenshtein(a: string, b: string): number {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+function nearest(name: string, candidates: string[], count = 3): string[] {
+  return [...candidates].sort((a, b) => levenshtein(name, a) - levenshtein(name, b)).slice(0, count);
+}
+
+function listNames(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.svg'))
+    .map((f) => f.slice(0, -4));
+}
+
+/** Reads one icon's SVG from an installed @fortawesome/fontawesome-free, or throws a build
+ * error naming the three nearest icon names in that style. Pure aside from the file reads, so
+ * it is unit-testable against the real installed package (see scripts/check-icon.mjs). */
+function resolveIcon(pkgRoot: string, name: string, style: string): { viewBox: string; path: string } {
+  if (!STYLES.includes(style as IconStyle)) {
+    throw new Error(`Icon "${name}": style "${style}" is not one of Font Awesome Free's styles (${STYLES.join(', ')}).`);
+  }
+  const dir = join(pkgRoot, 'svgs', style);
+  let svg: string;
+  try {
+    svg = readFileSync(join(dir, `${name}.svg`), 'utf8');
+  } catch {
+    const suggestions = nearest(name, listNames(dir));
+    throw new Error(
+      `Icon: no Font Awesome Free icon named "${name}" in the "${style}" style. Did you mean: ${suggestions.join(', ')}? ` +
+        `Browse the Free set at https://fontawesome.com/search?o=r&s=solid%2Cregular%2Cbrands or check the style — ` +
+        `some icons only ship in one of solid/regular/brands.`,
+    );
+  }
+  const viewBox = (svg.match(/\sviewBox="([^"]+)"/) || [])[1] ?? '0 0 512 512';
+  const path = (svg.match(/<path[^>]*\sd="([^"]+)"/) || [])[1] ?? '';
+  return { viewBox, path };
+}
+// </icon-parse>
+
+const require = createRequire(import.meta.url);
+const pkgRoot = dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+
+const { name, style = 'solid', size = '1em', label, title, class: className } = Astro.props as Props;
+
+if (typeof name !== 'string' || !name.trim()) {
+  throw new Error('Icon: `name` is required, e.g. name="house".');
+}
+
+const { viewBox, path } = resolveIcon(pkgRoot, name, style);
+---
+
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox={viewBox}
+  class={className}
+  style={`width:${size};height:${size};color:var(--ic-color, currentColor)`}
+  focusable="false"
+  role={label ? 'img' : undefined}
+  aria-hidden={label ? undefined : 'true'}
+  aria-label={label}
+>
+  {title && <title>{title}</title>}
+  <path fill="currentColor" d={path} />
+</svg>

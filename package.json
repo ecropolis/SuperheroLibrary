@@ -11,10 +11,15 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-catalog.mjs && node --disable-warning=ExperimentalWarning scripts/check-business-hours.mjs && node scripts/check-news-ticker.mjs && node --disable-warning=ExperimentalWarning scripts/check-flip-box.mjs && node scripts/check-social-grid.mjs && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-four.mjs && node --disable-warning=ExperimentalWarning scripts/check-video-player.mjs"
+    "build:icon-data": "node scripts/build-icon-data.mjs",
+    "check": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-catalog.mjs && node --disable-warning=ExperimentalWarning scripts/check-business-hours.mjs && node scripts/check-news-ticker.mjs && node --disable-warning=ExperimentalWarning scripts/check-flip-box.mjs && node scripts/check-social-grid.mjs && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-four.mjs && node --disable-warning=ExperimentalWarning scripts/check-video-player.mjs && node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/check-icon.mjs"
   },
   "dependencies": {
     "astro": "^7.2.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "yaml": "^2.9.1"
+  }
 }

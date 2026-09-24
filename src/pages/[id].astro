@@ -35,6 +35,13 @@ const Demo = demos[e.id];
     <h2>Accessibility</h2>
     <ul>{e.a11y.map((a) => <li>{a}</li>)}</ul>
 
+    {e.license && (
+      <>
+        <h2>Licensing</h2>
+        <p>{e.license}</p>
+      </>
+    )}
+
     <h2>Used on</h2>
     <ul>{e.usedOn.map((u) => <li><strong>{u.site}</strong>: {u.where}</li>)}</ul>
 

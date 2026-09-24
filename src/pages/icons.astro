@@ -1,0 +1,48 @@
+---
+/**
+ * The icon element's own full-width browser. /icon/ (from [id].astro, like every element)
+ * carries the usual props/theming/usage tables; this page is just the searchable grid at
+ * full width, since it is the one element people actually want to scroll and search, not read
+ * about first.
+ */
+import Base from '../layouts/Base.astro';
+import { demos } from '../components/demos/index';
+
+const IconDemo = demos.icon;
+---
+
+<Base
+  title="Icons"
+  description="Every Font Awesome Free icon, searchable by name, term or category, with a Copy button for the request string to paste into a build."
+>
+  <section class="wrap intro">
+    <p class="eyebrow">Icon library</p>
+    <h1>Find the icon, copy its name</h1>
+    <p class="lead">
+      Search by name, what it's for, or its category, then press a tile to copy the request string —
+      <code>icon: solid house</code> — to paste into a brief. See <a href="/icon/">the icon element's page</a> for
+      props, theming and how to copy the component itself into a build.
+    </p>
+  </section>
+
+  <section class="wrap">
+    <IconDemo />
+  </section>
+</Base>
+
+<style>
+  .intro {
+    max-width: 52rem;
+    margin-bottom: 2rem;
+  }
+  .lead {
+    font-size: 1.1rem;
+  }
+  .lead code {
+    background: var(--tint);
+    border: 1px solid var(--line);
+    padding: 0.1rem 0.4rem;
+    border-radius: 6px;
+    color: var(--ink);
+  }
+</style>

@@ -43,6 +43,9 @@ export interface Element {
   theming: ThemeVar[];
   a11y: string[];
   usage: string;
+  /** A licensing note for the element's page, in the client's words. Only elements that draw on
+   * licensed third-party material (so far: `icon`, on Font Awesome) carry one. */
+  license?: string;
   usedOn: { site: string; where: string }[];
   /** Path of the component in this repo — the file to copy into a client build. */
   file: string;
@@ -1012,6 +1015,45 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
       { site: 'jwalktours.com', where: 'Home and tour pages, as ReviewScroller: the earlier version, with a fixed 5 s interval' },
     ],
     file: 'src/library/testimonial-carousel/TestimonialCarousel.astro',
+    added: '2026-09-23',
+  },
+  {
+    id: 'icon',
+    name: 'Icon library',
+    aka: ['Font Awesome', 'icon picker', 'icon search', 'Beaver Builder icon', 'UABB icon', 'Elementor icon widget', 'SVG icon'],
+    summary: 'One glyph from Font Awesome Free, inlined as a single SVG at build. No icon font, no CSS sprite, no client-side JavaScript.',
+    pitch: 'Find the icon, copy its name, put it in a request — it arrives as one crisp inline SVG, not a 300 KB font.',
+    // SE Ranking US, 2026-09-23: icon picker 140/mo diff 6; icons for website design 260/27;
+    // icon search 320/39; website icons 330/39. "icon library" itself is 1,900/71 — out of
+    // reach for a page this size, so it stays an aka rather than the target.
+    search: { query: 'icon picker', alsoRanks: ['icons for website design', 'icon search', 'website icons'] },
+    replaces: ['Font Awesome as a web font (the whole set on every page)', 'icon fonts', 'page-builder icon modules'],
+    goodFor: 'A glyph next to text, in a button, or standing alone: navigation, feature lists, contact details, social links, icon-only buttons (with `label` set).',
+    notFor: 'Illustrations and logos — an icon is a glyph, not artwork. And any Pro-only style or glyph: ask for it by name and we license and embed it directly in that site, never here.',
+    props: [
+      { name: 'name', type: 'string', note: 'Font Awesome Free icon name, kebab-case: "house", "user", "phone-volume". Required.' },
+      { name: 'style', type: '"solid" | "regular" | "brands"', default: 'solid', note: 'Free ships exactly these three styles, and not every icon has all three.' },
+      { name: 'size', type: 'string', default: '1em', note: 'Any CSS length. The icon is a square of this size.' },
+      { name: 'label', type: 'string', note: 'Accessible name. Without it the icon is decorative (aria-hidden), which is right for most uses since the text beside it already carries the meaning. Set it when the icon is the only content that does, such as an icon-only button.' },
+      { name: 'title', type: 'string', note: 'Optional native tooltip text (an SVG <title>), independent of `label`.' },
+      { name: 'class', type: 'string', note: 'Class on the <svg>, for the host to size or theme it further.' },
+    ],
+    theming: [{ name: '--ic-color', fallback: 'currentColor', note: 'Icon colour. Most call sites need none of this: the icon already follows the surrounding text colour.' }],
+    a11y: [
+      'Decorative by default: no `label` means `aria-hidden="true"`, because most icons sit beside text that already says what they mean.',
+      'With `label`, the icon gets `role="img"` and that exact text as its accessible name — set it whenever the icon is the only content conveying meaning, such as an icon-only button.',
+      '`focusable="false"` always, so the SVG never becomes a stray tab stop in Safari or older Edge.',
+      'An unknown `name` or `style` fails the build, with the three nearest names by edit distance, rather than shipping a blank icon.',
+    ],
+    usage: `<Icon name="house" />                                   <!-- decorative, next to "123 Main St" -->
+<Icon name="trash-can" style="regular" label="Delete" />    <!-- icon-only button: label is required -->
+<Icon name="truck" size="1.5em" class="hero__icon" />
+
+<!-- In a request: "Put icon: solid truck next to the delivery line." -->`,
+    license:
+      "Every icon here is Font Awesome Free, CC BY 4.0 — its own attribution comment travels inside each SVG, exactly as Font Awesome ships it. Want a thin, light, sharp or duotone version, or a glyph that's Pro-only? Browse the full set at fontawesome.com/search and send us the name: Font Awesome's Pro license lets us embed those icons only in the sites we build for our clients, never hand them over as files or carry them in a public gallery like this one, so Pro icons never appear here — only in your own site, once you've asked for one by name.",
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/icon/ (gallery)' }],
+    file: 'src/library/icon/Icon.astro',
     added: '2026-09-23',
   },
 ];
