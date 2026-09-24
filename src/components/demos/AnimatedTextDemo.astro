@@ -342,7 +342,7 @@ const fonts = [
       if (effect === 'rotate') css.push('--at-slot-display: grid;  /* the slot on a line of its own */', '--at-slot-align: center;');
       if (effect === 'distil') css.push('--at-wrap: nowrap;  /* one line, sized by the whole phrase */');
       if (css.length) lines.push('', '/* In the site’s CSS, on a parent: */', ...css);
-      code.textContent = lines.join('\n');
+      if (code) code.textContent = lines.join('\n');
     }
 
     function outputs() {

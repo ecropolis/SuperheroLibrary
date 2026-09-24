@@ -45,6 +45,8 @@ export interface Element {
   usage: string;
   usedOn: { site: string; where: string }[];
   /** Path of the component in this repo — the file to copy into a client build. */
+  /** Where the file is really maintained, when this repo only holds a synced copy. */
+  source?: { repo: string; sync: string };
   file: string;
   added: string;
 }

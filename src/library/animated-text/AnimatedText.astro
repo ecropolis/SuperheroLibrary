@@ -142,7 +142,7 @@ const DEFAULTS: Record<Effect, { speed: number; gap: number; hold: number; repea
   highlight: { speed: 900, gap: 1200, hold: 6000, repeat: 'once', entrance: 'fade' },
   strike: { speed: 600, gap: 900, hold: 6000, repeat: 'once', entrance: 'fade' },
 };
-const d = DEFAULTS[effect];
+const d = DEFAULTS[effect as Effect];
 const speed = Astro.props.speed ?? d.speed;
 const gap = Astro.props.gap ?? d.gap;
 const hold = Astro.props.hold ?? d.hold;
@@ -226,7 +226,7 @@ const said = label ?? (effect === 'typewriter' ? parts(text).join(' ') : '');
       )
   }{
     effect === 'highlight' &&
-      segs.map((s, i) => (i % 2 ? <mark class="at__mark" style={`--at-i:${(i - 1) / 2}`}>{s}</mark> : s))
+      segs.map((s: string, i: number) => (i % 2 ? <mark class="at__mark" style={`--at-i:${(i - 1) / 2}`}>{s}</mark> : s))
   }{
     effect === 'rotate' &&
       <Fragment>{before}{!label && <span class="at__sr">{list.format(options)}</span>}<span class="at__slot" aria-hidden="true">{options.map((o) => <span class="at__opt">{o}</span>)}</span>{after}</Fragment>
