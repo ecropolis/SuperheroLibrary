@@ -1014,6 +1014,90 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
     file: 'src/library/testimonial-carousel/TestimonialCarousel.astro',
     added: '2026-09-23',
   },
+  {
+    id: 'animated-text',
+    name: 'Animated text',
+    aka: ['animated headline', 'Elementor Animated Headline', 'text rotator', 'word rotator', 'rotating text', 'typewriter effect', 'typing animation', 'Typed.js', 'fancy text', 'word reveal', 'highlighted headline'],
+    summary:
+      'One line of text in one of six effects: build (word by word), typewriter, rotate (one slot turns over), distil (words fall away to a shorter phrase), highlight (a marker or underline sweeps), strike (a word is struck and replaced). Speed, cadence, hold, repeat, entrance and type are set per use. Nothing reflows, a screen reader hears the sentence once, and it rests whole under reduced motion or with no script.',
+    pitch: 'Let your most important line arrive the way you would say it out loud, in your own type and at your own pace.',
+    // 90/mo, difficulty 20; "html text animation" 90/24, "animated text html" 90/22 (SE Ranking US,
+    // 2026-09-23). Google's first page for it is galleries of examples (Prismic's CSS text
+    // animations, CodePen, Moving Letters), which is what this page is. The bigger queries are
+    // not this element: "text animation" 1,600/62 and "animated text" 920/32 are Premiere Pro,
+    // iPhone message effects and GIF makers (9 of the top 10 for "animated text" are generators
+    // or video templates); "typewriter effect" 320 is After Effects and Instagram stories;
+    // "rotating words" is rotating text in Microsoft Word. The web-intent queries with volume
+    // are typewriter only ("typing text animation" 480/22, up from 260 a year ago; "css typing
+    // animation" 390/32), so they are alsoRanks, not the title of a page that shows six effects.
+    search: { query: 'text animation html', alsoRanks: ['typing text animation', 'css typing animation', 'animated text html'] },
+    replaces: [
+      'Elementor Pro “Animated Headline” widget (its highlighted and rotating modes)',
+      'Typed.js and TypeIt typing effects',
+      'UABB “Fancy Text” and PowerPack “Animated Headlines” (Beaver Builder)',
+      'text-rotator and animated-headline WordPress plugins',
+    ],
+    goodFor:
+      'The one line that carries a page or a band: a tagline, a promise, a mantra. Highlight suits a first-screen headline because it is readable from the first frame; the other five suit a line the visitor meets after it.',
+    notFor:
+      'Body copy, anything a visitor must read to act (a price, an instruction), or more than one on a screen. Not the first screen’s h1 in build, typewriter or distil: they start invisible, which delays the moment it can be read and the page’s Largest Contentful Paint. Typewriter splits letters, so not for scripts that join them (Arabic, Devanagari).',
+    props: [
+      { name: 'effect', type: `'build' | 'typewriter' | 'rotate' | 'distil' | 'highlight' | 'strike'`, default: `'build'`, note: 'Which of the six.' },
+      { name: 'text', type: 'string', note: 'The words, with marks as the effect needs: `|` between parts (build, distil) or lines (typewriter); `[…]` round the words that fall away (distil); `{a|b|c}` the slot (rotate); `{…}` the marked words (highlight); `{old|new}` the change (strike). A missing mark is a build error that says which.' },
+      { name: 'as', type: `'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'div'`, default: `'p'`, note: 'The element the text is. Semantics only: the type comes from `--at-*` or where it sits, not the host’s heading rules.' },
+      { name: 'speed', type: 'number', default: 'per effect', note: 'How long one piece takes to arrive (ms): build 700, rotate 600, distil 900, highlight 900, strike 600. For typewriter, ms per letter (60), deleting at twice that pace.' },
+      { name: 'gap', type: 'number', default: 'per effect', note: 'The cadence (ms). Build and distil: from one piece starting to the next (build 160 by word, 900 by part; distil 1000). Rotate and typewriter: how long each option or line rests (2200, 1800). Highlight: before each mark (1200). Strike: from the strike to the replacement (900).' },
+      { name: 'hold', type: 'number', default: 'per effect', note: 'How long the finished line holds before it goes round again (ms). Distil 10000, rotate 2200, typewriter 1800, others 6000. Only matters when it repeats.' },
+      { name: 'repeat', type: `'once' | 'loop' | number`, default: `'loop' for rotate and typewriter, else 'once'`, note: 'A single run ends in its finished state and stays there. A number runs that many times.' },
+      { name: 'entrance', type: `'rise' | 'fade' | 'blur'`, default: `'rise', or 'fade' for distil`, note: 'How pieces arrive in build and distil, and how rotate’s options change: a small rise, a plain fade, or out of a blur into focus.' },
+      { name: 'mark', type: `'marker' | 'underline'`, default: `'marker'`, note: 'Highlight only: a fill behind the words (`--at-mark`) or a line under them (`--at-accent`).' },
+      { name: 'pause', type: `'visible' | 'focus'`, default: `'visible'`, note: 'The pause button, for anything that loops or runs past 5 s. `focus` shows it only on keyboard focus, like a skip link (see Accessibility for the trade-off).' },
+      { name: 'label', type: 'string', note: 'What assistive technology reads instead of the defaults, e.g. “We sell outcomes, not software.” for a strike.' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: '“Pause the animation” / “Play …”', note: 'Names of the button in each state.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, to theme and space it. The text element has no margin of its own.' },
+    ],
+    theming: [
+      { name: '--at-font', fallback: 'inherit', note: 'Typeface. The type comes from here or from where the element sits, never from the host’s h1/h2 rules.' },
+      { name: '--at-size', fallback: 'inherit', note: 'Size. For a looping line, size it by its widest state so it fits a 320 px phone: Nicole’s is clamp(1.4rem, 7.6vw, 3.4rem).' },
+      { name: '--at-weight', fallback: 'inherit', note: 'Weight.' },
+      { name: '--at-line-height', fallback: 'inherit', note: 'Line height.' },
+      { name: '--at-tracking', fallback: 'inherit', note: 'Letter spacing.' },
+      { name: '--at-ink', fallback: 'inherit', note: 'Text colour.' },
+      { name: '--at-align', fallback: 'inherit', note: 'Alignment.' },
+      { name: '--at-slot-display', fallback: 'inline-grid', note: 'Rotate’s slot. `grid` gives it a line of its own (“We build” / “websites”), which a centred headline wants.' },
+      { name: '--at-slot-align', fallback: 'start', note: 'Where each option sits in the slot, which is as wide as the widest: `start` for a slot at the end of a line, `center` for a slot on its own line.' },
+      { name: '--at-wrap', fallback: 'normal', note: 'white-space. `nowrap` keeps a line whole, as distil usually wants.' },
+      { name: '--at-accent', fallback: 'currentColor', note: 'The caret, the underline and the strike line.' },
+      { name: '--at-mark', fallback: 'rgb(255 205 0 / 0.45)', note: 'Highlight’s marker. The text must still clear 4.5:1 on it.' },
+      { name: '--at-control-fg / --at-control-bg / --at-control-border', fallback: 'inherit / transparent / currentColor', note: 'The pause button. With `pause="focus"` its fill falls back to Canvas, because it then sits over whatever follows.' },
+      { name: '--at-focus', fallback: 'currentColor', note: 'The pause button’s focus ring.' },
+      { name: '--at-pause-align', fallback: 'flex-end', note: 'Where the visible pause button sits under the text: flex-start, center or flex-end.' },
+    ],
+    a11y: [
+      'A screen reader hears the whole sentence once and nothing while it moves: the DOM text never changes, only opacity and position. Build, distil and highlight are plain text. Typewriter’s letters are hidden from assistive technology and its lines given once in a visually hidden copy; rotate’s slot reads as its options joined (“websites, online shops, and booking pages”); strike’s change reads as the replacement. `label` substitutes a sentence of your own.',
+      'WCAG 2.2.2: anything that loops or runs past five seconds gets a pause button, visible by default, named for what it will do. `pause="focus"` keeps it in the page but shows it only on keyboard focus: keyboard and screen-reader visitors can stop it, but a mouse or touch visitor who has not set reduced motion cannot. That is a choice to make with the client (Nicole made it), not a default.',
+      'prefers-reduced-motion (tracked live), no JavaScript, or paused: one still, complete state — the whole phrase, the first line or option, the marks drawn, the strike made — and no button.',
+      'No flashing (WCAG 2.3.1): fades, slides and sweeps only. The typewriter caret blinks about once a second, and only while it rests.',
+      'It runs only while 60% on screen and the tab is visible, and starts after web fonts have loaded. Nothing reflows while it runs, so nothing near it moves either.',
+    ],
+    usage: `---
+import AnimatedText from '../components/AnimatedText.astro';
+---
+<!-- Nicole Lawton's band, as this element: distil, looping, the button on keyboard focus only -->
+<AnimatedText class="letgo" effect="distil" text="[Let] Go. | [Let] Be. | [Let] Me." repeat="loop" pause="focus" />
+<!-- .letgo { --at-font: var(--font-display); --at-size: clamp(1.4rem, 7.6vw, 3.4rem); --at-wrap: nowrap; --at-align: center; } -->
+
+<AnimatedText as="h2" effect="rotate" text="We build {websites|online shops|booking pages}" />
+<AnimatedText effect="typewriter" text="Book a call.|Ask a question.|See the work." speed={45} />
+<AnimatedText as="h1" effect="highlight" text="Every page {one click} from the header." mark="underline" />
+<AnimatedText effect="strike" text="We sell {software|outcomes}." label="We sell outcomes, not software." />`,
+    usedOn: [
+      { site: 'nicolelawton.com', where: 'Home, the "Let Go. Let Be. Let Me." band over the deep water (pre-launch on nicolelawton.gohero.us). It is the distil original, LetGo.astro, built before this element and not yet swapped for it' },
+      { site: 'superherotech.ai', where: '/elements/animated-text/ (demo): all six effects' },
+    ],
+    file: 'src/library/animated-text/AnimatedText.astro',
+    added: '2026-09-23',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
