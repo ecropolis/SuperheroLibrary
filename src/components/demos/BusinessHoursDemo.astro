@@ -175,6 +175,11 @@ const ld = JSON.stringify(openingHoursJsonLd(cafe, Date.now(), { id: 'https://ne
     background: var(--white, #fff);
     color: inherit;
   }
+  /* A select is as wide as its longest option; at width: 100% it shrinks with a narrow card
+     instead of sizing the whole gallery column. */
+  .demo-bh__knob select {
+    width: 100%;
+  }
   .demo-bh__knob output {
     font-style: italic;
   }
@@ -211,7 +216,10 @@ const ld = JSON.stringify(openingHoursJsonLd(cafe, Date.now(), { id: 'https://ne
     margin-top: 1rem;
     font-size: 0.85rem;
   }
+  /* Scrolls inside itself; without inline-size containment its longest line still sets the
+     card's min-content width once the details are open. */
   .demo-bh__ld pre {
+    contain: inline-size;
     overflow-x: auto;
     max-height: 22rem;
   }
