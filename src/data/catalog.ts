@@ -1500,6 +1500,75 @@ import { analytics } from '../data/site';
     file: 'src/library/menu-button/MenuButton.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'radio-group',
+    name: 'Radio group',
+    aka: ['chunky radio buttons', 'radio cards', 'card radio buttons', 'segmented control', 'segmented buttons', 'toggle button group', 'custom radio buttons', 'styled radio buttons', 'Gravity Forms radio', 'WPForms multiple choice'],
+    summary:
+      'One choice from a few, as real <input type="radio">s in a <fieldset> with a <legend>: a styled list, chunky cards with a Font Awesome Free icon, a title and a line, or a segmented pill row. Native keyboard, visible focus, posts name=value in a plain form, and a data-changed event for hosts.',
+    pitch: 'Let people pick one option at a glance — as a list, as big cards with an icon, or as a pill switch — and it still posts like the plain form it is.',
+    // SE Ranking US, 2026-09-26: radio button css 590/mo, difficulty 21; radio group 480/30;
+    // radio button design 390/28; segmented control 260/7 (volatile, 10–590 over the year);
+    // styled radio buttons 210/22. "segmented control css", the phrase the round-4 brief
+    // pre-assigned, has no measurable volume, so its parent is a variant here instead.
+    search: { query: 'radio button css', alsoRanks: ['radio group', 'radio button design', 'segmented control', 'styled radio buttons'] },
+    replaces: ['Gravity Forms / WPForms / Contact Form 7 radio fields with a theme’s styling', 'page-builder “radio image” and “card select” add-ons', 'JavaScript segmented controls that replace the inputs with divs'],
+    goodFor:
+      'Two to six choices people should see side by side: delivery or pickup, a plan, a billing period (segmented), a size, how to be contacted. Chunky cards when each option needs a line of explanation; segmented for two to four short words.',
+    notFor:
+      'Many options or long labels: over about six, use a native <select>. Several answers at once: that is checkboxes. An action that happens on click (a view switch that is not part of a form is fine, a Delete button is not). And a list of pages: those are links.',
+    props: [
+      { name: 'legend', type: 'string', note: 'The question, as the fieldset’s <legend>; the group’s accessible name. Required.' },
+      { name: 'name', type: 'string', note: 'The field name the form posts. Required.' },
+      { name: 'options', type: 'RadioOption[]', note: '`{ value, label, text?, icon?, disabled? }`. `text` is a line under the label and its description (not shown in segmented). `icon` (chunky) is a Font Awesome Free name: "truck", or "regular/clock" for another Free style.' },
+      { name: 'value', type: 'string', note: 'The value checked on render. Leave it out to make the visitor choose (with `required`).' },
+      { name: 'style', type: "'default' | 'chunky' | 'segmented'", default: "'default'", note: 'A styled list, a card per option, or a pill row.' },
+      { name: 'hideLegend', type: 'boolean', default: 'false', note: 'Hide the legend visually; it still names the group. Only when the question is already visible beside it.' },
+      { name: 'hint', type: 'string', note: 'A line under the legend, set as the group’s description.' },
+      { name: 'required', type: 'boolean', default: 'false', note: 'The browser’s own validation: the form will not submit until one is chosen.' },
+      { name: 'id', type: 'string', default: '“rg-<name>-<n>”', note: 'Base of the input ids (<id>-1, <id>-2 …).' },
+      { name: 'data-changed', type: 'event', note: 'Dispatched on the fieldset when the choice changes: bubbles, `detail: { name, value, label }`. The fieldset’s `data-value` follows it. The native change event fires too.' },
+      { name: 'class', type: 'string', note: 'Class on the fieldset, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--rg-accent', fallback: '#5933d8', note: 'Checked dot, checked card border, checked segment fill, icons.' },
+      { name: '--rg-accent-fg', fallback: '#fff', note: 'Text on a checked segment (7.27:1 on the fallback accent).' },
+      { name: '--rg-fg', fallback: 'inherit', note: 'Legend and labels.' },
+      { name: '--rg-muted', fallback: '#585c6e', note: 'Descriptions and the hint (6.6:1 on white).' },
+      { name: '--rg-border', fallback: '#8a8ea0', note: 'Radio ring and segmented outline (3.25:1 on white; the non-text minimum is 3:1); cards use it at 55%, full on hover.' },
+      { name: '--rg-bg', fallback: '#fff', note: 'Card, segment and radio fill.' },
+      { name: '--rg-bg-checked', fallback: '#f4f1fd', note: 'Checked card fill.' },
+      { name: '--rg-radius', fallback: '10px', note: 'Card and segment corners.' },
+      { name: '--rg-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+      { name: '--rg-size', fallback: '1.25rem', note: 'The radio circle.' },
+      { name: '--rg-card-min', fallback: '13rem', note: 'Narrowest a chunky card gets before the row wraps.' },
+    ],
+    a11y: [
+      'Real radios in a <fieldset> named by its <legend>: nothing is replaced, given a role or hidden from assistive technology, so screen readers announce “radio button, 2 of 3” and the group’s question.',
+      'The keyboard is the browser’s: Tab enters the group on the checked radio (or the first), the arrow keys move and select, Space selects, Tab leaves. No script is involved.',
+      'Each radio is named by its title only; a chunky card’s line of text is its description (aria-describedby), and the hint describes the group.',
+      'A visible 3px focus ring on the radio, or around the whole card or segment in those looks. Every option is at least 44px tall.',
+      'Colour is never the only signal: the checked radio has a dot, the checked card a heavier border and a fill, and in forced-colors mode checked cards and segments get a Highlight outline.',
+      'prefers-reduced-motion: no colour transition.',
+      'Without JavaScript nothing is missing: it is a form control, and it posts `name=value` in a plain form, with `required` validation by the browser. The script only adds the data-changed event for hosts.',
+    ],
+    usage: `<form method="post" action="/checkout/">
+  <RadioGroup legend="How would you like your order?" name="delivery" style="chunky" value="pickup" options={[
+    { value: 'delivery', label: 'Delivery', text: 'To your door in 2 to 3 working days.', icon: 'truck' },
+    { value: 'pickup', label: 'Pick up', text: 'From the shop, ready in an hour.', icon: 'store' },
+  ]} />
+  <RadioGroup legend="Billing period" name="billing" style="segmented" value="monthly" options={[
+    { value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly' },
+  ]} />
+  <button type="submit">Continue</button>
+</form>
+<!-- chunky icons are read at build: npm i -D @fortawesome/fontawesome-free (as for the icon element) -->
+<!-- .checkout { --rg-accent: var(--brand); --rg-focus: var(--brand); --rg-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/radio-group/ (demo)' }],
+    file: 'src/library/radio-group/RadioGroup.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

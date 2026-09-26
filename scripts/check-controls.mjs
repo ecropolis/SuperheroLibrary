@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * npm run check (after check-catalog.mjs, which builds dist/) — pins the controls added in round 4
- * (menu-button). Each is read from its built demo page and from
+ * (menu-button and radio-group). Each is read from its built demo page and from
  * the gallery index (which renders every demo on one page), i.e. exactly what a visitor without
  * JavaScript gets, plus the runtime script as the page emits it.
  *
@@ -15,6 +15,12 @@
  *   returns focus to the button. The `<mb-keys>` block is RUN from the built page against the
  *   keyboard contract: ↓ ↑ wrap, Home, End, Escape, Tab, Enter, Space, type-ahead by first letter,
  *   the opening keys, and the up/down placement rule.
+ * radio-group
+ *   Real radios in a <fieldset> with a <legend>, one name per group, unique ids and values, at
+ *   most one checked (and not a disabled one), every radio named by a label and every
+ *   aria-labelledby / aria-describedby pointing at text. No role and no tabindex (the keyboard is
+ *   native). The demo form's successful controls are computed as a browser would post them.
+ *   Chunky icons are Font Awesome Free. The script dispatches a bubbling `data-changed`.
  * All of them
  *   The runtime is emitted once per page. Every inlined <path> in the three element files is a
  *   Font Awesome Free glyph, byte for byte. Each CSS variable has one fallback throughout its
@@ -255,9 +261,92 @@ async function checkMenuButton(html, where, demo) {
   return out;
 }
 
+// =================================================================== radio-group
+async function checkRadioGroup(html, where, demo) {
+  const out = [];
+  const found = roots(html, 'fieldset', 'data-rg');
+  const styles = new Set();
+  const ids = new Set();
+  for (const r of found) {
+    const name = attr(r.open, 'data-name');
+    const at = `${where}, radio group "${name}"`;
+    const style = r.open.match(/\brg--(default|chunky|segmented)\b/)?.[1];
+    styles.add(style);
+    if (!style) out.push(`${at}: no rg--default / rg--chunky / rg--segmented class.`);
+    if (!name) out.push(`${at}: the fieldset has no data-name.`);
+    const legend = r.html.match(/^<fieldset\b[^>]*>\s*<legend\b[^>]*>([\s\S]*?)<\/legend>/);
+    if (!legend || !text(legend[1])) out.push(`${at}: the fieldset's first child must be a <legend> with the question.`);
+    const described = attr(r.open, 'aria-describedby');
+    if (described && !textOfId(html, described)) out.push(`${at}: aria-describedby="${described}" points at no text.`);
+    if (/\srole="/.test(r.html)) out.push(`${at}: a role is rendered; real radios in a fieldset need none.`);
+    const inputs = tags(r.html, /<input\b[^>]*>/g).map((t) => t.open);
+    if (inputs.length < 2) out.push(`${at}: fewer than two inputs.`);
+    const values = new Set();
+    const checked = [];
+    for (const i of inputs) {
+      const id = attr(i, 'id');
+      const v = attr(i, 'value');
+      if (attr(i, 'type') !== 'radio') out.push(`${at}: an input is type="${attr(i, 'type')}", not a radio.`);
+      if (attr(i, 'name') !== name) out.push(`${at}: input #${id} has name "${attr(i, 'name')}"; every radio in the group posts as "${name}".`);
+      if (!v) out.push(`${at}: input #${id} has no value.`);
+      if (values.has(v)) out.push(`${at}: value "${v}" appears twice.`);
+      values.add(v);
+      if (!id) out.push(`${at}: an input has no id.`);
+      else if (ids.has(id)) out.push(`${at}: id "${id}" is used twice on the page.`);
+      ids.add(id);
+      if (attr(i, 'tabindex') !== undefined) out.push(`${at}: input #${id} has a tabindex; the browser's own radio keyboard needs none.`);
+      if (attr(i, 'hidden') !== undefined || /display:\s*none/.test(attr(i, 'style') ?? '')) out.push(`${at}: input #${id} is hidden; it must stay the focusable control.`);
+      if (attr(i, 'checked') !== undefined) {
+        checked.push(v);
+        if (attr(i, 'disabled') !== undefined) out.push(`${at}: the checked radio "${v}" is disabled.`);
+      }
+      const label = r.html.match(new RegExp(`<label\\b[^>]*\\sfor="${id}"[^>]*>`));
+      if (!label) out.push(`${at}: input #${id} has no <label for>.`);
+      const by = attr(i, 'aria-labelledby');
+      const name1 = by ? textOfId(html, by) : label && text(block(r.html, label.index, 'label'));
+      if (!name1) out.push(`${at}: input #${id} has no accessible name.`);
+      const desc = attr(i, 'aria-describedby');
+      if (desc && !textOfId(html, desc)) out.push(`${at}: input #${id} aria-describedby="${desc}" points at no text.`);
+    }
+    if (checked.length > 1) out.push(`${at}: ${checked.length} radios checked.`);
+    const dv = attr(r.open, 'data-value');
+    if ((dv ?? null) !== (checked[0] ?? null)) out.push(`${at}: data-value "${dv}" is not the checked value "${checked[0]}".`);
+    if (style === 'chunky') {
+      const icons = r.html.match(/<span class="rg__icon[^"]*"[^>]*>[\s\S]*?<\/span>/g) ?? [];
+      if (demo && !icons.length) out.push(`${at}: the chunky demo shows no icons.`);
+      faSvgs(icons.join(''), at, out);
+    }
+  }
+  if (demo) {
+    for (const s of ['default', 'chunky', 'segmented']) if (!styles.has(s)) out.push(`${where}: the demo has no ${s} radio group.`);
+    // A plain form post: what the browser would send from the demo form as rendered.
+    const form = html.match(/<form\b[^>]*data-demo-rg[^>]*>/);
+    if (!form) out.push(`${where}: the demo's radio groups are not in a <form>.`);
+    else {
+      const f = block(html, form.index, 'form');
+      if (!/<button\b[^>]*type="submit"/.test(f)) out.push(`${where}: the demo form has no submit button.`);
+      if (/<fieldset\b[^>]*\sdisabled[\s>=]/.test(f)) out.push(`${where}: a disabled fieldset posts nothing.`);
+      const sent = tags(f, /<input\b[^>]*>/g)
+        .map((t) => t.open)
+        .filter((i) => attr(i, 'checked') !== undefined && attr(i, 'disabled') === undefined && attr(i, 'name') && attr(i, 'form') === undefined)
+        .map((i) => `${attr(i, 'name')}=${attr(i, 'value')}`);
+      const want = ['delivery=pickup', 'billing=monthly'];
+      if (!eq(sent, want)) out.push(`${where}: the demo form would post ${JSON.stringify(sent)}, expected ${JSON.stringify(want)}.`);
+      const contact = tags(f, /<input\b[^>]*\sname="contact"[^>]*>/g).map((t) => t.open);
+      if (!contact.length || contact.some((i) => attr(i, 'required') === undefined)) out.push(`${where}: every "contact" radio must carry required, so the browser holds the form until one is chosen.`);
+    }
+  }
+  const rts = scripts(html).filter((s) => /window\.__superheroRadioGroup = true/.test(s));
+  if (found.length && rts.length !== 1) out.push(`${where}: the radio-group runtime is on the page ${rts.length} times; it must be emitted once.`);
+  if (rts[0] && !/new CustomEvent\('data-changed', \{ bubbles: true, detail: \{ name: input\.name, value: input\.value, label \} \}\)/.test(rts[0]))
+    out.push(`${where}: the emitted script no longer dispatches a bubbling data-changed with { name, value, label }.`);
+  return out;
+}
+
 // =================================================================== run on the pages
 const checks = {
   'menu-button': checkMenuButton,
+  'radio-group': checkRadioGroup,
 };
 // A check runs when its element is in the catalogue (ids read as text, as check-four does).
 const inCatalog = new Set([...readFileSync(join(root, 'src/data/catalog.ts'), 'utf8').matchAll(/^\s{4}id: '([a-z0-9-]+)'/gm)].map((m) => m[1]));
@@ -274,6 +363,7 @@ finish('built pages');
 // =================================================================== source: FA Free, fallbacks, contrast
 const files = {
   'menu-button': 'src/library/menu-button/MenuButton.astro',
+  'radio-group': 'src/library/radio-group/RadioGroup.astro',
 };
 const fallbacks = {};
 for (const [id, rel] of Object.entries(files)) {
@@ -309,6 +399,11 @@ const pairs = [
   ['menu-button', '--mb-fg', '--mb-bg', 4.5],
   ['menu-button', '--mb-menu-fg', '--mb-menu-bg', 4.5],
   ['menu-button', '--mb-menu-fg', '--mb-hover', 4.5],
+  ['radio-group', '--rg-accent-fg', '--rg-accent', 4.5],
+  ['radio-group', '--rg-muted', '--rg-bg', 4.5],
+  ['radio-group', '--rg-muted', '--rg-bg-checked', 4.5],
+  ['radio-group', '--rg-border', '--rg-bg', 3],
+  ['radio-group', '--rg-accent', '--rg-bg', 3],
 ];
 const measured = [];
 for (const [id, fg, bg, min] of pairs) {
@@ -347,6 +442,16 @@ const mutants = {
     ['focus not returned on close', swap('if (returnFocus) button.focus();', '')],
     ['placement flipping up with room below', swap('return below < height && above > below', 'return above > below')],
     ['the runtime emitted twice', swapRe(/(<script>\s*\(\(\) => \{\s*if \(window\.__superheroMenuButton\)[\s\S]*?<\/script>)/, '$1$1')],
+  ],
+  'radio-group': [
+    ['a radio posting under another name', swapRe(/(<input class="rg__input" type="radio" id="[^"]+" name=")billing"/, '$1billing2"')],
+    ['a second checked radio', swapRe(/(value="delivery")/, '$1 checked')],
+    ['a checkbox in the group', swapRe(/type="radio"/, 'type="checkbox"')],
+    ['a radio without its label', swapRe(/<label class="rg__option" for="[^"]+"/, '<label class="rg__option"')],
+    ['a tabindex on a radio', swapRe(/type="radio"/, 'type="radio" tabindex="0"')],
+    ['required dropped from the contact group', swapRe(/(name="contact" value="email") required/, '$1')],
+    ['the legend missing', swapRe(/<legend class="rg__legend"[^>]*>[\s\S]*?<\/legend>/, '')],
+    ['data-changed no longer dispatched', swap("new CustomEvent('data-changed'", "new CustomEvent('changed'")],
   ],
 };
 let caught = 0;

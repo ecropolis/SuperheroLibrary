@@ -1,0 +1,392 @@
+---
+/**
+ * Radio group — one choice from a few, as real <input type="radio">s in a <fieldset> with a
+ * <legend>, in three looks: `default` (a styled list of radios), `chunky` (a card per option
+ * with an icon, a title and a line of text: delivery methods, plans) and `segmented` (a pill row:
+ * Monthly | Yearly, List | Grid). Behaviour and accessibility intent from Rocketbelt's radio
+ * buttons (Pier 1 Imports, 2020, MIT); reimplemented here, no code copied.
+ *
+ * It is a form control first. The inputs are never replaced, hidden from assistive technology
+ * or given a role: the browser supplies the keyboard (Tab into the group lands on the checked
+ * radio, or the first; arrow keys move AND select, and wrap; Space selects), the group is named
+ * by its legend, each radio by its title, and a chunky option's line of text is its
+ * description (aria-describedby). In a <form> it posts `name=value` like any radio, and
+ * `required` gets the browser's own validation. Without JavaScript nothing is missing.
+ *
+ * The one script (emitted once per page) is for hosts: on a change it sets `data-value` on the
+ * fieldset and dispatches `data-changed` (bubbles) with `detail: { name, value, label }`.
+ * The native `change` event fires as well.
+ *
+ * Icons (chunky): `icon` is a Font Awesome Free name, "truck", or "regular/clock" /
+ * "brands/github" for another Free style. It is read at BUILD time from
+ * @fortawesome/fontawesome-free (a devDependency, as for the icon element) and inlined with its
+ * CC BY 4.0 attribution comment; the built page carries only the <svg>. An unknown name fails the
+ * build. A site without that package can pass the <svg>…</svg> string itself (a Free glyph).
+ * Nothing is read when no option has an icon.
+ *
+ * States are drawn from the input with sibling selectors (`:checked + .rg__face`), so they need
+ * no :has(). In forced-colors mode a checked card or segment gets a Highlight outline, since
+ * backgrounds are dropped there. No motion beyond a 120 ms colour transition, none under
+ * prefers-reduced-motion.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --rg-accent / --rg-accent-fg   checked dot, card border, segment fill / text on it   (#5933d8 / #fff)
+ *   --rg-fg / --rg-muted           titles / descriptions and hint                       (inherit / #585c6e)
+ *   --rg-border                    radio ring, card and segment borders                  (#8a8ea0)
+ *   --rg-bg / --rg-bg-checked      card and segment fill / checked card fill             (#fff / #f4f1fd)
+ *   --rg-radius                    card and segment corners                              (10px)
+ *   --rg-focus                     keyboard focus ring                                   (#5933d8)
+ *   --rg-size                      the radio circle                                      (1.25rem)
+ *   --rg-card-min                  narrowest a chunky card gets before wrapping          (13rem)
+ */
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+export interface RadioOption {
+  value: string;
+  label: string;
+  /** A line under the label; its description (aria-describedby). */
+  text?: string;
+  /** chunky: a Font Awesome Free name ("truck", "regular/clock"), or an <svg> string. */
+  icon?: string;
+  disabled?: boolean;
+}
+interface Props {
+  /** The question, as the fieldset's <legend>. Required. */
+  legend: string;
+  /** The field name posted with the form. Required. */
+  name: string;
+  options: RadioOption[];
+  /** The value checked on render. Default: none (the browser's, and a form's, default). */
+  value?: string;
+  style?: 'default' | 'chunky' | 'segmented';
+  /** Hide the legend visually; it still names the group. For a segmented control whose label is elsewhere. */
+  hideLegend?: boolean;
+  /** A line under the legend, the group's description. */
+  hint?: string;
+  required?: boolean;
+  /** Base for the input ids. Default: generated from `name`. */
+  id?: string;
+  class?: string;
+}
+
+const { legend, name, options, value, style = 'default', hideLegend = false, hint, required = false, id: givenId, class: className } = Astro.props;
+
+const who = `RadioGroup "${name}"`;
+if (!legend || !String(legend).trim()) throw new Error(`${who}: \`legend\` is required; it names the group.`);
+if (!name || !String(name).trim()) throw new Error('RadioGroup: `name` is required; it is what the form posts.');
+if (!['default', 'chunky', 'segmented'].includes(style)) throw new Error(`${who}: style "${style}" is not default, chunky or segmented.`);
+if (!Array.isArray(options) || options.length < 2) throw new Error(`${who}: a radio group needs at least two options.`);
+const seen = new Set<string>();
+for (const o of options) {
+  if (typeof o.value !== 'string' || !o.value) throw new Error(`${who}: every option needs a non-empty string \`value\`.`);
+  if (!o.label || !String(o.label).trim()) throw new Error(`${who}: option "${o.value}" has no label.`);
+  if (seen.has(o.value)) throw new Error(`${who}: value "${o.value}" is used twice.`);
+  seen.add(o.value);
+}
+if (value !== undefined && !seen.has(value)) throw new Error(`${who}: value "${value}" is not one of the options (${[...seen].join(', ')}).`);
+if (value !== undefined && options.find((o) => o.value === value)?.disabled) throw new Error(`${who}: the checked value "${value}" is disabled.`);
+if (givenId !== undefined && !/^[A-Za-z][\w-]*$/.test(givenId)) throw new Error(`${who}: id "${givenId}" must start with a letter and hold only letters, digits, - and _.`);
+
+// <rg-icon> Font Awesome Free, read at build. Only runs when an option has an icon.
+const STYLES = ['solid', 'regular', 'brands'];
+let faRoot = '';
+const resolveIcon = (spec: string): string => {
+  if (/^\s*<svg[\s>]/.test(spec)) return spec.replace(/<svg\b/, '<svg aria-hidden="true" focusable="false"');
+  const m = spec.match(/^(?:([a-z]+)\/)?([a-z0-9]+(?:-[a-z0-9]+)*)$/);
+  if (!m || (m[1] && !STYLES.includes(m[1]))) throw new Error(`${who}: icon "${spec}" is not a Font Awesome Free name ("truck", "regular/clock", "brands/github") or an <svg> string.`);
+  const [, set = 'solid', icon] = m;
+  if (!faRoot) {
+    try {
+      faRoot = dirname(createRequire(import.meta.url).resolve('@fortawesome/fontawesome-free/package.json'));
+    } catch {
+      throw new Error(`${who}: icon "${spec}" is read at build from @fortawesome/fontawesome-free, which is not installed. Run npm i -D @fortawesome/fontawesome-free, or pass the <svg> itself.`);
+    }
+  }
+  let svg: string;
+  try {
+    svg = readFileSync(join(faRoot, 'svgs', set, `${icon}.svg`), 'utf8');
+  } catch {
+    throw new Error(`${who}: no Font Awesome Free icon "${icon}" in the ${set} style. Browse the Free set at https://fontawesome.com/search?ic=free`);
+  }
+  return svg.trim().replace(/<svg\b/, '<svg aria-hidden="true" focusable="false"');
+};
+// </rg-icon>
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__radioGroupCount as number) || 0) + 1;
+locals.__radioGroupCount = n;
+const firstOnPage = !locals.__radioGroupScript;
+locals.__radioGroupScript = true;
+const base = givenId || `rg-${String(name).replace(/[^\w-]+/g, '-')}-${n}`;
+const hintId = hint ? `${base}-hint` : undefined;
+// A segmented pill has no room for a description, so `text` is not rendered there.
+const rows = options.map((o, i) => ({
+  ...o,
+  text: style === 'segmented' ? undefined : o.text,
+  id: `${base}-${i + 1}`,
+  svg: style === 'chunky' && o.icon ? resolveIcon(o.icon) : '',
+}));
+---
+
+<fieldset class:list={['rg', `rg--${style}`, className]} data-rg data-name={name} data-value={value} aria-describedby={hintId}>
+  <legend class:list={['rg__legend', { rg__sr: hideLegend }]}>{legend}</legend>
+  {hint && <p class="rg__hint" id={hintId}>{hint}</p>}
+  <div class="rg__options">
+    {
+      rows.map((o) => (
+        <label class="rg__option" for={o.id}>
+          <input
+            class="rg__input"
+            type="radio"
+            id={o.id}
+            name={name}
+            value={o.value}
+            checked={o.value === value}
+            disabled={o.disabled}
+            required={required}
+            aria-labelledby={o.text ? `${o.id}-label` : undefined}
+            aria-describedby={o.text ? `${o.id}-text` : undefined}
+          />
+          <span class="rg__face">
+            {o.svg && <span class="rg__icon" set:html={o.svg} />}
+            <span class="rg__words">
+              <span class="rg__label" id={`${o.id}-label`}>{o.label}</span>
+              {o.text && <span class="rg__text" id={`${o.id}-text`}>{o.text}</span>}
+            </span>
+          </span>
+        </label>
+      ))
+    }
+  </div>
+</fieldset>
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroRadioGroup) return;
+        window.__superheroRadioGroup = true;
+        document.addEventListener('change', (e) => {
+          const input = e.target;
+          if (!(input instanceof HTMLInputElement) || input.type !== 'radio' || !input.checked) return;
+          const root = input.closest('[data-rg]');
+          if (!root || input.name !== root.dataset.name) return;
+          root.dataset.value = input.value;
+          const label = (document.getElementById(input.id + '-label') || input.labels?.[0])?.textContent.trim() || input.value;
+          root.dispatchEvent(new CustomEvent('data-changed', { bubbles: true, detail: { name: input.name, value: input.value, label } }));
+        });
+      })();
+    </script>
+  )
+}
+
+<style>
+  .rg {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: var(--rg-fg, inherit);
+  }
+  .rg__legend {
+    padding: 0;
+    margin-bottom: 0.6rem;
+    font-weight: 700;
+  }
+  .rg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .rg__hint {
+    margin: -0.25rem 0 0.75rem;
+    color: var(--rg-muted, #585c6e);
+    font-size: 0.925rem;
+  }
+  .rg__option {
+    position: relative;
+    cursor: pointer;
+  }
+  .rg__words {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .rg__label {
+    font-weight: 600;
+  }
+  .rg__text {
+    color: var(--rg-muted, #585c6e);
+    font-size: 0.925rem;
+    line-height: 1.4;
+  }
+
+  /* The radio itself: the real input, drawn. */
+  .rg__input {
+    appearance: none;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--rg-size, 1.25rem);
+    height: var(--rg-size, 1.25rem);
+    margin: 0;
+    border: 2px solid var(--rg-border, #8a8ea0);
+    border-radius: 50%;
+    background: var(--rg-bg, #fff);
+    cursor: pointer;
+  }
+  .rg__input:checked {
+    border-color: var(--rg-accent, #5933d8);
+    background: radial-gradient(circle, var(--rg-accent, #5933d8) 0 40%, transparent 44%) var(--rg-bg, #fff);
+  }
+  .rg__input:focus-visible {
+    outline: 3px solid var(--rg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .rg__input:disabled,
+  .rg__input:disabled + .rg__face {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .rg__option:has(.rg__input:disabled) {
+    cursor: not-allowed;
+  }
+
+  /* ---- default: a list of radios */
+  .rg--default .rg__options {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .rg--default .rg__option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    min-height: 2.75rem;
+    padding-block: 0.55rem;
+  }
+  .rg--default .rg__input {
+    margin-top: calc((1lh - var(--rg-size, 1.25rem)) / 2);
+  }
+
+  /* ---- chunky: a card per option */
+  .rg--chunky .rg__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--rg-card-min, 13rem)), 1fr));
+    gap: 0.75rem;
+  }
+  .rg--chunky .rg__option {
+    display: grid;
+  }
+  .rg--chunky .rg__input {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1;
+  }
+  .rg--chunky .rg__face {
+    display: grid;
+    align-content: start;
+    gap: 0.6rem;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 1rem calc(1.75rem + var(--rg-size, 1.25rem)) 1.1rem 1.1rem;
+    border: 2px solid color-mix(in srgb, var(--rg-border, #8a8ea0) 55%, transparent);
+    border-radius: var(--rg-radius, 10px);
+    background: var(--rg-bg, #fff);
+  }
+  .rg--chunky .rg__option:hover .rg__face {
+    border-color: var(--rg-border, #8a8ea0);
+  }
+  .rg--chunky .rg__input:checked + .rg__face {
+    border-color: var(--rg-accent, #5933d8);
+    background: var(--rg-bg-checked, #f4f1fd);
+  }
+  .rg--chunky .rg__input:focus-visible {
+    outline: none;
+  }
+  .rg--chunky .rg__input:focus-visible + .rg__face {
+    outline: 3px solid var(--rg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .rg__icon {
+    display: inline-grid;
+    width: 1.6rem;
+    height: 1.6rem;
+    color: var(--rg-accent, #5933d8);
+  }
+  .rg__icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ---- segmented: a pill row */
+  .rg--segmented .rg__options {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    padding: 0.2rem;
+    gap: 0.2rem;
+    border: 1px solid var(--rg-border, #8a8ea0);
+    border-radius: calc(var(--rg-radius, 10px) + 0.2rem);
+    background: var(--rg-bg, #fff);
+  }
+  .rg--segmented .rg__option {
+    display: flex;
+    flex: 1 1 auto;
+  }
+  /* Out of sight, still the focusable, checkable, posted control. */
+  .rg--segmented .rg__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    border: 0;
+  }
+  .rg--segmented .rg__face {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.45rem 1.1rem;
+    border-radius: var(--rg-radius, 10px);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .rg--segmented .rg__option:hover .rg__face {
+    background: color-mix(in srgb, var(--rg-accent, #5933d8) 8%, transparent);
+  }
+  .rg--segmented .rg__input:checked + .rg__face {
+    background: var(--rg-accent, #5933d8);
+    color: var(--rg-accent-fg, #fff);
+  }
+  .rg--segmented .rg__input:focus-visible {
+    outline: none;
+  }
+  .rg--segmented .rg__input:focus-visible + .rg__face {
+    outline: 3px solid var(--rg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rg__face,
+    .rg__input {
+      transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+  }
+  @media (forced-colors: active) {
+    .rg__input:checked {
+      background: Highlight;
+      box-shadow: inset 0 0 0 3px Canvas;
+    }
+    .rg--chunky .rg__input:checked + .rg__face,
+    .rg--segmented .rg__input:checked + .rg__face {
+      outline: 3px solid Highlight;
+      outline-offset: -3px;
+    }
+  }
+</style>
