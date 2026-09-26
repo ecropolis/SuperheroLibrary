@@ -30,6 +30,9 @@ import IconDemo from './IconDemo.astro';
 import AnimatedBackgroundDemo from './AnimatedBackgroundDemo.astro';
 import ModalDemo from './ModalDemo.astro';
 import AnnouncementBarDemo from './AnnouncementBarDemo.astro';
+import HotspotDemo from './HotspotDemo.astro';
+import InfoCircleDemo from './InfoCircleDemo.astro';
+import SlideBoxDemo from './SlideBoxDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,4 +61,7 @@ export const demos: Record<string, AstroComponent> = {
   'animated-background': AnimatedBackgroundDemo,
   modal: ModalDemo,
   'announcement-bar': AnnouncementBarDemo,
+  hotspot: HotspotDemo,
+  'info-circle': InfoCircleDemo,
+  'slide-box': SlideBoxDemo,
 };

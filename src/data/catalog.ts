@@ -1428,6 +1428,217 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'hotspot',
+    name: 'Image hotspots',
+    aka: ['UABB Hotspot', 'image hotspots', 'interactive image', 'image map', 'hotspot tour', 'product tour image', 'Elementor Hotspot', 'shoppable image'],
+    summary:
+      'An image with numbered pins at percent coordinates; each pin is a button that opens a small panel (title, text, optionally a small image) beside it. Click, tap, Enter and Space toggle a pin everywhere; hover and focus also open it where there is a mouse. One open at a time, Escape closes. An optional tour steps through the pins with "2 of 5", Previous, Next and End tour, and can play itself once started. Without JavaScript the pins link to a numbered list of every point under the image.',
+    pitch: 'Put the explanation on the picture: pins on the parts that matter, each opening a line about it — or a guided tour that walks visitors round.',
+    // SE Ranking US, 2026-09-26: image hotspot 320/mo, difficulty 23; interactive image 390/10;
+    // image hotspots 320/24 and hotspot image 320/24 (one cluster); image tooltip 70/13.
+    // "image map" (760/41) is the old HTML <map> element's term and "hotspot" alone (90,500/93)
+    // is Wi-Fi; neither is this page.
+    search: { query: 'image hotspot', alsoRanks: ['interactive image', 'image hotspots', 'image tooltip'] },
+    replaces: ['UABB “Hotspot” module (Beaver Builder), tour included', 'Elementor Pro Hotspot widget', 'image hotspot / image map plugins', 'HTML <map> / <area> image maps'],
+    goodFor:
+      'One picture that stands for a lot of parts: a room or a product whose features each need a line, a floor plan, a site map of a campus or a trail, a diagram of a machine. The tour suits a picture people should see in order, like the stops of a visit or the steps of an assembly.',
+    notFor:
+      'Text people must read to use the page: behind a pin, many never see it (the numbered list under the image is only there without JavaScript and in print). More than about eight pins, which crowd the picture and a phone. Pins that are links to other pages: that is a list of links, or cards. And a picture without a spot to point at, where a caption does the job.',
+    props: [
+      { name: 'src', type: 'string', note: 'The image.' },
+      { name: 'alt', type: 'string', note: 'Required. Describe the whole picture; the pins add the detail. "" only when the pins and their text say everything.' },
+      { name: 'width / height', type: 'number', note: 'Intrinsic size, so nothing shifts while the image loads. Pins are placed in percent, so any display size works.' },
+      { name: 'points', type: '{ x, y, title, text, image?, imageAlt? }[]', note: '`x` and `y` are percent of the image from its left and top edge (0–100; the build fails outside that). `title` names the pin, `text` is what it opens. `image` shows a small picture above the text and needs `imageAlt` ("" if decorative).' },
+      { name: 'caption', type: 'string', note: 'A <figcaption> under the image.' },
+      { name: 'tour', type: 'boolean', default: 'false', note: 'A “Start tour” button over the image; each panel then carries “2 of 5”, Previous, Next and End tour, in the points’ order.' },
+      { name: 'repeat', type: 'boolean', default: 'false', note: 'Tour: Next on the last step goes back to the first (and Previous on the first to the last). Without it, the first step has no Previous and the last no Next.' },
+      { name: 'autoplay', type: 'number (ms)', note: 'Tour: step on by itself every so many ms (at least 2000) once the visitor presses Start tour. Waits while the pointer is on the open pin or panel, while keyboard focus is in the figure and while the tab is hidden; never under reduced motion. Needs `tour`.' },
+      { name: 'pulse', type: 'boolean', default: 'true', note: 'A soft ring pulsing out of each closed pin. Never under reduced motion.' },
+      { name: 'labels', type: '{ start?, previous?, next?, end?, of? }', default: 'Start tour, Previous, Next, End tour, of', note: 'The tour’s words, for another language.' },
+      { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", note: 'Eager only when the image is in the first screen.' },
+      { name: 'class', type: 'string', note: 'Class on the <figure>, for theming one figure.' },
+    ],
+    theming: [
+      { name: '--hs-accent', fallback: '#5933d8', note: 'Pins, Start tour, Next, focus rings, unless set separately.' },
+      { name: '--hs-pin-bg', fallback: 'var(--hs-accent)', note: 'The pin’s dot.' },
+      { name: '--hs-pin-fg', fallback: '#fff', note: 'The number in the dot, and text on Start tour and Next.' },
+      { name: '--hs-pin-ring', fallback: 'rgb(255 255 255 / 0.9)', note: 'Ring round the dot and the pulse, so a pin shows on a dark or busy picture.' },
+      { name: '--hs-pin-active', fallback: '#1e283c', note: 'The dot of the pin whose panel is open.' },
+      { name: '--hs-pin-size', fallback: '1.75rem', note: 'The visible dot. The hit area stays 44px whatever this is.' },
+      { name: '--hs-panel-bg', fallback: '#fff', note: 'Panel background.' },
+      { name: '--hs-panel-fg', fallback: '#1e283c', note: 'Panel text (14.75:1 on the fallback background).' },
+      { name: '--hs-panel-width', fallback: '18rem', note: 'Panel width over the image; never more than 70% of the figure.' },
+      { name: '--hs-muted', fallback: '#5b6275', note: 'The tour’s “2 of 5” (6.09:1 on the fallback panel).' },
+      { name: '--hs-radius', fallback: '10px', note: 'Image and panel corners.' },
+      { name: '--hs-shadow', fallback: '0 0.75rem 2rem rgb(15 20 35 / 0.25)', note: 'Panel shadow.' },
+      { name: '--hs-focus', fallback: 'var(--hs-accent)', note: 'Focus ring on pins and tour buttons.' },
+    ],
+    a11y: [
+      'Each pin is a real <button> with aria-expanded and aria-controls pointing at its panel, named by the point’s title and described by its text (aria-describedby), so a screen reader hears both on reaching it. The hit area is 44 × 44 px whatever the image size.',
+      'Click, tap, Enter and Space toggle a pin on every device. With a mouse or trackpad, hover and keyboard focus also open it; leaving closes what hover opened, and a click holds it open. One panel at a time. Escape closes it and returns focus to its pin; a click or tap off the pins closes it too.',
+      'Tour: each step’s controls are a group named “2 of 5” plus the title; after Previous or Next, focus moves to the same button in the new panel, so the keyboard stays in the tour. End tour (or Escape) closes it and puts focus back on Start tour.',
+      'Autoplay only after the visitor presses Start tour, never on arrival. It waits while the pointer is on the open pin or panel and while keyboard focus is in the figure, and End tour stops it (WCAG 2.2.2). prefers-reduced-motion (tracked live): no autoplay, no pulse, no fade.',
+      'Panels open toward the larger space, decided at build; in a figure narrower than 34rem the open panel sits under the image, so it never covers the picture or leaves the screen.',
+      'Without JavaScript the pins are links to a numbered list under the image holding every point’s title, text and image: nothing is only behind a pin. Print shows the list too.',
+    ],
+    usage: `<Hotspot
+  src="/images/showroom.webp" width={1600} height={1000}
+  alt="The showroom: a sofa by the window, a lamp and a plant"
+  points={[
+    { x: 50, y: 62, title: 'Three-seat sofa', text: 'Washable covers in twelve colours.' },
+    { x: 73, y: 25, title: 'Arc lamp', text: 'Warm light on a dimmer.' },
+    { x: 87, y: 58, title: 'Rubber plant', text: 'Copes with low light.', image: '/images/plant.webp', imageAlt: '' },
+  ]}
+  tour autoplay={6000}
+/>
+<!-- global.css: .hs { --hs-accent: var(--brand); --hs-radius: var(--radius); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/hotspot/ (demo)' }],
+    file: 'src/library/hotspot/Hotspot.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'info-circle',
+    name: 'Info circle',
+    aka: ['UABB Info Circle', 'circular infographic', 'circle infographic', 'process circle', 'cycle diagram', 'radial menu', 'interactive infographic'],
+    summary:
+      'Items (an icon or a round image each) spaced evenly round a circle, positions computed at build; the chosen item’s title and text show in the middle. Hover, focus and click choose; each item is a button with aria-pressed and the centre is a polite live region. Optional autoplay with a pause button. In a container narrower than 28rem, and without JavaScript, it is a plain list with every item’s text showing.',
+    pitch: 'Five things you do, round one circle: point at one and it tells its story in the middle — and on a phone it is simply a list.',
+    // SE Ranking US, 2026-09-26: circular infographic 320/mo, difficulty 7 (circle infographic
+    // and infographic circle are the same cluster, 320/7); info circle 40/10; interactive
+    // infographic 320/25; cycle diagram 810/7 (people making slides, so a variant, not the title).
+    search: { query: 'circular infographic', alsoRanks: ['info circle', 'interactive infographic', 'cycle diagram'] },
+    replaces: ['UABB “Info Circle” module (Beaver Builder)', 'Ultimate Addons / Elementor “info circle” widgets', 'circular infographic images with the text baked in'],
+    goodFor:
+      'Three to eight things of equal weight that belong together: the steps of a process that repeats, the services round one promise, the branches of a small business, the parts of a method. The circle says “these go round together”; the middle gives each its moment.',
+    notFor:
+      'Content people must read in order or all at once (a list does that better), more than eight items (they crowd the circle and the text box in its middle), or items with long texts: the middle holds about 30 words. Steps with a start and an end, which are info-list’s vertical timeline. And not a navigation menu, whatever “radial menu” searches suggest: items choose text, they do not go anywhere.',
+    props: [
+      { name: 'items', type: '{ title, text, icon?, image?, link?: { text, href } }[]', note: '2 to 10 items (the build fails outside that); each needs a title, a text and an `icon` (inline SVG) or an `image`. Both are decorative: the title names the item. `link` adds a link under the text.' },
+      { name: 'size', type: 'string (CSS length)', default: '32rem', note: 'The circle’s diameter; never wider than its container. The circle needs a container at least 28rem wide; below that it is a list.' },
+      { name: 'autoplay', type: 'number (ms) | boolean', default: 'false', note: 'Move to the next item every so many ms (`true` = 5000, at least 2000). Comes with a pause button; waits on hover, focus, off screen and in a hidden tab; stops for good when the visitor clicks an item; never under reduced motion.' },
+      { name: 'startAt', type: 'number', default: '0', note: 'The item chosen when the page loads (0-based).' },
+      { name: 'label', type: 'string', note: 'Accessible name of the whole group (it becomes role="group"), e.g. “What we offer”.' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the item titles; match the page outline.' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: '“Pause the rotation” / “Start the rotation”', note: 'The pause button’s words.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for theming one circle.' },
+    ],
+    theming: [
+      { name: '--inc-accent', fallback: '#5933d8', note: 'The chosen item, item borders and icons, links, focus ring.' },
+      { name: '--inc-item-bg', fallback: '#fff', note: 'An item that is not chosen.' },
+      { name: '--inc-item-fg', fallback: 'var(--inc-accent)', note: 'Its icon.' },
+      { name: '--inc-active-fg', fallback: '#fff', note: 'The chosen item’s icon (7.27:1 on the accent).' },
+      { name: '--inc-centre-bg', fallback: '#f4f1fe', note: 'The disc behind the text in the middle, and behind list icons.' },
+      { name: '--inc-fg', fallback: '#1e283c', note: 'Text (13.24:1 on the centre disc).' },
+      { name: '--inc-ring', fallback: 'rgb(89 51 216 / 0.35)', note: 'The dashed circumference.' },
+      { name: '--inc-size', fallback: '32rem', note: 'Diameter; the `size` prop sets it.' },
+      { name: '--inc-item-size', fallback: '4.5rem', note: 'Each item’s disc (never under 44px).' },
+      { name: '--inc-focus', fallback: 'var(--inc-accent)', note: 'Focus ring.' },
+    ],
+    a11y: [
+      'Each item is a real <button> named by its title, with aria-pressed (exactly one is pressed) and aria-controls pointing at the middle. Hover (with a mouse or trackpad), focus and click all choose it, so Tab alone walks the circle.',
+      'The middle is aria-live="polite": when the choice changes, a screen reader reads the new title and text. While autoplay runs it is not live, so nothing is read out on its own.',
+      'Autoplay has a visible pause button (WCAG 2.2.2), waits while the pointer is on the circle or focus is inside, while off screen and in a hidden tab, stops for good once the visitor clicks an item, and never runs under prefers-reduced-motion (tracked live), which also drops the fade.',
+      'The circle needs about 28rem. In a narrower container it becomes a vertical list with each item’s icon, title and text showing, and there is nothing to press.',
+      'Without JavaScript it is that list, whatever the width: every item’s text is on the page. The list is the only copy of the content; the middle shows a copy of the chosen entry. Print shows the list.',
+      'Icons and images are decorative (the title names the item); items are at least 44px.',
+    ],
+    usage: `<InfoCircle
+  label="What we offer"
+  items={[
+    { icon: listenSvg, title: 'Listen', text: 'An hour about your customers.' },
+    { icon: planSvg, title: 'Plan', text: 'A page list, agreed first.' },
+    { image: '/images/team.webp', title: 'Build', text: 'Tested parts.', link: { text: 'How we build', href: '/process/' } },
+  ]}
+  autoplay={6000}
+/>
+<!-- global.css: .inc { --inc-accent: var(--brand); --inc-centre-bg: var(--tint); } -->`,
+    license:
+      'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The circle takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/info-circle/ (demo)' }],
+    file: 'src/library/info-circle/InfoCircle.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'slide-box',
+    name: 'Slide box',
+    aka: ['UABB Slide Box', 'slide box', 'reveal card', 'sliding card', 'hover reveal box', 'info box with slide-up detail', 'card overlay'],
+    summary:
+      'A card whose back panel slides in over the front from a chosen direction (up, down, left, right): on hover where there is a mouse, and on click, tap, Enter or Space everywhere, through a real button with aria-expanded. The front is a teaser (icon or image, title, a line), the back its detail (text and a link). Both panels share one height; the one out of view is inert.',
+    pitch: 'A card that shows the headline first and slides up the detail when someone wants it, on a phone as well as with a mouse.',
+    // SE Ranking US, 2026-09-26: reveal card 110/mo, difficulty 14; sliding card 260/8; card
+    // hover effects 30/12; card overlay 50/10. "slide box" itself is 1,300/55, but its results
+    // are microscope-slide storage boxes and toolbox drawer slides, not websites, so it stays an aka.
+    search: { query: 'reveal card', alsoRanks: ['sliding card', 'card hover effects', 'card overlay'] },
+    replaces: ['UABB “Slide Box” module (Beaver Builder), overlay style', 'hover-reveal info boxes in Elementor and Divi', 'hand-rolled CSS slide-up card overlays'],
+    goodFor:
+      'A grid of teasers whose detail is worth one more gesture: services that each need three lines of explanation and a link, job openings (title on the front, what the job is and Apply on the back), products with ingredients or specifications, team members with a short bio.',
+    notFor:
+      'Two faces of equal weight: that is flip-box, which turns a card over to a second, equally important side. Pick slide-box when the front is a teaser and the back its detail sliding over it; pick flip-box when both sides stand on their own. Neither is for anything a visitor must read without interacting: the back never holds the only copy of a price, a phone number or an opening time. And a panel that drops open below the card and pushes the page down (UABB’s other styles) is an accordion.',
+    props: [
+      { name: 'title', type: 'string', note: 'Front heading, and the accessible name of the card’s button.' },
+      { name: 'text', type: 'string', note: 'The front’s short line.' },
+      { name: 'icon', type: 'string', note: 'Inline SVG markup, in a tinted circle above the title; decorative. Ignored when there is an `image`.' },
+      { name: 'image', type: 'string', note: 'An image across the top of the front (16:9, cropped to fit).' },
+      { name: 'imageAlt', type: 'string', note: 'Required with `image` (the build fails without it): describe it, or "" when it is decorative on purpose.' },
+      { name: 'backTitle', type: 'string', default: '`title`', note: 'Back heading; "" for none.' },
+      { name: 'backText', type: 'string', note: 'The back’s longer text; about 40 words fit a card of the default size.' },
+      { name: 'cta', type: '{ text: string; href: string }', note: 'A link on the back. On a touch screen the first tap slides the back in, the second follows the link.' },
+      { name: 'direction', type: "'up' | 'down' | 'left' | 'right'", default: "'up'", note: 'Where the back comes from as it moves: up rises from the bottom edge, down drops from the top, left comes in from the right edge, right from the left.' },
+      { name: 'trigger', type: "'both' | 'click'", default: "'both'", note: 'Whether hover ALSO slides it in. Click, tap, Enter and Space always do; a hover-only card would lock out touch screens and keyboards.' },
+      { name: 'duration', type: 'number (ms)', note: 'The slide. Overrides `--slb-duration` (450ms).' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the headings; match the page outline.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the card’s button. Default: `title`, else the front’s first heading.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for theming one card.' },
+      { name: 'slot front / slot back', type: 'slot', note: 'Any HTML for a panel; wins over the props for that panel. Keep links off the front: the whole front is the button.' },
+    ],
+    theming: [
+      { name: '--slb-accent', fallback: '#5933d8', note: 'The back, the icon and the focus ring, unless set separately.' },
+      { name: '--slb-front-bg', fallback: '#fff', note: 'Front background.' },
+      { name: '--slb-front-fg', fallback: '#1e283c', note: 'Front text (14.75:1 on the fallback background).' },
+      { name: '--slb-border', fallback: 'rgb(0 0 0 / 0.08)', note: 'Front border.' },
+      { name: '--slb-back-bg', fallback: 'var(--slb-accent)', note: 'Back background.' },
+      { name: '--slb-back-fg', fallback: '#fff', note: 'Back text (7.27:1 on the fallback accent), and the ring round a focused back link.' },
+      { name: '--slb-cta-bg', fallback: '#fff', note: 'Back link fill.' },
+      { name: '--slb-cta-fg', fallback: 'var(--slb-back-bg)', note: 'Back link text.' },
+      { name: '--slb-icon-color', fallback: 'var(--slb-accent)', note: 'Icon and the corner hint.' },
+      { name: '--slb-icon-bg', fallback: '#f4f1fe', note: 'Circle behind the icon.' },
+      { name: '--slb-icon-size', fallback: '2.25rem', note: 'Icon size; its circle is twice it.' },
+      { name: '--slb-radius', fallback: '14px', note: 'Corner radius.' },
+      { name: '--slb-padding', fallback: '1.75rem 1.5rem', note: 'Inside each panel.' },
+      { name: '--slb-shadow', fallback: '0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1)', note: 'box-shadow of the card.' },
+      { name: '--slb-min-height', fallback: '14rem', note: 'A floor, not a height: the card grows with its taller panel.' },
+      { name: '--slb-title-size', fallback: '1.2rem', note: 'Title font size.' },
+      { name: '--slb-duration', fallback: '450ms', note: 'The slide; the `duration` prop overrides it.' },
+      { name: '--slb-easing', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Timing of the slide.' },
+      { name: '--slb-fade', fallback: '200ms', note: 'The crossfade under reduced motion.' },
+      { name: '--slb-focus', fallback: 'var(--slb-accent)', note: 'Focus ring round the card.' },
+    ],
+    a11y: [
+      'The card is a real <button> named from the title, with aria-expanded saying whether the back is in and aria-controls pointing at the back. Enter or Space slides it in and out; Escape slides it out and returns focus to the button.',
+      'Both panels are in the DOM. The one out of view is inert and aria-hidden, so its link is not a tab stop and a screen reader reads only what shows. With the back in, Tab goes from the button to the back’s link.',
+      'Focus inside the back keeps it in. Focus leaving the card slides out a back opened from the keyboard; one a pointer clicked in stays until clicked again.',
+      'Hover never works alone: on a touch screen the first tap slides the back in and its link works on the second tap; a tap on the back away from the link slides it out. A corner plus on the front, turned to a cross on the back, says there is more.',
+      'prefers-reduced-motion (tracked live): no sliding; the panels crossfade.',
+      'Without JavaScript the button is never shown and both panels render, the back below the front, link included. Printing shows both.',
+    ],
+    usage: `<div class="jobs">   <!-- grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)) -->
+  <SlideBox
+    icon={wrenchSvg}
+    title="Service technician"
+    text="Full time, Springfield."
+    backText="Install and repair heating systems across the county. Van, tools and training provided."
+    cta={{ text: 'Apply now', href: '/jobs/technician/' }}
+  />
+  <SlideBox image="/images/office.webp" imageAlt="" title="Office manager" direction="left" … />
+</div>
+<!-- global.css: .slb { --slb-accent: var(--brand); --slb-radius: var(--radius); } -->`,
+    license:
+      'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The card takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/slide-box/ (demo)' }],
+    file: 'src/library/slide-box/SlideBox.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

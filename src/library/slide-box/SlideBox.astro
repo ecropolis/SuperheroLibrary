@@ -1,0 +1,491 @@
+---
+/**
+ * SlideBox — a card whose back panel slides in over the front: the front is a teaser (an icon
+ * or an image, a title, a line), the back its detail (a longer text and a link). What UABB's
+ * Slide Box does in its overlay style, working on a phone and a keyboard as well as a mouse.
+ *
+ * Triggers. The card is a real button, named from the title, with aria-expanded and
+ * aria-controls → the back. Click, tap, Enter and Space always slide the back in and out.
+ * `trigger` decides whether hover ALSO does: `both` (default) slides it in while a mouse or
+ * trackpad is over the card; `click` never on hover. On a touch screen the first tap slides
+ * the back in and its link is an ordinary link for the second tap; a tap on the back away from
+ * its links slides it out. With a mouse, a click holds it in after the mouse leaves.
+ *
+ * `direction` is where the back comes from as it moves: `up` (default) rises from the bottom
+ * edge, `down` drops from the top, `left` comes in from the right edge, `right` from the left.
+ *
+ * Accessibility. Both panels are in the DOM. The one out of view is `inert` and aria-hidden,
+ * so its links are not tab stops and a screen reader reads only what shows. Tab order: the
+ * card's button, then the back's link while it shows. Escape slides it out and returns focus
+ * to the button. Focus inside the back keeps it in; focus leaving the card slides out a back
+ * opened from the keyboard, not one a pointer clicked open. prefers-reduced-motion (live): no
+ * sliding; the panels crossfade. Without JavaScript the button is never shown and both panels
+ * render, the back below the front, link included. Keep links off the front: it is the button.
+ *
+ * Sizing. Both panels share one grid cell, so the card is as tall as the taller panel and
+ * neither is cut off; there is no fixed height. The host's grid sets the width.
+ *
+ * Theming (each has a fallback):
+ *   --slb-accent     #5933d8   back, icon, focus ring
+ *   --slb-front-bg   #fff      --slb-front-fg  #1e283c     --slb-border  rgb(0 0 0 / 0.08)
+ *   --slb-back-bg    var(--slb-accent)        --slb-back-fg   #fff (7.27:1 on the accent)
+ *   --slb-cta-bg     #fff      --slb-cta-fg    var(--slb-back-bg)
+ *   --slb-icon-color var(--slb-accent)        --slb-icon-bg   #f4f1fe   --slb-icon-size 2.25rem
+ *   --slb-radius 14px  --slb-padding 1.75rem 1.5rem  --slb-shadow (box-shadow)  --slb-min-height 14rem
+ *   --slb-title-size 1.2rem  --slb-duration 450ms  --slb-easing cubic-bezier(0.2, 0.7, 0.2, 1)
+ *   --slb-fade 200ms  --slb-focus var(--slb-accent)
+ */
+interface Props {
+  title?: string;
+  text?: string;
+  /** Inline SVG markup for the front. Decorative. */
+  icon?: string;
+  /** An image across the top of the front. */
+  image?: string;
+  /** Required with `image`: its description, or "" when it is decorative on purpose. */
+  imageAlt?: string;
+  /** Default: `title`. Pass "" for no heading on the back. */
+  backTitle?: string;
+  backText?: string;
+  cta?: { text: string; href: string };
+  /** Where the back comes from as it moves: 'up' rises from the bottom edge. */
+  direction?: 'up' | 'down' | 'left' | 'right';
+  /** Whether hover ALSO slides it in. Click, tap and keyboard always do. */
+  trigger?: 'both' | 'click';
+  /** ms. Overrides --slb-duration. */
+  duration?: number;
+  headingLevel?: 2 | 3 | 4 | 5 | 6;
+  /** Accessible name of the card's button. Default: `title`, else the front's first heading. */
+  label?: string;
+  class?: string;
+}
+const {
+  title,
+  text,
+  icon,
+  image,
+  imageAlt,
+  backTitle,
+  backText,
+  cta,
+  direction = 'up',
+  trigger = 'both',
+  duration,
+  headingLevel = 3,
+  label,
+  class: className,
+} = Astro.props;
+
+const who = `SlideBox${title ? ` "${title}"` : ''}`;
+if (image && typeof imageAlt !== 'string') {
+  throw new Error(`${who}: \`image\` needs \`imageAlt\` — describe the image, or pass imageAlt="" if it is decorative on purpose.`);
+}
+if (!['up', 'down', 'left', 'right'].includes(direction)) throw new Error(`${who}: \`direction\` is up, down, left or right; got "${direction}".`);
+
+const uid = 'slb-' + Math.random().toString(36).slice(2, 8);
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+const hasFront = Astro.slots.has('front');
+const hasBack = Astro.slots.has('back');
+const back = backTitle ?? title;
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__slideBoxScript;
+locals.__slideBoxScript = true;
+---
+
+<div
+  class:list={['slb', className]}
+  data-slb
+  data-direction={direction}
+  data-trigger={trigger}
+  style={duration !== undefined ? `--slb-duration:${duration}ms` : undefined}
+>
+  <button type="button" class="slb__control" aria-expanded="false" aria-controls={`${uid}-back`} hidden data-slb-control>
+    <span class="slb__sr" data-slb-label>{label ?? title}</span>
+  </button>
+  <div class="slb__card">
+    <div class="slb__panel slb__front" id={`${uid}-front`} data-slb-front>
+      {image && <img class="slb__image" src={image} alt={imageAlt} loading="lazy" decoding="async" />}
+      <div class="slb__body">
+        {
+          hasFront ? (
+            <slot name="front" />
+          ) : (
+            <>
+              {icon && !image && <span class="slb__icon" aria-hidden="true" set:html={icon} />}
+              {title && <H class="slb__title">{title}</H>}
+              {text && <p class="slb__text">{text}</p>}
+            </>
+          )
+        }
+      </div>
+      <span class="slb__hint" aria-hidden="true"></span>
+    </div>
+    <div class="slb__panel slb__back" id={`${uid}-back`} data-slb-back>
+      <div class="slb__body">
+        {
+          hasBack ? (
+            <slot name="back" />
+          ) : (
+            <>
+              {back && <H class="slb__title">{back}</H>}
+              {backText && <p class="slb__text">{backText}</p>}
+              {cta && (
+                <a class="slb__cta" href={cta.href}>
+                  {cta.text}
+                </a>
+              )}
+            </>
+          )
+        }
+      </div>
+      <span class="slb__hint slb__hint--close" aria-hidden="true"></span>
+    </div>
+  </div>
+</div>
+
+{
+  firstOnPage ? (
+    <script is:inline>
+      (() => {
+        const boot = (window.__superheroSlideBox ||= (() => {
+          const INTERACTIVE = 'a[href],button,input,select,textarea,summary,label,[tabindex],[contenteditable]';
+          const canHover = matchMedia('(hover: hover) and (pointer: fine)');
+          const init = (el) => {
+            if (el.hasAttribute('data-ready')) return;
+            const control = el.querySelector('[data-slb-control]');
+            const front = el.querySelector('[data-slb-front]');
+            const back = el.querySelector('[data-slb-back]');
+            if (!control || !front || !back) return;
+            const label = control.querySelector('[data-slb-label]');
+            if (label && !label.textContent.trim()) {
+              const h = front.querySelector('h1,h2,h3,h4,h5,h6') || front;
+              label.textContent = h.textContent.replace(/\s+/g, ' ').trim().slice(0, 80) || 'Show more';
+            }
+            const hoverSlides = el.dataset.trigger !== 'click';
+            // Why the back is in. It shows while any of these holds.
+            let held = false; // a pointer clicked it in
+            let keyOpen = false; // Enter / Space (or assistive tech) opened it
+            let focusBack = false; // focus is inside the back
+            let hovering = false; // a mouse is over the card
+            let suppress = false; // closed under the mouse: ignore hover until it leaves
+            let open = null;
+
+            const render = () => {
+              const next = held || keyOpen || focusBack || (hovering && !suppress);
+              if (next === open) return;
+              open = next;
+              if (!open && back.contains(document.activeElement)) control.focus({ preventScroll: true });
+              el.toggleAttribute('data-open', open);
+              control.setAttribute('aria-expanded', String(open));
+              for (const [panel, shown] of [[front, !open], [back, open]]) {
+                panel.inert = !shown;
+                if (shown) panel.removeAttribute('aria-hidden');
+                else panel.setAttribute('aria-hidden', 'true');
+              }
+            };
+            const close = () => {
+              held = keyOpen = focusBack = false;
+              suppress = hovering;
+              render();
+            };
+
+            el.addEventListener('pointerenter', (e) => {
+              if (!hoverSlides || e.pointerType === 'touch' || !canHover.matches) return;
+              hovering = true;
+              render();
+            });
+            el.addEventListener('pointerleave', () => {
+              if (!hovering) return;
+              hovering = suppress = false;
+              render();
+            });
+            el.addEventListener('click', (e) => {
+              const hit = e.target.closest(INTERACTIVE);
+              if (hit && hit !== control && el.contains(hit)) return; // the back's link does its own job
+              const sel = getSelection();
+              if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return; // selecting text is not a click
+              if (e.detail === 0 && e.target === control) {
+                if (open) close();
+                else {
+                  keyOpen = true;
+                  render();
+                }
+                return;
+              }
+              if (open && held) close();
+              else {
+                held = true;
+                render();
+              }
+            });
+            el.addEventListener('keydown', (e) => {
+              if (e.key !== 'Escape' || !open) return;
+              e.preventDefault();
+              close();
+            });
+            el.addEventListener('focusin', (e) => {
+              if (back.contains(e.target)) {
+                focusBack = true;
+                render();
+              }
+            });
+            el.addEventListener('focusout', () => {
+              setTimeout(() => {
+                const a = document.activeElement;
+                focusBack = back.contains(a);
+                if (!el.contains(a) && document.hasFocus()) keyOpen = false;
+                render();
+              });
+            });
+
+            render();
+            control.hidden = false;
+            el.setAttribute('data-ready', '');
+            // Transitions start only after the first frame, so nothing slides on load.
+            requestAnimationFrame(() => requestAnimationFrame(() => el.setAttribute('data-armed', '')));
+          };
+          return () => document.querySelectorAll('[data-slb]:not([data-ready])').forEach(init);
+        })());
+        boot();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+      })();
+    </script>
+  ) : (
+    <script is:inline>window.__superheroSlideBox && window.__superheroSlideBox();</script>
+  )
+}
+
+<style>
+  .slb {
+    position: relative;
+    display: grid;
+    border-radius: var(--slb-radius, 14px);
+  }
+  /* Where the back waits, out of view, before it slides in. */
+  .slb[data-direction='up'] {
+    --slb-waiting: translateY(100%);
+  }
+  .slb[data-direction='down'] {
+    --slb-waiting: translateY(-100%);
+  }
+  .slb[data-direction='left'] {
+    --slb-waiting: translateX(100%);
+  }
+  .slb[data-direction='right'] {
+    --slb-waiting: translateX(-100%);
+  }
+
+  /* The card's button covers the card; it is the pointer target for the front. */
+  .slb__control {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .slb__control[hidden] {
+    display: none;
+  }
+  .slb__control:focus-visible {
+    outline: 3px solid var(--slb-focus, var(--slb-accent, #5933d8));
+    outline-offset: 3px;
+  }
+  .slb[data-open] .slb__control {
+    pointer-events: none;
+  }
+  .slb__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Without JavaScript: two rows, front then back. With it: one clipped cell. */
+  .slb__card {
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    border-radius: var(--slb-radius, 14px);
+  }
+  .slb[data-ready] .slb__card {
+    overflow: hidden;
+    box-shadow: var(--slb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
+  }
+  .slb__panel {
+    position: relative;
+    display: grid;
+    align-content: start;
+    min-height: var(--slb-min-height, 14rem);
+    overflow: hidden;
+    border-radius: var(--slb-radius, 14px);
+    overflow-wrap: anywhere;
+  }
+  .slb[data-ready] .slb__panel {
+    grid-area: 1 / 1;
+    border-radius: 0;
+  }
+  .slb__front {
+    border: 1px solid var(--slb-border, rgb(0 0 0 / 0.08));
+    background: var(--slb-front-bg, #fff);
+    color: var(--slb-front-fg, #1e283c);
+    box-shadow: var(--slb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
+  }
+  .slb[data-ready] .slb__front {
+    box-shadow: none;
+    border-radius: inherit;
+  }
+  .slb__back {
+    z-index: 1;
+    align-content: center;
+    background: var(--slb-back-bg, var(--slb-accent, #5933d8));
+    color: var(--slb-back-fg, #fff);
+  }
+  .slb[data-ready] .slb__back {
+    transform: var(--slb-waiting);
+  }
+  .slb[data-ready][data-open] .slb__back {
+    transform: none;
+  }
+  .slb[data-armed] .slb__back {
+    transition: transform var(--slb-duration, 450ms) var(--slb-easing, cubic-bezier(0.2, 0.7, 0.2, 1));
+  }
+
+  .slb__image {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+  .slb__body {
+    display: grid;
+    justify-items: start;
+    padding: var(--slb-padding, 1.75rem 1.5rem);
+  }
+  /* Room for the corner hint, which only the script shows. */
+  .slb[data-ready] .slb__front .slb__body {
+    padding-bottom: 3.5rem;
+  }
+  .slb[data-ready] .slb__back .slb__body {
+    padding-top: 3.25rem;
+  }
+  .slb__body > :global(*) {
+    max-width: 100%;
+  }
+  .slb__icon {
+    display: grid;
+    place-items: center;
+    width: calc(var(--slb-icon-size, 2.25rem) * 2);
+    height: calc(var(--slb-icon-size, 2.25rem) * 2);
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    background: var(--slb-icon-bg, #f4f1fe);
+    color: var(--slb-icon-color, var(--slb-accent, #5933d8));
+    line-height: 0;
+  }
+  .slb__icon :global(svg) {
+    width: var(--slb-icon-size, 2.25rem);
+    height: var(--slb-icon-size, 2.25rem);
+  }
+  .slb__title {
+    margin: 0 0 0.5rem;
+    color: inherit;
+    font-size: var(--slb-title-size, 1.2rem);
+    line-height: 1.25;
+  }
+  .slb__text {
+    margin: 0;
+    line-height: 1.5;
+  }
+  .slb__cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-top: 1.25rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 999px;
+    background: var(--slb-cta-bg, #fff);
+    color: var(--slb-cta-fg, var(--slb-back-bg, var(--slb-accent, #5933d8)));
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .slb__cta:hover {
+    text-decoration: underline;
+  }
+  .slb__cta:focus-visible {
+    outline: 3px solid var(--slb-back-fg, #fff);
+    outline-offset: 3px;
+  }
+
+  /* The corner hint: a plus on the front, turned into a cross on the back. Script only. */
+  .slb__hint {
+    display: none;
+  }
+  .slb[data-ready] .slb__hint {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    display: block;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background:
+      linear-gradient(currentColor, currentColor) center / 0.85rem 2px no-repeat,
+      linear-gradient(currentColor, currentColor) center / 2px 0.85rem no-repeat;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+    color: var(--slb-icon-color, var(--slb-accent, #5933d8));
+  }
+  .slb[data-ready] .slb__hint--close {
+    top: 1rem;
+    bottom: auto;
+    color: inherit;
+    rotate: 45deg;
+  }
+
+  /* No sliding: the panels crossfade. */
+  @media (prefers-reduced-motion: reduce) {
+    .slb[data-ready] .slb__back,
+    .slb[data-ready][data-open] .slb__back {
+      transform: none;
+    }
+    .slb[data-ready] .slb__back {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .slb[data-ready][data-open] .slb__back {
+      opacity: 1;
+      visibility: visible;
+    }
+    .slb[data-armed] .slb__back {
+      transition:
+        opacity var(--slb-fade, 200ms) ease,
+        visibility 0s linear var(--slb-fade, 200ms);
+    }
+    .slb[data-armed][data-open] .slb__back {
+      transition-delay: 0s;
+    }
+  }
+
+  @media print {
+    .slb__control,
+    .slb__hint {
+      display: none !important;
+    }
+    .slb[data-ready] .slb__panel {
+      grid-area: auto;
+      transform: none;
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+</style>

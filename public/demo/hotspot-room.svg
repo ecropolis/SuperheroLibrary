@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb6e0"/><stop offset="1" stop-color="#d9e7f2"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffd9a0" stop-opacity=".75"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="#efe7dc"/>
+  <rect y="760" width="1600" height="240" fill="#c9a27a"/>
+  <rect y="752" width="1600" height="12" fill="#b08660"/>
+  <rect x="160" y="140" width="420" height="400" rx="6" fill="#fff"/>
+  <rect x="180" y="160" width="380" height="360" fill="url(#sky)"/>
+  <path d="M180 440c80-50 170-40 250-70s100-10 130 0v150H180z" fill="#7fa36f"/>
+  <path d="M180 480c120-40 240-20 380-40v80H180z" fill="#5d8a55"/>
+  <rect x="364" y="160" width="12" height="360" fill="#fff"/>
+  <rect x="180" y="334" width="380" height="12" fill="#fff"/>
+  <rect x="140" y="536" width="460" height="18" rx="4" fill="#e3d5c3"/>
+  <rect x="700" y="230" width="220" height="150" rx="4" fill="#1e283c"/>
+  <rect x="716" y="246" width="188" height="118" fill="#f08c3c"/>
+  <circle cx="850" cy="290" r="26" fill="#ffd9b0"/>
+  <path d="M716 364l60-60 44 40 34-26 50 46z" fill="#4526ad"/>
+  <circle cx="1170" cy="300" r="230" fill="url(#glow)"/>
+  <rect x="1164" y="320" width="12" height="440" fill="#1e283c"/>
+  <rect x="1120" y="752" width="100" height="14" rx="7" fill="#1e283c"/>
+  <path d="M1100 320h140l-30-100h-80z" fill="#f08c3c"/>
+  <rect x="540" y="560" width="560" height="120" rx="28" fill="#2f6f73"/>
+  <rect x="520" y="640" width="600" height="110" rx="26" fill="#3b8589"/>
+  <rect x="500" y="600" width="70" height="160" rx="30" fill="#2f6f73"/>
+  <rect x="1070" y="600" width="70" height="160" rx="30" fill="#2f6f73"/>
+  <rect x="610" y="600" width="170" height="70" rx="20" fill="#f3e7d3"/>
+  <rect x="540" y="750" width="16" height="30" fill="#1e283c"/>
+  <rect x="1084" y="750" width="16" height="30" fill="#1e283c"/>
+  <path d="M1390 640c-70-60-90-150-40-220 10 70 40 120 40 220z" fill="#5d8a55"/>
+  <path d="M1390 640c40-80 110-120 170-120-30 60-90 100-170 120z" fill="#7fa36f"/>
+  <path d="M1390 640c-10-110 30-190 90-230 0 90-40 170-90 230z" fill="#4b7545"/>
+  <path d="M1330 640h120l-16 120h-88z" fill="#c8743f"/>
+  <ellipse cx="560" cy="890" rx="420" ry="72" fill="#e2c9a3"/>
+  <ellipse cx="560" cy="890" rx="330" ry="52" fill="none" stroke="#c8743f" stroke-width="10" stroke-dasharray="30 18"/>
+</svg>

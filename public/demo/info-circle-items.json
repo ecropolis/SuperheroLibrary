@@ -1,0 +1,22 @@
+{
+  "process": {
+    "label": "How a website gets built",
+    "items": [
+      { "icon": "ear-listen", "title": "Listen", "text": "An hour on the phone about your customers: what they ask, what they need to find, what makes them call." },
+      { "icon": "pen-ruler", "title": "Plan", "text": "A page list and a sketch of each page, agreed before anything is built, so there are no surprises." },
+      { "icon": "screwdriver-wrench", "title": "Build", "text": "Pages built from tested parts, on a preview address you can click through at any time." },
+      { "icon": "rocket", "title": "Launch", "text": "The new site goes live on your domain, with the old addresses redirected so no link breaks." },
+      { "icon": "seedling", "title": "Grow", "text": "Monthly checks on speed and search, and small changes whenever you ask." }
+    ]
+  },
+  "cafes": {
+    "label": "Our cafés",
+    "startAt": 1,
+    "items": [
+      { "image": "social-01.svg", "title": "Riverside", "text": "By the footbridge. Opens at 7, with the best seats in town for watching rowers.", "link": { "text": "Riverside hours", "href": "#info-circle-demo" } },
+      { "image": "social-04.svg", "title": "Market Hall", "text": "A counter inside the covered market; the roastery is behind it.", "link": { "text": "Market Hall hours", "href": "#info-circle-demo" } },
+      { "image": "social-07.svg", "title": "Station", "text": "Coffee to go from 6 am, and the only pastries on the platform.", "link": { "text": "Station hours", "href": "#info-circle-demo" } },
+      { "image": "social-10.svg", "title": "Hilltop", "text": "Weekends only, at the end of the trail, with a view worth the climb.", "link": { "text": "Hilltop hours", "href": "#info-circle-demo" } }
+    ]
+  }
+}
