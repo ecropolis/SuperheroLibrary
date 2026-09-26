@@ -1546,6 +1546,66 @@ import { analytics } from '../data/site';
     file: 'src/library/scrollbox/Scrollbox.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'sticker',
+    name: 'Sticker',
+    aka: ['sale badge', 'sale sticker', 'corner ribbon', 'product badge', 'discount badge', 'new badge', 'price tag', 'WooCommerce sale flash'],
+    summary:
+      'A badge pinned to a corner of a card or image: a turned label, a round sticker or a ribbon across the corner, in three tones. The host places it inside a position: relative box. `label` gives the spoken name when the text is not the meaning (“-20%” is read “20% off”, automatically for a bare percentage or amount). No motion, no script.',
+    pitch: 'Mark the sale, the new arrival or the last few in stock right on the photo, where shoppers look first.',
+    // SE Ranking US, 2026-09-26: sale badge 90/mo, difficulty 7; sale sticker 80/7; css ribbon
+    // 90/16; discount badge 30/8. The pre-assigned "sale badge css" has no data. "sale tag"
+    // 240/8 and "new badge" 320/15 are mostly shoppers and gamers, left unclaimed.
+    search: { query: 'sale badge', alsoRanks: ['sale sticker', 'css ribbon', 'discount badge'] },
+    replaces: ['WooCommerce “Sale!” flash and badge plugins', 'page-builder ribbon and badge modules', 'corner-ribbon CSS snippets', 'sale stickers baked into product photos'],
+    goodFor: 'One short word or number on a product, offer, post or event card: Sale, New, -20%, Sold out, Last few, Free delivery.',
+    notFor:
+      'A list of labels (that is tags), a message the visitor must read (put it in the text: a sticker is decoration a screen reader still names, not the only place a price or a condition lives), or a banner across the page (announcement-bar). One sticker per card; two fight each other.',
+    props: [
+      { name: 'text', type: 'string', note: 'What it shows: “Sale”, “New”, “-20%”. Keep it short; a ribbon holds about eight characters. Required.' },
+      { name: 'label', type: 'string', note: 'What a screen reader says instead, when the text is not the meaning: “Buy one, get one free” for “2 for 1”. A bare “-20%” or “-$10” gets “20% off” / “$10 off” without it; other languages need it. `label=""` marks the sticker decorative on purpose.' },
+      { name: 'shape', type: "'label' | 'circle' | 'ribbon'", default: "'label'", note: 'A turned rectangle, a round sticker, or a band across the corner.' },
+      { name: 'corner', type: "'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'", default: "'top-left'", note: 'Which corner of the positioned parent.' },
+      { name: 'tone', type: "'accent' | 'sale' | 'dark'", default: "'accent'", note: 'Which pair of colours.' },
+      { name: 'class', type: 'string', note: 'Class on the sticker, for the host to theme or nudge it.' },
+    ],
+    theming: [
+      { name: '--sk-accent-bg / --sk-accent-fg', fallback: '#5933d8 / #fff', note: 'tone="accent" (7.27:1).' },
+      { name: '--sk-sale-bg / --sk-sale-fg', fallback: '#b42318 / #fff', note: 'tone="sale" (6.57:1).' },
+      { name: '--sk-dark-bg / --sk-dark-fg', fallback: '#1e283c / #fff', note: 'tone="dark" (14.75:1). If you map any pair to brand colours, keep 4.5:1.' },
+      { name: '--sk-offset', fallback: '0.75rem', note: 'Distance from the edges (label and circle; the ribbon sits flush).' },
+      { name: '--sk-size', fallback: '4.5rem', note: 'Diameter of the circle.' },
+      { name: '--sk-ribbon-size', fallback: '6.5rem', note: 'The square corner box the ribbon crosses.' },
+      { name: '--sk-radius', fallback: '4px', note: 'Corners of the label.' },
+      { name: '--sk-rotate / --sk-circle-rotate', fallback: '-3deg / -12deg', note: 'The label’s and the circle’s turn. 0deg for a straight one.' },
+      { name: '--sk-font-size / --sk-weight / --sk-transform', fallback: '0.8125rem / 800 / uppercase', note: 'Type.' },
+      { name: '--sk-shadow', fallback: '0 1px 3px rgb(0 0 0 / 0.25)', note: 'box-shadow, to lift it off a photo.' },
+      { name: '--sk-z', fallback: '1', note: 'Stacking inside the card.' },
+    ],
+    a11y: [
+      'Read as written, where it sits in the source: put it before the card’s title and a screen reader says “Sale, Evening print”.',
+      'When the text is not the meaning, `label` is read and the text is hidden from assistive technology. “-20%” and “-$10” get “20% off” and “$10 off” by themselves (English). `label=""` hides a sticker that only repeats what the card already says.',
+      'The fallback colours of all three tones clear 4.5:1 (7.27, 6.57 and 14.75 to 1); `npm run check` computes them. A transparent border draws it in forced-colours mode.',
+      'It ignores the pointer, so a tap on it reaches the card’s link. It is never focusable and never interactive.',
+      'No motion at all, so nothing to reduce. No JavaScript, so nothing differs without it.',
+    ],
+    usage: `<article class="product">
+  <div class="product__media">          <!-- position: relative (the host's job) -->
+    <Sticker shape="circle" tone="sale" text="-20%" />   <!-- read "20% off" -->
+    <img src="/images/table.webp" alt="" />
+  </div>
+  <h3><a href="/shop/oak-table/">Oak side table</a></h3>
+  <p>$96, was $120</p>
+</article>
+
+<Sticker shape="ribbon" corner="top-right" tone="sale" text="Sale" />
+<Sticker text="2 for 1" label="Buy one, get one free" tone="dark" />
+<!-- global.css: .sk { --sk-accent-bg: var(--brand); --sk-sale-bg: var(--red-700); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/sticker/ (demo)' }],
+    file: 'src/library/sticker/Sticker.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

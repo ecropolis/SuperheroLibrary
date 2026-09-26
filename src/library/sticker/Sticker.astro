@@ -1,0 +1,186 @@
+---
+/**
+ * Sticker — a small badge pinned to a corner of a card or an image: "Sale", "New", "-20%",
+ * "Last few". Three shapes:
+ *
+ * - `label`  a small rectangle, slightly turned (`--sk-rotate`, -3deg).
+ * - `circle` a round sticker (`--sk-size`, 4.5rem) for a number: "-20%", "2 for 1".
+ * - `ribbon` a band across the corner. It clips itself, so the card needs no overflow rule.
+ *   Keep it to about eight characters; longer words belong on a `label`.
+ *
+ * Placement: the HOST puts the sticker inside the element it marks, and that element must be
+ * `position: relative` (or any positioned box): the sticker is `position: absolute` in the
+ * `corner` you name, `--sk-offset` in from the edges (the ribbon sits flush). It ignores the
+ * pointer, so a click on it reaches the card's link underneath. Place it in the source where it
+ * should be read: before the card's title, a screen reader says "Sale, Oak side table".
+ *
+ * Accessible name. The text is read as written. When the text alone is not the meaning, give
+ * `label`: the text is then hidden from assistive technology and the label is read instead
+ * ("-20%" would be read "minus twenty percent"). A bare "-20%" or "-$10" gets "20% off" /
+ * "$10 off" by itself; any other wording, or another language, needs `label`. `label=""` marks
+ * the sticker decorative on purpose (aria-hidden), for when the card already says it in words.
+ *
+ * No motion: nothing animates or transitions. Without JavaScript: the same; there is none.
+ *
+ * Theming (each has a fallback; the pairs clear 4.5:1, `npm run check` computes them):
+ *   --sk-accent-bg #5933d8 / --sk-accent-fg #fff   tone="accent" (7.27:1)
+ *   --sk-sale-bg   #b42318 / --sk-sale-fg   #fff   tone="sale"   (6.57:1)
+ *   --sk-dark-bg   #1e283c / --sk-dark-fg   #fff   tone="dark"   (14.75:1)
+ *   --sk-offset 0.75rem   --sk-size 4.5rem (circle)   --sk-ribbon-size 6.5rem (the corner box)
+ *   --sk-radius 4px (label)   --sk-rotate -3deg (label)   --sk-circle-rotate -12deg
+ *   --sk-font-size 0.8125rem   --sk-weight 800   --sk-transform uppercase
+ *   --sk-shadow 0 1px 3px rgb(0 0 0 / 0.25)   --sk-z 1
+ *
+ * Pattern from Rocketbelt's sale-sticker and product-tag (Pier 1 Imports, 2020, MIT);
+ * reimplemented, no code copied.
+ */
+interface Props {
+  /** What the sticker shows: "Sale", "New", "-20%". Short. */
+  text: string;
+  /** What a screen reader says instead, when the text is not the meaning: "20% off". "" = decorative. */
+  label?: string;
+  shape?: 'label' | 'circle' | 'ribbon';
+  corner?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  tone?: 'accent' | 'sale' | 'dark';
+  class?: string;
+}
+const { text, label, shape = 'label', corner = 'top-left', tone = 'accent', class: className } = Astro.props;
+
+if (!text || !text.trim()) throw new Error('Sticker: `text` is empty.');
+if (!['label', 'circle', 'ribbon'].includes(shape)) throw new Error(`Sticker: shape "${shape}" is not label, circle or ribbon.`);
+if (!['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(corner)) throw new Error(`Sticker: corner "${corner}" is not top-left, top-right, bottom-left or bottom-right.`);
+if (!['accent', 'sale', 'dark'].includes(tone)) throw new Error(`Sticker: tone "${tone}" is not accent, sale or dark.`);
+
+/** "-20%" → "20% off", "-$10" → "$10 off"; anything else has no automatic name. */
+const offName = (t: string) => {
+  const m = t.trim().match(/^[-−–]\s*((?:[$£€]\s?)?\d+(?:[.,]\d+)?\s*%?)$/);
+  return m ? `${m[1].replace(/\s+/g, '')} off` : undefined;
+};
+const decorative = label === '';
+const name = decorative ? undefined : (label ?? offName(text));
+---
+
+<span class:list={['sk', `sk--${shape}`, `sk--${tone}`, `sk--${corner}`, className]} aria-hidden={decorative ? 'true' : undefined} data-sk>
+  <span class="sk__face">
+    {
+      name ? (
+        <>
+          <span aria-hidden="true">{text}</span>
+          <span class="sk__sr">{name}</span>
+        </>
+      ) : (
+        text
+      )
+    }
+  </span>
+</span>
+
+<style>
+  .sk {
+    --sk-o: var(--sk-offset, 0.75rem);
+    position: absolute;
+    z-index: var(--sk-z, 1);
+    pointer-events: none;
+    font-size: var(--sk-font-size, 0.8125rem);
+    font-weight: var(--sk-weight, 800);
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-transform: var(--sk-transform, uppercase);
+    white-space: nowrap;
+  }
+  .sk--accent {
+    --sk-bg: var(--sk-accent-bg, #5933d8);
+    --sk-fg: var(--sk-accent-fg, #fff);
+  }
+  .sk--sale {
+    --sk-bg: var(--sk-sale-bg, #b42318);
+    --sk-fg: var(--sk-sale-fg, #fff);
+  }
+  .sk--dark {
+    --sk-bg: var(--sk-dark-bg, #1e283c);
+    --sk-fg: var(--sk-dark-fg, #fff);
+  }
+  .sk--top-left {
+    top: var(--sk-o);
+    left: var(--sk-o);
+  }
+  .sk--top-right {
+    top: var(--sk-o);
+    right: var(--sk-o);
+  }
+  .sk--bottom-left {
+    bottom: var(--sk-o);
+    left: var(--sk-o);
+  }
+  .sk--bottom-right {
+    bottom: var(--sk-o);
+    right: var(--sk-o);
+  }
+  /* The transparent border draws the sticker in forced-colours mode, where backgrounds go. */
+  .sk__face {
+    display: block;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    background: var(--sk-bg);
+    color: var(--sk-fg);
+    box-shadow: var(--sk-shadow, 0 1px 3px rgb(0 0 0 / 0.25));
+  }
+
+  .sk--label .sk__face {
+    padding: 0.4em 0.75em;
+    border-radius: var(--sk-radius, 4px);
+    rotate: var(--sk-rotate, -3deg);
+  }
+
+  .sk--circle .sk__face {
+    display: grid;
+    place-items: center;
+    width: var(--sk-size, 4.5rem);
+    height: var(--sk-size, 4.5rem);
+    padding: 0.4rem;
+    border-radius: 50%;
+    font-size: 1.15em;
+    white-space: normal;
+    text-wrap: balance;
+    rotate: var(--sk-circle-rotate, -12deg);
+  }
+
+  /* The ribbon: a square box in the corner that clips a band laid across it at 45 degrees. */
+  .sk--ribbon {
+    --sk-o: 0px;
+    width: var(--sk-ribbon-size, 6.5rem);
+    height: var(--sk-ribbon-size, 6.5rem);
+    overflow: hidden;
+  }
+  .sk--ribbon .sk__face {
+    position: absolute;
+    top: 33%;
+    left: 33%;
+    width: 150%;
+    padding: 0.4em 0;
+    translate: -50% -50%;
+    rotate: -45deg;
+  }
+  .sk--ribbon.sk--top-right .sk__face {
+    left: 67%;
+    rotate: 45deg;
+  }
+  .sk--ribbon.sk--bottom-left .sk__face {
+    top: 67%;
+    rotate: 45deg;
+  }
+  .sk--ribbon.sk--bottom-right .sk__face {
+    top: 67%;
+    left: 67%;
+  }
+
+  .sk__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>

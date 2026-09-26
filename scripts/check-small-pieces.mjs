@@ -25,6 +25,12 @@
  *   scrollbar is never hidden; the scroller is position: relative (it must contain positioned
  *   descendants, or they widen the page); a button press is instant under reduced motion.
  *
+ * sticker
+ * - Each sticker: not interactive, and named as the demo expects: the visible text, or (with a
+ *   label, or a bare "-20%") the text aria-hidden and the name in a visually hidden span.
+ * - The CSS: position: absolute, pointer-events: none, no animation or transition, and the
+ *   three tones' fallback pairs clear 4.5:1.
+ *
  * Mutation tests: each element's checks are run again on deliberately broken copies (see
  * `mutants`). Every mutant must be caught, or the check itself is broken.
  *
@@ -290,13 +296,81 @@ function checkScrollboxCss(src) {
   return out;
 }
 
+// ================================================================ sticker
+const SK_SRC = 'src/library/sticker/Sticker.astro';
+/** The check's own reading of the "-20%" rule, written independently of the component's. */
+const offName = (t) => {
+  const m = t.trim().match(/^[-−–]\s*([$£€]?\s?\d+(?:[.,]\d+)?\s*%?)$/);
+  return m ? `${m[1].replace(/\s+/g, '')} off` : undefined;
+};
+function expectedStickers() {
+  const demo = readFileSync(join(root, 'src/components/demos/StickerDemo.astro'), 'utf8');
+  return [...demo.matchAll(/<Sticker\b([^>]*?)\/>/g)].map((m) => {
+    const a = (n) => m[1].match(new RegExp(`\\s${n}="([^"]*)"`))?.[1];
+    const t = a('text');
+    const label = a('label');
+    return { text: t, shape: a('shape') ?? 'label', labelled: label !== undefined, name: label === '' ? null : (label ?? offName(t) ?? t) };
+  });
+}
+function checkSticker(html, where, { demo = false } = {}) {
+  const out = [];
+  const stickers = roots(html, 'span', 'data-sk');
+  const want = demo ? expectedStickers() : [];
+  if (demo && stickers.length !== want.length) out.push(`${where}: expected the demo's ${want.length} stickers, found ${stickers.length}.`);
+  const shapes = new Set();
+  stickers.forEach((s, i) => {
+    const shape = s.open.match(/\bsk--(label|circle|ribbon)\b/)?.[1];
+    shapes.add(shape);
+    const w = `${where}, sticker ${i + 1} (${shape})`;
+    if (/<(a|button|input|select|textarea)\b|\stabindex=/.test(s.html)) out.push(`${w}: holds something interactive; a sticker is decoration with a name.`);
+    const sr = s.html.match(/<span class="sk__sr"[^>]*>([\s\S]*?)<\/span>/);
+    const shown = s.html.match(/<span aria-hidden="true"[^>]*>([\s\S]*?)<\/span>/);
+    const decorative = attr(s.open, 'aria-hidden') === 'true';
+    const name = decorative ? null : sr ? text(sr[1]) : text(s.html);
+    if (sr && !shown) out.push(`${w}: has a spoken label but its visible text is not aria-hidden, so both are read.`);
+    if (sr && !text(sr[1])) out.push(`${w}: the spoken label is empty.`);
+    const e = want[i];
+    if (e) {
+      if (name !== e.name) out.push(`${w}: "${e.text}" is named ${JSON.stringify(name)}, expected ${JSON.stringify(e.name)}.`);
+      if (e.shape !== shape) out.push(`${w}: expected shape ${e.shape}.`);
+    }
+  });
+  if (demo) for (const sh of ['label', 'circle', 'ribbon']) if (!shapes.has(sh)) out.push(`${where}: the demo has no ${sh} sticker.`);
+  if (demo && !want.some((e) => offName(e.text) && !e.labelled)) out.push(`${where}: the demo shows no bare "-N%" sticker, so the automatic name is not pinned.`);
+  return out;
+}
+function checkStickerCss(src) {
+  const out = [];
+  const ratios = [];
+  const css = styleOf(src);
+  for (const [sel, body] of rules(css)) {
+    if (/(^|[;\s])(animation|transition)(-[a-z-]+)?\s*:/.test(body)) out.push(`${SK_SRC}: "${sel}" animates or transitions; a sticker has no motion.`);
+  }
+  const base = rules(css).find(([sel]) => sel === '.sk');
+  if (!base || !/position:\s*absolute/.test(base[1])) out.push(`${SK_SRC}: .sk must be position: absolute (the host's parent is the positioned box).`);
+  if (!base || !/pointer-events:\s*none/.test(base[1])) out.push(`${SK_SRC}: .sk must be pointer-events: none, so a tap reaches the card's link.`);
+  for (const tone of ['accent', 'sale', 'dark']) {
+    const m = css.match(new RegExp(`\\.sk--${tone} \\{\\s*--sk-bg: var\\(--sk-${tone}-bg, (#[0-9a-f]{3,6})\\);\\s*--sk-fg: var\\(--sk-${tone}-fg, (#[0-9a-f]{3,6})\\);`, 'i'));
+    if (!m) {
+      out.push(`${SK_SRC}: no \`.sk--${tone} { --sk-bg: var(--sk-${tone}-bg, #…); --sk-fg: var(--sk-${tone}-fg, #…); }\` to measure.`);
+      continue;
+    }
+    const r = contrast(m[1], m[2]);
+    ratios.push(`${tone} ${r.toFixed(2)}`);
+    if (r < 4.5) out.push(`sticker tone "${tone}": ${m[2]} on ${m[1]} is ${r.toFixed(2)}:1, under 4.5:1.`);
+  }
+  if (!/\.sk__face \{[^}]*background: var\(--sk-bg\);\s*color: var\(--sk-fg\);/.test(css)) out.push(`${SK_SRC}: .sk__face must paint --sk-bg / --sk-fg, the measured pair.`);
+  return { out, ratios };
+}
+
 // ================================================================== run
 const pages = {
   tags: read('dist/tags/index.html'),
   scrollbox: read('dist/scrollbox/index.html'),
+  sticker: read('dist/sticker/index.html'),
   index: read('dist/index.html'),
 };
-const src = { tags: read(TAGS_SRC), scrollbox: read(SB_SRC) };
+const src = { tags: read(TAGS_SRC), scrollbox: read(SB_SRC), sticker: read(SK_SRC) };
 finish('files');
 
 failures.push(...checkTags(pages.tags, 'dist/tags/index.html', { demo: true }), ...checkTags(pages.index, 'dist/index.html'));
@@ -312,6 +386,11 @@ failures.push(
   ...checkScrollboxCss(src.scrollbox),
 );
 finish('scrollbox');
+
+failures.push(...checkSticker(pages.sticker, 'dist/sticker/index.html', { demo: true }), ...checkSticker(pages.index, 'dist/index.html'));
+const stickerCss = checkStickerCss(src.sticker);
+failures.push(...stickerCss.out);
+finish('sticker');
 
 // ---------------------------------------------------------- mutation tests
 const swap = (s, from, to) => {
@@ -335,6 +414,11 @@ const mutants = [
   ['scrollbox: fades without JavaScript', () => checkScrollboxCss(swap(src.scrollbox, '.sb[data-ready] .sb__viewport {\n    --sb-l', '.sb .sb__viewport {\n    --sb-l'))],
   ['scrollbox: scrollbar hidden', () => checkScrollboxCss(swap(src.scrollbox, 'scrollbar-width: thin', 'scrollbar-width: none'))],
   ['scrollbox: scroller no longer contains positioned items', () => checkScrollboxCss(swap(src.scrollbox, '    position: relative;\n    display: flex;', '    display: flex;'))],
+  ['sticker: the "-20%" label lost', () => checkSticker(pages.sticker.replace(/<span aria-hidden="true"[^>]*>-20%<\/span><span class="sk__sr"[^>]*>20% off<\/span>/, '-20%'), 'k', { demo: true })],
+  ['sticker: a link inside', () => checkSticker(swap(pages.sticker, '>New<', '><a href="#">New</a><'), 'k', { demo: true })],
+  ['sticker: a pale sale tone', () => checkStickerCss(swap(src.sticker, 'var(--sk-sale-bg, #b42318)', 'var(--sk-sale-bg, #f28b82)')).out],
+  ['sticker: a transition', () => checkStickerCss(swap(src.sticker, '    pointer-events: none;', '    pointer-events: none;\n    transition: rotate 0.2s;')).out],
+  ['sticker: catches clicks', () => checkStickerCss(swap(src.sticker, '    pointer-events: none;', '')).out],
 ];
 const survived = [];
 for (const [name, run] of mutants) {
@@ -351,5 +435,5 @@ for (const s of survived) fail(`mutation "${s}" survived: the check no longer no
 finish('mutation tests');
 
 console.log(
-  `check-small-pieces ok: tags (chips, remove names, "+N more"; ${tagsCss.ratios.join(', ')}), scrollbox (regions, buttons, ${EDGE_CASES.length} fade cases on the emitted script), ${mutants.length} mutants caught.`,
+  `check-small-pieces ok: tags (chips, remove names, "+N more"; ${tagsCss.ratios.join(', ')}), scrollbox (regions, buttons, ${EDGE_CASES.length} fade cases on the emitted script), sticker (names; ${stickerCss.ratios.join(', ')}), ${mutants.length} mutants caught.`,
 );
