@@ -1552,6 +1552,72 @@ import { analytics } from '../data/site';
     file: 'src/library/toast/Toast.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'loading',
+    name: 'Loading',
+    aka: ['spinner', 'loading spinner', 'skeleton screen', 'skeleton loader', 'preloader', 'busy indicator', 'loading animation', 'progress spinner'],
+    summary:
+      'Three ways to say “wait” in one element: an inline spinner with a name (role="status"), skeleton placeholders from CSS gradients (lines, avatar, card; aria-hidden), and a busy wrapper that, while data-busy is set, makes its content aria-busy and inert, covers it with the spinner and says what is happening. No motion under reduced motion; without JavaScript the busy content stays usable.',
+    pitch: 'Show people the page heard them: a spinner where something is working, grey shapes where content is on its way, and a form that cannot be clicked twice while it saves.',
+    // SE Ranking US, 2026-09-26: css loading animation 480/mo, difficulty 18; css skeleton
+    // 390/27; skeleton ui 480/23; loading spinner 720/33. The pre-assigned "skeleton loader
+    // css" has no US volume and "skeleton loader" is 20/45; the page targets the loading
+    // animation and ranks for the skeleton and spinner variants.
+    search: { query: 'css loading animation', alsoRanks: ['css skeleton', 'skeleton ui', 'loading spinner'] },
+    replaces: ['page-builder preloaders and loading animations', 'spinner GIFs', 'skeleton screen libraries', 'jQuery BlockUI-style busy overlays'],
+    goodFor:
+      'A wait longer than about a second: a spinner in a button or beside “Loading results”, a skeleton where a list or card is about to arrive (so the page does not jump when it does), and a busy wrapper round a form or panel while it saves, so it cannot be submitted twice.',
+    notFor:
+      'A whole-page preloader that hides a page which could already be read: show the content and mark only the part that is waiting. Waits under a second, which feel instant without one (the busy overlay waits 300 ms before it shows for that reason). And progress you can measure: a known percentage is a <progress> bar, not a spinner.',
+    props: [
+      { name: 'shape', type: "'spinner' | 'skeleton' | 'busy'", default: "'spinner'", note: 'Which indicator.' },
+      { name: 'label', type: 'string', default: '“Loading” (skeleton: none)', note: 'What a screen reader says. Spinner: its visually hidden name. Busy: the status while busy. Skeleton: when given, a hidden status beside the hidden shapes; without it the skeleton is silent.' },
+      { name: 'showLabel', type: 'boolean', default: 'false', note: 'Spinner: show the label beside the ring.' },
+      { name: 'size', type: "'sm' | 'md' | 'lg'", default: "'md'", note: 'Spinner and the busy overlay’s ring: 1.25rem, 2rem or 3rem.' },
+      { name: 'variant', type: "'lines' | 'avatar' | 'card'", default: "'lines'", note: 'Skeleton: text lines; a circle with two lines; a 16:9 block with a title and lines.' },
+      { name: 'lines', type: 'number (1–12)', default: '3', note: 'Skeleton: text lines for lines and card.' },
+      { name: 'busy', type: 'boolean', default: 'false', note: 'Busy: start busy once the script runs. Without JavaScript the content is usable whatever this says.' },
+      { name: 'slowText / slowAfter', type: 'string / number (ms)', default: '— / 5000', note: 'Busy: shown over the content and said when the wait runs past slowAfter.' },
+      { name: 'doneLabel', type: 'string', note: 'Busy: said when it clears (“Saved”). Default: nothing.' },
+      { name: 'class', type: 'string', note: 'Class on the root.' },
+      { name: 'data-busy / busy(el, on)', type: 'attribute / script API', note: 'Busy: toggle the data-busy attribute on the wrapper, or call window.__superheroLoading.busy(el, on) with the wrapper, anything inside it, or a selector. Returns false when there is no wrapper.' },
+    ],
+    theming: [
+      { name: '--ld-color', fallback: 'currentColor', note: 'The ring. Keep 3:1 against what is behind it.' },
+      { name: '--ld-track', fallback: 'rgb(127 127 127 / 0.25)', note: 'The ring’s track.' },
+      { name: '--ld-skel-base', fallback: '#e6e9ef', note: 'Skeleton shapes.' },
+      { name: '--ld-skel-shine', fallback: '#f5f7fa', note: 'The shimmer.' },
+      { name: '--ld-radius', fallback: '6px', note: 'Skeleton corners.' },
+      { name: '--ld-overlay', fallback: 'rgb(255 255 255 / 0.72)', note: 'Over busy content.' },
+      { name: '--ld-msg-bg / --ld-msg-fg', fallback: '#fff / #1e283c', note: 'The slow message (14.75:1).' },
+    ],
+    a11y: [
+      'Spinner: role="status" with a name (“Loading”, or `label`); the ring is aria-hidden. Rendered in place before the wait, it is read when reached; for an announcement, use busy.',
+      'Skeleton: the shapes are aria-hidden, because grey bars mean nothing read aloud. With `label`, a visually hidden status says it instead.',
+      'Busy: while data-busy is set the content is aria-busy="true" and inert, so it cannot be clicked, focused or submitted twice. The status that says `label` sits outside the busy content, because screen readers hold back changes inside an aria-busy region. If focus was in the content, it moves to the wrapper and back to the same control when the wait ends. `slowText` is said if the wait runs long; `doneLabel` when it clears.',
+      'prefers-reduced-motion: the ring stops turning and fades gently instead, the skeleton does not shimmer, and the busy overlay appears without a fade.',
+      'In forced-colours mode the ring and the skeleton shapes take the system text colour.',
+      'Without JavaScript a spinner and a skeleton render as given, and a busy wrapper renders its content, usable: the overlay, aria-busy and inert only ever come from the script.',
+    ],
+    usage: `<button type="submit">Search <Loading size="sm" label="Searching" /></button>
+
+<Loading shape="skeleton" variant="card" />
+
+<Loading shape="busy" label="Saving" doneLabel="Saved" slowText="Still saving…">
+  <form>…</form>
+</Loading>
+<script>
+  // Around a real request:
+  window.__superheroLoading.busy(form, true);
+  await save();
+  window.__superheroLoading.busy(form, false);
+</script>
+<!-- global.css: .ld { --ld-color: var(--brand); --ld-skel-base: var(--tint); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/loading/ (demo)' }],
+    file: 'src/library/loading/Loading.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

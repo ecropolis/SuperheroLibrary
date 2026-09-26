@@ -1,0 +1,436 @@
+---
+/**
+ * Loading — the three ways to say "wait", in one element:
+ *   shape="spinner"   an inline spinning ring with a name: role="status" and a visually hidden
+ *                     `label` ("Loading"), or the label shown beside it (`showLabel`).
+ *   shape="skeleton"  grey placeholder shapes where content will be (`variant` lines, avatar or
+ *                     card), drawn with CSS gradients and a shimmer. aria-hidden: shapes mean
+ *                     nothing to a screen reader. Give it a `label` and it carries a
+ *                     visually hidden role="status" with that text beside the hidden shapes.
+ *   shape="busy"      a wrapper around real content. While it has the `data-busy` attribute,
+ *                     its content gets aria-busy="true" and `inert` (no clicks, no focus, hidden
+ *                     from assistive tech), a spinner covers it, and a status line outside the
+ *                     busy content says `label`. Hosts toggle the attribute, or call
+ *                     window.__superheroLoading.busy(el, on).
+ * Spinners, skeleton screens, "busy" overlays: page builders' preloaders and loading
+ * animations, and the skeleton screens app frameworks ship.
+ *
+ * Pattern from Rocketbelt's busy indicators (Pier 1 Imports, 2020, MIT): a component or a page
+ * marked busy shows an indicator over itself, and a message if the wait runs long.
+ * Reimplemented here; none of its markup, styles or script is used.
+ *
+ * The busy status line is deliberately a sibling of the content, not inside it: aria-busy
+ * tells screen readers to hold back changes inside that subtree until it clears, so a message
+ * inside it might never be read. If focus was inside the content when it went busy, focus moves
+ * to the wrapper (so it is not lost to <body>) and back to the same control when it is done.
+ * `slowText` replaces the status after `slowAfter` ms ("This is taking longer than usual…").
+ * `doneLabel`, if given, is said when it clears. The overlay fades in after 300 ms, so a fast
+ * action never flickers; under reduced motion it appears at once.
+ *
+ * Motion: the ring turns and the skeleton shimmers only under prefers-reduced-motion:
+ * no-preference. Under reduce, the ring holds still and fades gently in and out, and the
+ * skeleton is flat.
+ *
+ * Without JavaScript: a spinner and a skeleton render as given (they are plain markup). A busy
+ * wrapper renders its content, usable, whatever `busy` says: the overlay, aria-busy and inert
+ * only ever come from the script, which is emitted once per page when a busy wrapper is on it.
+ *
+ * ONE copy of the runtime: loadingRuntime() is serialised into the inline script, and
+ * scripts/check-feedback.mjs runs the source between the `<ld-runtime>` markers on a DOM
+ * stand-in. It must reference nothing but its `win` argument and language globals.
+ *
+ * Theming (each has a fallback):
+ *   --ld-color        the ring                        (currentColor)
+ *   --ld-track        the ring's track                (rgb(127 127 127 / 0.25))
+ *   --ld-skel-base    skeleton shapes                 (#e6e9ef)
+ *   --ld-skel-shine   the shimmer                     (#f5f7fa)
+ *   --ld-radius       skeleton corners                (6px)
+ *   --ld-overlay      over busy content               (rgb(255 255 255 / 0.72))
+ *   --ld-msg-bg / --ld-msg-fg   the slow message      (#fff / #1e283c, 14.75:1)
+ */
+
+// <ld-runtime>
+export function loadingRuntime(win: any) {
+  interface State {
+    on: boolean;
+    cfg: { label: string; slowText: string; slowAfter: number; doneLabel: string };
+    back: HTMLElement | null;
+    focusedWrap: boolean;
+    slowTimer: number;
+  }
+  const doc = win.document;
+  const states = new Map<HTMLElement, State>();
+
+  const sync = (el: HTMLElement) => {
+    const s = states.get(el);
+    if (!s) return;
+    const on = el.hasAttribute('data-busy');
+    if (on === s.on) return;
+    s.on = on;
+    const content = el.querySelector<HTMLElement>('[data-ld-content]');
+    const status = el.querySelector<HTMLElement>('[data-ld-status]');
+    const slow = el.querySelector<HTMLElement>('[data-ld-slow]');
+    win.clearTimeout(s.slowTimer);
+    if (on) {
+      if (content) {
+        if (content.contains(doc.activeElement)) {
+          // Focus would fall to <body> when the content goes inert; hold it on the wrapper.
+          s.back = doc.activeElement;
+          s.focusedWrap = true;
+          el.setAttribute('tabindex', '-1');
+          el.focus();
+        }
+        content.setAttribute('aria-busy', 'true');
+        content.inert = true;
+      }
+      if (status) status.textContent = s.cfg.label;
+      if (slow && s.cfg.slowText) {
+        s.slowTimer = win.setTimeout(() => {
+          slow.hidden = false;
+          if (status) status.textContent = s.cfg.slowText;
+        }, s.cfg.slowAfter);
+      }
+    } else {
+      if (content) {
+        content.removeAttribute('aria-busy');
+        content.inert = false;
+      }
+      if (slow) slow.hidden = true;
+      if (status) status.textContent = s.cfg.doneLabel || '';
+      if (s.focusedWrap) {
+        s.focusedWrap = false;
+        const back = s.back;
+        s.back = null;
+        const stillHere = doc.activeElement === el;
+        el.removeAttribute('tabindex');
+        if (stillHere && back && back.isConnected && !(back as HTMLButtonElement).disabled) back.focus();
+      }
+    }
+  };
+
+  const mount = (el: HTMLElement) => {
+    if (states.has(el)) return;
+    let cfg: State['cfg'];
+    try {
+      cfg = JSON.parse(el.getAttribute('data-ld') || '');
+    } catch {
+      return;
+    }
+    states.set(el, { on: false, cfg, back: null, focusedWrap: false, slowTimer: 0 });
+    el.classList.add('ld--live');
+    if (win.MutationObserver) new win.MutationObserver(() => sync(el)).observe(el, { attributes: true, attributeFilter: ['data-busy'] });
+    sync(el);
+  };
+
+  const boot = () => doc.querySelectorAll('[data-ld]').forEach(mount);
+  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  return {
+    /** Mark a busy wrapper (or an element inside one, or a selector) busy or not. Returns false when there is no wrapper. */
+    busy(target: HTMLElement | string, on = true) {
+      const found = typeof target === 'string' ? doc.querySelector(target) : target;
+      const el = found && found.closest ? (found.closest('[data-ld]') as HTMLElement | null) : null;
+      if (!el) return false;
+      mount(el);
+      el.toggleAttribute('data-busy', !!on);
+      sync(el);
+      return true;
+    },
+    mount,
+  };
+}
+// </ld-runtime>
+
+type Shape = 'spinner' | 'skeleton' | 'busy';
+type Size = 'sm' | 'md' | 'lg';
+type Variant = 'lines' | 'avatar' | 'card';
+
+interface Props {
+  /** Which indicator. Default spinner. */
+  shape?: Shape;
+  /** What is happening, in words. Spinner and busy: default "Loading". Skeleton: none (fully hidden). */
+  label?: string;
+  /** Spinner: show the label beside the ring instead of only to screen readers. */
+  showLabel?: boolean;
+  /** Spinner (and the busy overlay's ring): 1.25rem, 2rem or 3rem. Default md. */
+  size?: Size;
+  /** Skeleton: which placeholder. Default lines. */
+  variant?: Variant;
+  /** Skeleton: how many text lines (lines and card). Default 3. */
+  lines?: number;
+  /** Busy: start busy (with JavaScript; without it the content is always usable). */
+  busy?: boolean;
+  /** Busy: shown and said when the wait runs past `slowAfter`. */
+  slowText?: string;
+  /** Busy: ms before `slowText`. Default 5000. */
+  slowAfter?: number;
+  /** Busy: said when it clears, e.g. "Results updated". Default: nothing. */
+  doneLabel?: string;
+  class?: string;
+}
+
+const {
+  shape = 'spinner',
+  label,
+  showLabel = false,
+  size = 'md',
+  variant = 'lines',
+  lines = 3,
+  busy = false,
+  slowText = '',
+  slowAfter = 5000,
+  doneLabel = '',
+  class: className,
+} = Astro.props as Props;
+
+if (!['spinner', 'skeleton', 'busy'].includes(shape)) throw new Error(`Loading: shape "${shape}" is not spinner, skeleton or busy.`);
+if (!['sm', 'md', 'lg'].includes(size)) throw new Error(`Loading: size "${size}" is not sm, md or lg.`);
+if (!['lines', 'avatar', 'card'].includes(variant)) throw new Error(`Loading: variant "${variant}" is not lines, avatar or card.`);
+if (!(Number.isInteger(lines) && lines >= 1 && lines <= 12)) throw new Error('Loading: lines must be a whole number from 1 to 12.');
+if (!(Number.isFinite(slowAfter) && slowAfter >= 0)) throw new Error('Loading: slowAfter must be a number of milliseconds.');
+const name = label ?? (shape === 'skeleton' ? '' : 'Loading');
+if (shape !== 'skeleton' && !name.trim()) throw new Error(`Loading: a ${shape} needs a label; it is what a screen reader says.`);
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstBusy = shape === 'busy' && !locals.__loadingScript;
+if (shape === 'busy') locals.__loadingScript = true;
+const runtime = `window.__superheroLoading=window.__superheroLoading||(${loadingRuntime.toString()})(window);`;
+const config = shape === 'busy' ? JSON.stringify({ label: name, slowText, slowAfter, doneLabel }) : undefined;
+const textLines = Array.from({ length: variant === 'avatar' ? 2 : lines }, (_, i) => i);
+---
+
+{
+  shape === 'spinner' && (
+    <span class:list={['ld', 'ld--spinner', `ld--${size}`, className]} role="status">
+      <svg class="ld__ring" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <circle class="ld__track" cx="24" cy="24" r="20" />
+        <circle class="ld__arc" cx="24" cy="24" r="20" />
+      </svg>
+      <span class={showLabel ? 'ld__label' : 'ld__sr'}>{name}</span>
+    </span>
+  )
+}
+{
+  shape === 'skeleton' && (
+    <div class:list={['ld', 'ld--skeleton', `ld--${variant}`, className]} aria-hidden={name ? undefined : 'true'}>
+      {name && <span class="ld__sr" role="status">{name}</span>}
+      <div class="ld__bones" aria-hidden="true">
+        {variant === 'card' && <span class="ld__bone ld__bone--media" />}
+        {variant === 'avatar' && <span class="ld__bone ld__bone--circle" />}
+        <span class="ld__stack">
+          {variant === 'card' && <span class="ld__bone ld__bone--title" />}
+          {textLines.map(() => <span class="ld__bone ld__bone--line" />)}
+        </span>
+      </div>
+    </div>
+  )
+}
+{
+  shape === 'busy' && (
+    <div class:list={['ld', 'ld--busy', className]} data-ld={config} data-busy={busy ? '' : undefined}>
+      <div class="ld__content" data-ld-content>
+        <slot />
+      </div>
+      <div class="ld__overlay" aria-hidden="true">
+        <svg class:list={['ld__ring', `ld__ring--${size}`]} viewBox="0 0 48 48" focusable="false">
+          <circle class="ld__track" cx="24" cy="24" r="20" />
+          <circle class="ld__arc" cx="24" cy="24" r="20" />
+        </svg>
+        {slowText && <p class="ld__slow" data-ld-slow hidden>{slowText}</p>}
+      </div>
+      <span class="ld__sr" role="status" data-ld-status />
+    </div>
+  )
+}
+{firstBusy && <script is:inline set:html={runtime} />}
+
+<style>
+  .ld {
+    box-sizing: border-box;
+  }
+  .ld__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---- spinner (also the busy overlay's ring) */
+  .ld--spinner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    vertical-align: middle;
+    color: var(--ld-color, currentColor);
+  }
+  .ld__ring {
+    flex: none;
+    width: var(--_ld-size, 2rem);
+    height: var(--_ld-size, 2rem);
+  }
+  .ld--sm,
+  .ld__ring--sm {
+    --_ld-size: 1.25rem;
+  }
+  .ld--md,
+  .ld__ring--md {
+    --_ld-size: 2rem;
+  }
+  .ld--lg,
+  .ld__ring--lg {
+    --_ld-size: 3rem;
+  }
+  .ld__track,
+  .ld__arc {
+    fill: none;
+    stroke-width: 5;
+  }
+  .ld__track {
+    stroke: var(--ld-track, rgb(127 127 127 / 0.25));
+  }
+  .ld__arc {
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-dasharray: 34 92;
+  }
+
+  /* ---- skeleton */
+  .ld--skeleton {
+    width: 100%;
+  }
+  .ld__bones {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .ld--avatar .ld__bones {
+    flex-direction: row;
+    align-items: center;
+  }
+  .ld__stack {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+  .ld__bone {
+    display: block;
+    border-radius: var(--ld-radius, 6px);
+    background-color: var(--ld-skel-base, #e6e9ef);
+    background-image: linear-gradient(90deg, transparent, var(--ld-skel-shine, #f5f7fa), transparent);
+    background-repeat: no-repeat;
+    background-size: 40% 100%;
+    background-position: -100% 0;
+  }
+  .ld__bone--line {
+    height: 0.8em;
+  }
+  .ld__bone--line:last-child:not(:first-child) {
+    width: 62%;
+  }
+  .ld__bone--title {
+    width: 55%;
+    height: 1.15em;
+    margin-bottom: 0.2rem;
+  }
+  .ld__bone--circle {
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+  }
+  .ld__bone--media {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+  }
+
+  /* ---- busy */
+  .ld--busy {
+    position: relative;
+  }
+  .ld__overlay {
+    display: none;
+  }
+  .ld--busy.ld--live[data-busy] > .ld__overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: inherit;
+    background: var(--ld-overlay, rgb(255 255 255 / 0.72));
+    color: var(--ld-color, currentColor);
+    cursor: progress;
+  }
+  .ld__slow {
+    max-width: 22rem;
+    margin: 0;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    background: var(--ld-msg-bg, #fff);
+    color: var(--ld-msg-fg, #1e283c);
+    box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.14);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+  .ld__slow[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ld__ring {
+      animation: ld-spin 0.9s linear infinite;
+    }
+    .ld__bone {
+      animation: ld-shimmer 1.6s ease-in-out infinite;
+    }
+    .ld--busy.ld--live[data-busy] > .ld__overlay {
+      animation: ld-fade 0.2s ease-out 0.3s both;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ld__arc {
+      animation: ld-breathe 2s ease-in-out infinite;
+    }
+  }
+  @keyframes ld-spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+  @keyframes ld-shimmer {
+    from {
+      background-position: -100% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes ld-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ld-breathe {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @media (forced-colors: active) {
+    .ld__bone {
+      border: 1px solid CanvasText;
+    }
+    .ld__arc {
+      stroke: CanvasText;
+    }
+  }
+</style>

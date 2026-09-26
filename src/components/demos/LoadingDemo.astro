@@ -1,0 +1,151 @@
+---
+/**
+ * Demo for `loading`. The website renders this too (see README, "Consumed by superherotech.ai");
+ * it has no assets, and every host token has a fallback.
+ *
+ * The three shapes: spinners at the three sizes (one with its label shown), the three skeleton
+ * variants, and a small form inside a busy wrapper. The form's own buttons mark it busy through
+ * window.__superheroLoading.busy(), for 2 seconds, or for 7 with the slow message after 3, so
+ * you can watch focus leave the Save button for the wrapper and come back to it. Nothing is
+ * sent anywhere.
+ */
+import Loading from '../../library/loading/Loading.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+---
+<div class="demo-ld">
+  <div class="demo-ld__part">
+    <p class="demo-ld__label">Spinner</p>
+    <div class="demo-ld__row">
+      <Loading size="sm" />
+      <Loading />
+      <Loading size="lg" />
+      <Loading size="sm" label="Loading results" showLabel />
+    </div>
+  </div>
+
+  <div class="demo-ld__part">
+    <p class="demo-ld__label">Skeleton</p>
+    <div class="demo-ld__skeletons">
+      <Loading shape="skeleton" variant="card" lines={2} />
+      <div class="demo-ld__col">
+        <Loading shape="skeleton" variant="avatar" />
+        <Loading shape="skeleton" variant="avatar" />
+        <Loading shape="skeleton" lines={4} label="Loading comments" />
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-ld__part">
+    <p class="demo-ld__label">Busy</p>
+    <Loading shape="busy" label="Saving your details" slowText="This is taking longer than usual…" slowAfter={3000} doneLabel="Saved" class="demo-ld__busy">
+      <form class="demo-ld__form" data-demo-ld-form>
+        <label>Name <input name="name" autocomplete="name" value="Sam Rivera" /></label>
+        <label>Email <input name="email" type="email" autocomplete="email" value="sam@example.com" /></label>
+        <div class="demo-ld__row">
+          <button class="demo-ld__btn" type="submit" data-demo-ld="2000">Save</button>
+          <button class="demo-ld__btn demo-ld__btn--quiet" type="button" data-demo-ld="7000">Slow save</button>
+        </div>
+      </form>
+    </Loading>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('submit', (e) => {
+    if (e.target.matches && e.target.matches('[data-demo-ld-form]')) e.preventDefault();
+  });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-demo-ld]');
+    if (!b || !window.__superheroLoading) return;
+    e.preventDefault();
+    const api = window.__superheroLoading;
+    api.busy(b, true);
+    setTimeout(() => api.busy(b, false), Number(b.getAttribute('data-demo-ld')));
+  });
+</script>
+
+<style>
+  .demo-ld {
+    display: grid;
+    gap: 1.5rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-ld__part {
+    min-width: 0;
+  }
+  .demo-ld__label {
+    margin: 0 0 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .demo-ld__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+    color: var(--purple, #5933d8);
+  }
+  .demo-ld__skeletons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1.25rem;
+  }
+  .demo-ld__skeletons > :global(*) {
+    padding: 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-ld__col {
+    display: grid;
+    gap: 1.25rem;
+  }
+  .demo-ld :global(.demo-ld__busy) {
+    max-width: 28rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-ld__form {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  .demo-ld__form label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+  .demo-ld__form input {
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--line, #c9ced8);
+    border-radius: 8px;
+    font: inherit;
+  }
+  .demo-ld__btn {
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-ld__btn--quiet {
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+  }
+  .demo-ld__btn:focus-visible,
+  .demo-ld__form input:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 2px;
+  }
+</style>

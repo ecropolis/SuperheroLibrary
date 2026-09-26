@@ -25,6 +25,18 @@
  *    reduced motion removing at once. Contrast of the fallbacks from the CSS; animation only
  *    under prefers-reduced-motion: no-preference.
  *
+ * loading
+ * 5. On both built pages: every spinner is role="status" with a non-empty name and an
+ *    aria-hidden ring; every skeleton's shapes are aria-hidden, and a skeleton is either wholly
+ *    aria-hidden or carries a named role="status"; every busy wrapper renders its content usable
+ *    (no inert, no aria-busy), its overlay aria-hidden, and an empty role="status" OUTSIDE the
+ *    content (screen readers hold back changes inside an aria-busy region). The runtime is
+ *    emitted once per page with a busy wrapper, and not at all without one.
+ * 6. The busy runtime on the DOM stand-in: busy(el, on) and the bare data-busy attribute both
+ *    set aria-busy + inert on the content and the status; focus held on the wrapper and given
+ *    back; the slow message after slowAfter; doneLabel; false for a non-wrapper. Motion only
+ *    under no-preference (the reduce branch may only fade); the slow message ≥ 4.5:1.
+ *
  * Mutation tests: every section re-runs its own rules on copies of the page or source with one
  * known fault planted (a warning given role="status", a close button shown without JavaScript,
  * a text colour too light…) and fails if a rule no longer notices it. A rule that cannot fail
@@ -127,8 +139,10 @@ function standIn({ reduce = false } = {}) {
     o.addEventListener = (type, fn) => (o.listeners[type] ||= []).push(fn);
     o.removeEventListener = (type, fn) => (o.listeners[type] = (o.listeners[type] || []).filter((f) => f !== fn));
   };
-  const doc = { hidden: false, activeElement: null, getElementById: () => null };
+  const doc = { hidden: false, activeElement: null, readyState: 'complete', getElementById: () => null };
   listen(doc);
+  const observers = [];
+  const notify = (el, name) => observers.forEach((o) => o.target === el && (!o.filter || o.filter.includes(name)) && o.cb([{ type: 'attributes', target: el, attributeName: name }]));
   const fire = (target, type, extra = {}) => {
     const ev = { type, target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra };
     for (let n = target; n; n = n === doc ? null : n.parentNode || (n.isBody ? doc : null)) (n.listeners[type] || []).slice().forEach((fn) => fn(ev));
@@ -157,11 +171,11 @@ function standIn({ reduce = false } = {}) {
       };
       listen(this);
     }
-    setAttribute(k, v) { this.attrs.set(k, String(v)); }
+    setAttribute(k, v) { this.attrs.set(k, String(v)); notify(this, k); }
     getAttribute(k) { return this.attrs.has(k) ? this.attrs.get(k) : null; }
     hasAttribute(k) { return this.attrs.has(k); }
-    removeAttribute(k) { this.attrs.delete(k); }
-    toggleAttribute(k, on) { if (on === undefined ? !this.attrs.has(k) : on) this.attrs.set(k, ''); else this.attrs.delete(k); }
+    removeAttribute(k) { if (this.attrs.delete(k)) notify(this, k); }
+    toggleAttribute(k, on) { const had = this.attrs.has(k); if (on === undefined ? !had : on) this.attrs.set(k, ''); else this.attrs.delete(k); if (had !== this.attrs.has(k)) notify(this, k); }
     get hidden() { return this.attrs.has('hidden'); }
     set hidden(v) { this.toggleAttribute('hidden', !!v); }
     get inert() { return this.attrs.has('inert'); }
@@ -205,6 +219,8 @@ function standIn({ reduce = false } = {}) {
   doc.createElement = (tag) => new El(tag);
   doc.body = new El('body');
   doc.body.isBody = true;
+  doc.querySelectorAll = (sel) => doc.body.querySelectorAll(sel);
+  doc.querySelector = (sel) => doc.body.querySelector(sel);
   const template = (name) => {
     const t = new El('template');
     t.setAttribute('data-tst-icon', name);
@@ -219,6 +235,11 @@ function standIn({ reduce = false } = {}) {
     matchMedia: (q) => ({ matches: reduce && /reduce/.test(q) }),
     setTimeout: (fn, ms) => { const id = nextId++; timers.set(id, { at: clock + ms, fn }); return id; },
     clearTimeout: (id) => timers.delete(id),
+    MutationObserver: class {
+      constructor(cb) { this.cb = cb; }
+      observe(target, opts = {}) { observers.push({ target, cb: this.cb, filter: opts.attributeFilter }); }
+      disconnect() {}
+    },
   };
   const advance = (ms) => {
     const end = clock + ms;
@@ -631,6 +652,196 @@ if (ids.has('toast')) {
   mutation('toast', 'action text too dark', src, (s) => s.replace('--ts-action, #c4b5ff', '--ts-action, #5933d8'), toastSource);
   finish('toast mutations');
   summary.push(`toast: one hidden region on 2 pages; runtime behaviours on a DOM stand-in; contrast ${measured.join(', ')}`);
+}
+
+// --------------------------------------------------------------------------------- loading
+if (ids.has('loading')) {
+  const file = 'src/library/loading/Loading.astro';
+  const src = readFileSync(join(root, file), 'utf8');
+
+  const loadingPage = (html, rel, demo) => {
+    const out = [];
+    const count = { spinner: 0, skeleton: 0, busy: 0 };
+    for (const r of html.matchAll(/<(span|div)\b[^>]*\sclass="ld ld--(spinner|skeleton|busy)\b[^"]*"[^>]*>/g)) {
+      const [tag, el, shape] = r;
+      count[shape]++;
+      const where = `${rel}, ${shape} ${count[shape]}`;
+      const body = block(html, r.index, el);
+      if (shape === 'spinner') {
+        if (attr(tag, 'role') !== 'status') out.push(`${where}: a spinner must be role="status".`);
+        const ring = body.match(/<svg\b[^>]*class="ld__ring[^"]*"[^>]*>/);
+        if (!ring || attr(ring[0], 'aria-hidden') !== 'true') out.push(`${where}: the ring must be aria-hidden.`);
+        if (!text(body)) out.push(`${where}: a spinner without a name; screen readers would say nothing.`);
+      } else if (shape === 'skeleton') {
+        const bones = body.match(/<div\b[^>]*class="ld__bones"[^>]*>/);
+        if (!bones || attr(bones[0], 'aria-hidden') !== 'true') out.push(`${where}: the skeleton shapes must be aria-hidden.`);
+        const status = body.match(/<span\b[^>]*role="status"[^>]*>([^<]*)<\/span>/);
+        if (attr(tag, 'aria-hidden') === 'true') {
+          if (status) out.push(`${where}: a status inside an aria-hidden skeleton is never read.`);
+        } else if (!status || !status[1].trim()) out.push(`${where}: a skeleton that is not aria-hidden needs a named role="status".`);
+        if (text(body.replace(/<span\b[^>]*role="status"[^>]*>[^<]*<\/span>/, ''))) out.push(`${where}: text inside the skeleton shapes.`);
+      } else {
+        let cfg = {};
+        try {
+          cfg = JSON.parse(decode(attr(tag, 'data-ld')));
+        } catch {
+          out.push(`${where}: data-ld is not JSON.`);
+        }
+        if (!cfg.label) out.push(`${where}: no label in the config; the status would be empty.`);
+        if (/\sinert(?=[\s>=])/.test(body) || /aria-busy=/.test(body)) out.push(`${where}: inert or aria-busy in the static HTML; without JavaScript the content must be usable.`);
+        const content = body.match(/<div\b[^>]*\sdata-ld-content[^>]*>/);
+        if (!content) {
+          out.push(`${where}: no [data-ld-content] around the content.`);
+          continue;
+        }
+        const contentHtml = block(body, content.index, 'div');
+        if (/data-ld-status/.test(contentHtml)) out.push(`${where}: the status is inside the busy content, where aria-busy holds it back.`);
+        const status = body.match(/<span\b[^>]*\sdata-ld-status[^>]*>([\s\S]*?)<\/span>/);
+        if (!status || attr(status[0], 'role') !== 'status') out.push(`${where}: no role="status" [data-ld-status] beside the content.`);
+        else if (status[1].trim()) out.push(`${where}: the status must be empty until the wrapper is busy.`);
+        const overlay = body.match(/<div\b[^>]*class="ld__overlay"[^>]*>/);
+        if (!overlay || attr(overlay[0], 'aria-hidden') !== 'true') out.push(`${where}: the overlay must be aria-hidden.`);
+      }
+    }
+    if (demo) {
+      if (count.spinner !== 4 || count.skeleton !== 4 || count.busy !== 1) out.push(`${rel}: expected the demo's 4 spinners, 4 skeletons and 1 busy wrapper; found ${count.spinner}, ${count.skeleton}, ${count.busy}.`);
+    }
+    const defs = (html.match(/window\.__superheroLoading=window\.__superheroLoading\|\|/g) || []).length;
+    if (defs !== (count.busy ? 1 : 0)) out.push(`${rel}: the loading runtime is emitted ${defs} times with ${count.busy} busy wrappers; it must be once when there is one, and never without.`);
+    return out;
+  };
+
+  const behaviours = async (source) => {
+    const out = [];
+    const m = source.match(/\/\/ <ld-runtime>\n([\s\S]*?)\/\/ <\/ld-runtime>/);
+    if (!m) return [`${file} has no \`// <ld-runtime>\` … \`// </ld-runtime>\` block.`];
+    let loadingRuntime;
+    try {
+      ({ loadingRuntime } = await import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(m[1], { mode: 'strip' })).toString('base64')}`));
+    } catch (e) {
+      return [`the loading runtime does not load: ${e.message}`];
+    }
+    const expect = (cond, msg) => cond || out.push(`loading: ${msg}`);
+    const setup = (cfg = {}) => {
+      const s = standIn();
+      const wrap = new s.El('div');
+      wrap.setAttribute('data-ld', JSON.stringify({ label: 'Saving', slowText: 'Still saving', slowAfter: 3000, doneLabel: 'Saved', ...cfg }));
+      const content = new s.El('div');
+      content.setAttribute('data-ld-content', '');
+      const button = new s.El('button');
+      content.append(button);
+      const overlay = new s.El('div');
+      const slow = new s.El('p');
+      slow.setAttribute('data-ld-slow', '');
+      slow.hidden = true;
+      overlay.append(slow);
+      const status = new s.El('span');
+      status.setAttribute('data-ld-status', '');
+      wrap.append(content, overlay, status);
+      const outside = new s.El('a');
+      s.doc.body.append(outside, wrap);
+      const api = loadingRuntime(s.win);
+      return { ...s, wrap, content, button, slow, status, outside, api };
+    };
+    try {
+      const t = setup();
+      expect(t.wrap.className.includes('ld--live'), 'mounting must add ld--live, which is what lets the overlay show.');
+      t.button.focus();
+      expect(t.api.busy(t.button, true) === true, 'busy() on an element inside a wrapper must find the wrapper and return true.');
+      expect(t.content.getAttribute('aria-busy') === 'true' && t.content.inert, 'busy on: the content must be aria-busy="true" and inert.');
+      expect(t.wrap.getAttribute('aria-busy') === null, 'aria-busy belongs on the content, not the wrapper that holds the status.');
+      expect(t.status.textContent === 'Saving', 'busy on: the status must say the label.');
+      expect(t.doc.activeElement === t.wrap && t.wrap.getAttribute('tabindex') === '-1', 'busy on with focus inside: focus must move to the wrapper, not fall to <body>.');
+      t.advance(2999);
+      expect(t.slow.hidden, 'the slow message appeared before slowAfter.');
+      t.advance(1);
+      expect(!t.slow.hidden && t.status.textContent === 'Still saving', 'past slowAfter the slow message must show and be said.');
+      t.api.busy(t.wrap, false);
+      expect(t.content.getAttribute('aria-busy') === null && !t.content.inert, 'busy off: aria-busy and inert must go.');
+      expect(t.slow.hidden && t.status.textContent === 'Saved', 'busy off: the slow message must hide and doneLabel be said.');
+      expect(t.doc.activeElement === t.button && t.wrap.getAttribute('tabindex') === null, 'busy off: focus must go back to the control that had it.');
+
+      const a = setup({ doneLabel: '' });
+      a.outside.focus();
+      a.wrap.toggleAttribute('data-busy', true);
+      expect(a.content.inert && a.content.getAttribute('aria-busy') === 'true', 'setting the data-busy attribute alone must make the content busy.');
+      expect(a.doc.activeElement === a.outside, 'focus outside the content must stay where it is.');
+      a.wrap.removeAttribute('data-busy');
+      expect(!a.content.inert && a.status.textContent === '', 'removing data-busy must clear it, with an empty status when there is no doneLabel.');
+      a.advance(10_000);
+      expect(a.slow.hidden, 'a cleared wrapper must not show the slow message later.');
+      expect(a.api.busy(a.outside, true) === false, 'busy() on an element outside any wrapper must return false.');
+      expect(a.api.busy('[data-nothing]', true) === false, 'busy() with a selector that matches nothing must return false.');
+    } catch (e) {
+      out.push(`loading: threw ${e.message}`);
+    }
+    return out;
+  };
+
+  const loadingSource = (s) => {
+    const out = [];
+    const css = s.slice(s.indexOf('<style'));
+    const blocks = [...css.matchAll(/@media \(prefers-reduced-motion: (no-preference|reduce)\) \{([\s\S]*?)\n  \}\n/g)];
+    let rest = css;
+    for (const b of blocks) rest = rest.replace(b[0], '');
+    if (/\banimation:/.test(rest)) out.push(`${file}: an animation outside the prefers-reduced-motion blocks.`);
+    const reduce = blocks.filter((b) => b[1] === 'reduce').map((b) => b[2]).join('');
+    for (const a of reduce.matchAll(/animation:\s*([\w-]+)/g)) {
+      const kf = css.match(new RegExp(`@keyframes ${a[1]} \\{([\\s\\S]*?)\\n  \\}`));
+      if (!kf || /transform|background-position|translate|rotate/.test(kf[1])) out.push(`${file}: under reduced motion, ${a[1]} may only fade, not move.`);
+    }
+    // Every rule that gives the overlay a display other than none must need .ld--live[data-busy].
+    if (!/\.ld__overlay \{\s*display: none;/.test(css)) out.push(`${file}: the overlay must be display: none by default.`);
+    const shows = [...css.matchAll(/([^{}]*\.ld__overlay[^{}]*)\{([^{}]*)\}/g)].filter((r) => { const d = r[2].match(/display:\s*([a-z-]+)/); return d && d[1] !== 'none'; });
+    if (!shows.length) out.push(`${file}: no rule shows the overlay.`);
+    for (const r of shows) if (!r[1].includes('.ld--live[data-busy]')) out.push(`${file}: \`${r[1].trim()}\` shows the overlay without .ld--live[data-busy], so it could cover content without JavaScript.`);
+    const bg = (css.match(/var\(--ld-msg-bg, (#[0-9a-f]{3,6})\)/i) || [])[1];
+    const fg = (css.match(/var\(--ld-msg-fg, (#[0-9a-f]{3,6})\)/i) || [])[1];
+    if (!bg || !fg) out.push(`${file}: no --ld-msg-bg / --ld-msg-fg fallbacks to measure.`);
+    else if (ratio(fg, bg) < 4.5) out.push(`loading: the slow message ${fg} on ${bg} is ${ratio(fg, bg).toFixed(2)}:1, under 4.5:1.`);
+    return out;
+  };
+
+  const demoRel = 'dist/loading/index.html';
+  const demoHtml = readRel(demoRel);
+  for (const [rel, html] of [[demoRel, demoHtml], ['dist/index.html', readRel('dist/index.html')]]) if (html) loadingPage(html, rel, rel === demoRel).forEach(fail);
+  for (const rel of ['dist/notice/index.html', 'dist/toast/index.html']) {
+    const html = readRel(rel);
+    if (html && /window\.__superheroLoading=/.test(html)) fail(`${rel}: the loading runtime is on a page with no busy wrapper.`);
+  }
+  (await behaviours(src)).forEach(fail);
+  loadingSource(src).forEach(fail);
+  finish('loading');
+
+  const pageRules = (h) => loadingPage(h, demoRel, true);
+  mutation('loading', 'a spinner without role="status"', demoHtml, (h) => h.replace(/(class="ld ld--spinner ld--md") role="status"/, '$1'), pageRules);
+  mutation('loading', 'a spinner without a name', demoHtml, (h) => h.replace(/(class="ld ld--spinner ld--lg"[\s\S]*?<span class="ld__sr"[^>]*>)Loading/, '$1'), pageRules);
+  mutation('loading', 'skeleton shapes not hidden', demoHtml, (h) => h.replace(/(class="ld__bones") aria-hidden="true"/, '$1'), pageRules);
+  mutation('loading', 'busy content inert without JavaScript', demoHtml, (h) => h.replace(/(<div class="ld__content" data-ld-content)/, '$1 inert'), pageRules);
+  mutation('loading', 'the status inside the busy content', demoHtml, (h) => h.replace(/(<div class="ld__content" data-ld-content[^>]*>)/, '$1<span class="ld__sr" role="status" data-ld-status></span>'), pageRules);
+  const planted = [
+    ['aria-busy on the wrapper', (s) => s.replace("content.setAttribute('aria-busy', 'true');", "el.setAttribute('aria-busy', 'true');")],
+    ['content left operable', (s) => s.replace('content.inert = true;', 'content.inert = false;')],
+    ['focus dropped to <body>', (s) => s.replace("          el.focus();\n", '')],
+    ['focus not given back', (s) => s.replace('if (stillHere && back && back.isConnected', 'if (false && back && back.isConnected')],
+    ['the attribute ignored', (s) => s.replace("if (win.MutationObserver) new win.MutationObserver", 'if (false) new win.MutationObserver')],
+    ['no slow message', (s) => s.replace('if (slow && s.cfg.slowText) {', 'if (false) {')],
+  ];
+  for (const [label, plant] of planted) {
+    const bad = plant(src);
+    if (bad === src) {
+      fail(`loading mutation "${label}": the fault could not be planted; the runtime changed shape, so update the mutation.`);
+      continue;
+    }
+    if (!(await behaviours(bad)).length) fail(`loading mutation "${label}": the check did not notice it.`);
+    mutants.push(`loading: ${label}`);
+  }
+  mutation('loading', 'a shimmer under reduced motion', src, (s) => s.replace('.ld__bone--line {\n    height: 0.8em;', '.ld__bone--line {\n    animation: ld-shimmer 1.6s infinite;\n    height: 0.8em;'), loadingSource);
+  mutation('loading', 'the ring turning under reduced motion', src, (s) => s.replace('.ld__arc {\n      animation: ld-breathe', '.ld__arc {\n      animation: ld-spin'), loadingSource);
+  mutation('loading', 'the overlay shown without JavaScript', src, (s) => s.replace('.ld--busy.ld--live[data-busy] > .ld__overlay {\n    position', '.ld--busy[data-busy] > .ld__overlay {\n    position'), loadingSource);
+  mutation('loading', 'a faint slow message', src, (s) => s.replace('--ld-msg-fg, #1e283c', '--ld-msg-fg, #a0a6b0'), loadingSource);
+  finish('loading mutations');
+  summary.push('loading: spinner, skeleton and busy no-JS render on 2 pages; busy runtime on a DOM stand-in; motion only where allowed');
 }
 
 console.log(`check-feedback ok: ${summary.join('; ')}; ${mutants.length} planted faults caught.`);
