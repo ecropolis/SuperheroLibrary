@@ -1,0 +1,108 @@
+---
+/**
+ * Demo for `tags`. The website renders this too (see README, "Consumed by superherotech.ai"),
+ * so every host token has a fallback. No assets.
+ *
+ * The three modes: static chips on a product, topic links on a post, and the filters a
+ * visitor has applied, removable, remembered for the tab and capped at four with "+2 more".
+ * The line under the filters shows the `data-removed` event a host would listen for, and
+ * "Put them back" calls the restore API.
+ */
+import Tags from '../../library/tags/Tags.astro';
+---
+<div class="demo-tg" id="tags-demo">
+  <div class="demo-tg__row">
+    <p class="demo-tg__label">On a product</p>
+    <Tags label="Product features" items={['Indoor and outdoor', 'Online only', 'Hand-finished', 'Recycled glass']} />
+  </div>
+  <div class="demo-tg__row">
+    <p class="demo-tg__label">Topics on a post</p>
+    <Tags
+      mode="links"
+      label="Topics"
+      items={[
+        { text: 'Accessibility', href: '#tags-demo' },
+        { text: 'Hosting', href: '#tags-demo' },
+        { text: 'Local search', href: '#tags-demo' },
+      ]}
+    />
+  </div>
+  <div class="demo-tg__row">
+    <p class="demo-tg__label">Applied filters</p>
+    <Tags
+      class="demo-tg__filters"
+      mode="removable"
+      label="Applied filters"
+      max={4}
+      remember="demo-filters"
+      items={[
+        { text: 'Under $50', value: 'price-50' },
+        { text: 'In stock', value: 'in-stock' },
+        { text: 'Blue', value: 'blue' },
+        { text: 'Free delivery', value: 'free-delivery' },
+        { text: 'Rated 4 and up', value: 'rating-4' },
+        { text: 'Ships this week', value: 'ships-week' },
+      ]}
+    />
+    <p class="demo-tg__log">
+      <span data-demo-tg-log>Remove a filter: the host hears <code>data-removed</code> with its value.</span>
+      <button type="button" class="demo-tg__reset" data-demo-tg-reset>Put them back</button>
+    </p>
+  </div>
+</div>
+<script is:inline>
+  (() => {
+    const root = document.querySelector('#tags-demo .demo-tg__filters');
+    const log = document.querySelector('#tags-demo [data-demo-tg-log]');
+    const reset = document.querySelector('#tags-demo [data-demo-tg-reset]');
+    if (!root || !log || !reset) return;
+    root.addEventListener('data-removed', (e) => {
+      log.textContent = `data-removed: { value: "${e.detail.value}", text: "${e.detail.text}" }`;
+    });
+    reset.addEventListener('click', () => {
+      window.__superheroTags && window.__superheroTags.restore(root);
+      log.textContent = 'All six filters are back.';
+    });
+  })();
+</script>
+<style>
+  .demo-tg {
+    --tg-focus: var(--purple, #5933d8);
+    --tg-more-fg: var(--purple, #5933d8);
+    display: grid;
+    gap: 1.25rem;
+  }
+  .demo-tg__label {
+    margin: 0 0 0.5rem;
+    color: var(--ink, #1d2433);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .demo-tg__log {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin: 0.75rem 0 0;
+    font-size: 0.85rem;
+  }
+  .demo-tg__log code {
+    font-size: 0.95em;
+  }
+  .demo-tg__reset {
+    min-height: 2.75rem;
+    padding: 0.25rem 0.9rem;
+    border: 1px solid var(--line, #d5d9e2);
+    border-radius: var(--radius, 8px);
+    background: var(--white, #fff);
+    color: var(--ink, #1d2433);
+    font: inherit;
+    cursor: pointer;
+  }
+  .demo-tg__reset:focus-visible {
+    outline: 3px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+</style>

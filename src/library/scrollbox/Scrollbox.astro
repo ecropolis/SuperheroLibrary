@@ -1,0 +1,244 @@
+---
+/**
+ * Scrollbox — a row of cards or chips that runs off the side of its container and scrolls
+ * horizontally, with edge fades that say "there is more this way". Pass the items as the
+ * default slot's direct children.
+ *
+ * - The scroller is a `role="region"` named by `label`, with `tabindex="0"`, so a keyboard can
+ *   focus it and scroll it with the arrow keys. The items' own links are ordinary tab stops;
+ *   the browser scrolls a focused one into view, clear of the fade (scroll-padding).
+ * - Edge fades are a mask on the scroller, so they work over any background with no colour to
+ *   match. Each side fades only while there is more to scroll that way: the script measures
+ *   the room on each side (on scroll, on resize of the box or its content) and the fade grows
+ *   to `--sb-fade-size` as the room does. The measuring function is `scrollboxEdges`, emitted
+ *   between `/*<sb-edges>*\/` markers; `npm run check` runs the emitted copy.
+ * - `arrows` adds "Scroll left" / "Scroll right" buttons over the edges. Each shows only while
+ *   there is more that way; one that has focus when it reaches its end stays, dimmed and
+ *   aria-disabled, until focus leaves it, so focus is never dropped. They are never
+ *   the only way to scroll: the scrollbar always shows, and touch, trackpad, wheel and keys
+ *   are the browser's own. A press scrolls about four fifths of the visible width, smoothly,
+ *   or at once under prefers-reduced-motion (read at the press).
+ * - `snap` adds scroll-snap (proximity) so items come to rest at their start.
+ * - A carousel that pages, auto-advances or shows one card at a time is card-slider.
+ *
+ * Without JavaScript: a plain horizontal scroll with its scrollbar, no fades, no buttons. The
+ * script is defined once per page and each scrollbox mounts itself from the script straight
+ * after it, so its fades are right before the first paint.
+ *
+ * Sizing: it fills its container. Items keep their own width (`itemWidth`, or the host's CSS
+ * on the items); the row is as tall as its tallest item. The buttons sit over the edges, so
+ * the root is `position: relative`; no z-index beyond the buttons' own 1.
+ *
+ * Theming (each has a fallback):
+ *   --sb-gap         1rem       space between items
+ *   --sb-item        auto       item width (the `itemWidth` prop sets it)
+ *   --sb-fade-size   2.5rem     how far the fade reaches at most
+ *   --sb-btn-bg      #1b1c22    button    --sb-btn-fg  #fff   (16.99:1)
+ *   --sb-btn-size    2.75rem    44 px     --sb-focus   #5933d8
+ *   --sb-scrollbar   rgb(0 0 0 / 0.35) thumb colour (scrollbar-color, where supported)
+ *
+ * Behaviour and accessibility intent from Rocketbelt's scrollbox pattern (Pier 1 Imports,
+ * 2020, MIT); reimplemented, no code copied.
+ */
+interface Props {
+  /** Accessible name of the scrolling region: "Recent projects". Required. */
+  label: string;
+  /** "Scroll left" / "Scroll right" buttons over the edges. */
+  arrows?: boolean;
+  /** Items come to rest at their start (scroll-snap, proximity). */
+  snap?: boolean;
+  /** Space between items, any CSS length. Overrides --sb-gap. */
+  gap?: string;
+  /** Width of each item, any CSS length ("16rem", "min(80%, 18rem)"). Overrides --sb-item. */
+  itemWidth?: string;
+  /** Names of the buttons; translate on a non-English site. */
+  leftLabel?: string;
+  rightLabel?: string;
+  class?: string;
+}
+const { label, arrows = false, snap = false, gap, itemWidth, leftLabel = 'Scroll left', rightLabel = 'Scroll right', class: className } = Astro.props;
+if (!label || !label.trim()) throw new Error('Scrollbox: `label` is required; it names the scrolling region for screen readers.');
+
+/**
+ * Room on each side, in whole px: how far the box can still scroll left and right. Below one
+ * pixel counts as none, so a sub-pixel remainder at an end never shows a fade. Right-to-left
+ * boxes report scrollLeft from 0 at the start down to -max at the end.
+ */
+function scrollboxEdges(scrollLeft: number, scrollWidth: number, clientWidth: number, rtl: boolean) {
+  const max = Math.max(0, scrollWidth - clientWidth);
+  const fromLeft = Math.min(max, Math.max(0, rtl ? max + scrollLeft : scrollLeft));
+  const toRight = max - fromLeft;
+  return { left: fromLeft < 1 ? 0 : Math.round(fromLeft), right: toRight < 1 ? 0 : Math.round(toRight) };
+}
+
+/** The browser half. Self-contained: it is emitted with toString(). */
+function scrollboxClient(edges: typeof scrollboxEdges) {
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  const mount = (root: any) => {
+    if (!root || root.__sb) return;
+    const vp = root.querySelector('[data-sb-viewport]');
+    const left = root.querySelector('[data-sb-left]');
+    const right = root.querySelector('[data-sb-right]');
+    if (!vp) return;
+    root.__sb = true;
+    const update = () => {
+      const rtl = getComputedStyle(vp).direction === 'rtl';
+      const room = edges(vp.scrollLeft, vp.scrollWidth, vp.clientWidth, rtl);
+      vp.style.setProperty('--sb-room-left', room.left + 'px');
+      vp.style.setProperty('--sb-room-right', room.right + 'px');
+      const overflow = room.left > 0 || room.right > 0;
+      root.toggleAttribute('data-overflow', overflow);
+      for (const [btn, has] of [
+        [left, room.left > 0],
+        [right, room.right > 0],
+      ]) {
+        if (!btn) continue;
+        // Not needed at its own end, so hidden; but a button that has focus stays (dimmed,
+        // aria-disabled) until focus leaves it, so the keyboard never loses its place.
+        btn.hidden = !overflow || (!has && document.activeElement !== btn);
+        btn.setAttribute('aria-disabled', String(!has));
+      }
+    };
+    const step = (dir: number) => {
+      vp.scrollBy({ left: dir * Math.max(1, vp.clientWidth * 0.8), behavior: still.matches ? 'auto' : 'smooth' });
+    };
+    for (const [btn, dir] of [
+      [left, -1],
+      [right, 1],
+    ]) {
+      if (!btn) continue;
+      btn.addEventListener('click', () => btn.getAttribute('aria-disabled') !== 'true' && step(dir));
+      btn.addEventListener('blur', update);
+    }
+    vp.addEventListener('scroll', update, { passive: true });
+    if ('ResizeObserver' in window) {
+      // The box, and each item: an image that loads or a font that swaps changes the room.
+      const ro = new ResizeObserver(update);
+      ro.observe(vp);
+      for (const item of vp.children) ro.observe(item);
+    } else addEventListener('resize', update);
+    root.setAttribute('data-ready', '');
+    update();
+  };
+  return { mount };
+}
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__sbCount as number) || 0) + 1;
+locals.__sbCount = n;
+const uid = `sb-${n}`;
+const define = `window.__superheroScrollbox=window.__superheroScrollbox||(${scrollboxClient.toString()})(/*<sb-edges>*/${scrollboxEdges.toString()}/*</sb-edges>*/);`;
+const mountScript = `${n === 1 ? define : ''}window.__superheroScrollbox.mount(document.currentScript.previousElementSibling);`;
+const vars = [gap && `--sb-gap:${gap}`, itemWidth && `--sb-item:${itemWidth}`].filter(Boolean).join(';');
+---
+
+<div class:list={['sb', { 'sb--snap': snap }, className]} style={vars || undefined} data-sb>
+  <div class="sb__viewport" id={`${uid}-viewport`} role="region" aria-label={label} tabindex="0" data-sb-viewport>
+    <slot />
+  </div>
+  {
+    arrows && (
+      <>
+        <button class="sb__btn sb__btn--left" type="button" aria-label={leftLabel} aria-controls={`${uid}-viewport`} data-sb-left hidden>
+          <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false">
+            <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button class="sb__btn sb__btn--right" type="button" aria-label={rightLabel} aria-controls={`${uid}-viewport`} data-sb-right hidden>
+          <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false">
+            <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </>
+    )
+  }
+</div>
+<script is:inline set:html={mountScript} />
+
+<style>
+  .sb {
+    position: relative;
+    min-width: 0;
+  }
+  .sb [hidden] {
+    display: none !important;
+  }
+  /* The scroller is the row itself, so a percentage item width is a share of the visible box.
+     position: relative makes it the containing block of anything absolutely positioned in the
+     items (visually hidden text, a sticker), which it then clips; otherwise such a box, in an
+     item scrolled far off, escapes the scroller and widens the page. */
+  .sb__viewport {
+    position: relative;
+    display: flex;
+    gap: var(--sb-gap, 1rem);
+    box-sizing: border-box;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--sb-fade-size, 2.5rem);
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-scrollbar, rgb(0 0 0 / 0.35)) transparent;
+  }
+  .sb__viewport:focus-visible {
+    outline: 3px solid var(--sb-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  /* The fades. Only once the script has measured; the room variables it sets are 0px at an
+     end with nothing more to show, so that side stays sharp. */
+  .sb[data-ready] .sb__viewport {
+    --sb-l: min(var(--sb-fade-size, 2.5rem), var(--sb-room-left, 0px));
+    --sb-r: min(var(--sb-fade-size, 2.5rem), var(--sb-room-right, 0px));
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--sb-l), #000 calc(100% - var(--sb-r)), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 var(--sb-l), #000 calc(100% - var(--sb-r)), transparent);
+  }
+  /* A mask would fade the focus ring at the edges too, so the root draws it instead. */
+  .sb[data-ready] .sb__viewport:focus-visible {
+    outline: none;
+  }
+  .sb[data-ready]:has(> .sb__viewport:focus-visible) {
+    outline: 3px solid var(--sb-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .sb__viewport > :global(*) {
+    flex: 0 0 var(--sb-item, auto);
+    min-width: 0;
+  }
+  .sb--snap .sb__viewport {
+    scroll-snap-type: x proximity;
+  }
+  .sb--snap .sb__viewport > :global(*) {
+    scroll-snap-align: start;
+  }
+  .sb__btn {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: var(--sb-btn-size, 2.75rem);
+    height: var(--sb-btn-size, 2.75rem);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: var(--sb-btn-bg, #1b1c22);
+    color: var(--sb-btn-fg, #fff);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+    translate: 0 -50%;
+    cursor: pointer;
+  }
+  .sb__btn--left {
+    left: 0.25rem;
+  }
+  .sb__btn--right {
+    right: 0.25rem;
+  }
+  .sb__btn[aria-disabled='true'] {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .sb__btn:focus-visible {
+    outline: 3px solid var(--sb-focus, #5933d8);
+    outline-offset: 2px;
+  }
+</style>

@@ -2643,6 +2643,184 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     file: 'src/library/stepper/Stepper.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'tags',
+    name: 'Tags',
+    aka: ['chips', 'tag chips', 'pills', 'badges list', 'filter chips', 'removable tags', 'post tags', 'tag cloud'],
+    summary:
+      'A wrapping list of small labels in three modes: static chips, links, or removable chips whose real “Remove <tag>” buttons dispatch a data-removed event with the value and can be remembered for the tab. An optional max shows “+N more”. Without JavaScript every chip shows and the removal buttons stay hidden.',
+    pitch: 'Show the topics, features or filters that belong to something, and let visitors clear a filter with one tap.',
+    // SE Ranking US, 2026-09-26: tags ui 170/mo, difficulty 6; tag ui design 70/6; removable
+    // tags 20/6. The pre-assigned "tag chips ui" has no data. "chip component" 320/22 and
+    // "filter chips" 260/30 are developer queries for form controls, left unclaimed.
+    search: { query: 'tags ui', alsoRanks: ['tag ui design', 'removable tags'] },
+    replaces: ['WordPress post tags and tag-cloud widgets', 'page-builder “badge” and “label” modules', 'WooCommerce active-filter chips'],
+    goodFor:
+      'A few short labels that belong to something: the topics of a post, the features of a product, the filters a visitor has applied to a list. Removable chips when the visitor can take one off and the page should follow.',
+    notFor:
+      'Navigation (a menu is a menu), a choice the visitor is making (that is a set of checkboxes or a radio-group in a form), or a single badge on a card or photo (that is sticker). And not a tag cloud of fifty words: past a dozen, use `max` or a list page.',
+    props: [
+      { name: 'items', type: '(string | { text, href?, value? })[]', note: 'The tags. `value` (default: the text) is what data-removed reports and `remember` stores. Required.' },
+      { name: 'mode', type: "'static' | 'links' | 'removable'", default: "'static'", note: 'links needs an href on every item (the build fails without); removable needs unique values.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the list: “Topics”, “Applied filters”. Set it whenever the list has no visible heading right before it.' },
+      { name: 'max', type: 'number', note: 'Show the first `max` tags and a “+N more” button that shows the rest (and then reads “Show fewer”).' },
+      { name: 'remember', type: 'string', note: 'removable: keep removals for this tab in sessionStorage under tags:<remember>, so they stay removed on the next page.' },
+      { name: 'moreLabel / lessLabel', type: 'string', default: '“+{n} more” / “Show fewer”', note: 'The expander’s two texts; {n} is the number hidden.' },
+      { name: 'removeLabel / removedLabel', type: 'string', default: '“Remove {tag}” / “Removed {tag}”', note: 'Each removal button’s name, and what the status line says after a removal. Translate on a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it or listen on it.' },
+    ],
+    theming: [
+      { name: '--tg-bg', fallback: '#eef0f4', note: 'Chip background.' },
+      { name: '--tg-fg', fallback: '#1d2433', note: 'Chip text (13.61:1 on the fallback background; keep 4.5:1).' },
+      { name: '--tg-hover-bg', fallback: '#dfe3ec', note: 'A link chip under the pointer (12.08:1).' },
+      { name: '--tg-border', fallback: 'transparent', note: 'Chip border; in forced-colours mode it draws the chip.' },
+      { name: '--tg-radius', fallback: '999px', note: 'Chip corners.' },
+      { name: '--tg-gap', fallback: '0.5rem', note: 'Space between chips and between rows.' },
+      { name: '--tg-font-size', fallback: '0.875rem', note: 'Text size.' },
+      { name: '--tg-weight', fallback: '600', note: 'Text weight.' },
+      { name: '--tg-remove-hover-bg', fallback: 'rgb(0 0 0 / 0.1)', note: 'The removal button under the pointer.' },
+      { name: '--tg-more-fg', fallback: '#5933d8', note: '“+N more”, on the page background (7.27:1 on white).' },
+      { name: '--tg-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'A real <ul> with role="list" (VoiceOver drops list semantics on list-style: none without it), named by `label`. Links are links; static chips are text.',
+      'Each removable chip has a real <button> named “Remove <tag>”. After a removal, focus moves to the next chip’s button (or the previous one, or the list when none are left) and a polite status line says “Removed <tag>”.',
+      'On a touch screen (pointer: coarse) each removal button and “+N more” is a 44 by 44 px target; the chip keeps its height, so rows do not spread apart.',
+      '“+N more” is a button with aria-expanded and aria-controls naming the list; after it, focus stays on it, now reading “Show fewer”.',
+      'No motion. Colours clear 4.5:1 with their fallbacks; `npm run check` computes them.',
+      'Without JavaScript every tag shows and the removal and “+N more” buttons stay hidden rather than doing nothing. With it, a collapsed list and remembered removals are settled by the script right after the list, before the first paint, so nothing jumps.',
+    ],
+    usage: `<!-- Topics on a post -->
+<Tags mode="links" label="Topics" items={post.tags.map((t) => ({ text: t.name, href: \`/topics/\${t.slug}/\` }))} />
+
+<!-- Applied filters: the host listens for data-removed and drops the filter -->
+<Tags class="filters" mode="removable" label="Applied filters" remember="shop" max={6}
+  items={[{ text: 'Under $50', value: 'price-50' }, { text: 'Blue', value: 'blue' }]} />
+<script>
+  document.querySelector('.filters').addEventListener('data-removed', (e) => removeFilter(e.detail.value));
+</script>
+<!-- global.css: .tg { --tg-bg: var(--tint); --tg-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tags/ (demo)' }],
+    file: 'src/library/tags/Tags.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'scrollbox',
+    name: 'Scrollbox',
+    aka: ['horizontal scroller', 'scroll row', 'overflow row', 'scroll shadows', 'edge fade', 'horizontal scroll section', 'chip row'],
+    summary:
+      'A row of cards or chips that scrolls sideways inside its container: a named, focusable region the keyboard can scroll, with edge fades that appear only on a side with more to see (measured on scroll and resize) and optional left/right buttons that are never the only way to scroll. Optional scroll-snap. Without JavaScript it is a plain horizontal scroll.',
+    pitch: 'Fit a long row of projects, products or categories into one line, and let the edges show there is more to scroll.',
+    // SE Ranking US, 2026-09-26: horizontal scroll cards 170/mo, difficulty 13 (and rising:
+    // 70 a year ago); horizontal scroll css 170/24; horizontal scrolling website 90/21.
+    // "horizontal scroll" 720/27 is mostly people asking how to scroll sideways, left unclaimed.
+    search: { query: 'horizontal scroll cards', alsoRanks: ['horizontal scroll css', 'horizontal scrolling website'] },
+    replaces: ['page-builder “horizontal scroll” sections and scroll-shadow snippets', 'a carousel used only to fit a row that is too wide', 'overflow rows that hide their scrollbar and give no hint there is more'],
+    goodFor:
+      'A row that is useful at a glance and fine to explore: related products, recent projects, category chips, a filter bar on a phone. The visitor moves it, at their pace, however they like to scroll.',
+    notFor:
+      'A carousel: when the row should page one screen at a time with dots and a count, or move by itself, or show one card at a time, that is card-slider. Also not for content every visitor must read (a row hides most of what it holds: use a grid), and not for a data table (that scrolls in its own element, with its headers).',
+    props: [
+      { name: 'label', type: 'string', note: 'Accessible name of the scrolling region: “Recent projects”. Required.' },
+      { name: 'default slot', type: 'items', note: 'Each direct child is one item (card, chip, link). They keep their own width; the row is as tall as the tallest.' },
+      { name: 'arrows', type: 'boolean', default: 'false', note: '“Scroll left” / “Scroll right” buttons over the edges. Each shows only while there is more that way. A press scrolls about four fifths of the width.' },
+      { name: 'snap', type: 'boolean', default: 'false', note: 'scroll-snap (proximity): items come to rest at their start.' },
+      { name: 'gap', type: 'string', note: 'Space between items, any CSS length. Overrides `--sb-gap` (1rem).' },
+      { name: 'itemWidth', type: 'string', note: 'Width of each item: “16rem”, “min(80%, 18rem)”. Overrides `--sb-item` (auto).' },
+      { name: 'leftLabel / rightLabel', type: 'string', default: '“Scroll left” / “Scroll right”', note: 'Button names; translate on a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--sb-gap', fallback: '1rem', note: 'Space between items; the `gap` prop overrides it.' },
+      { name: '--sb-item', fallback: 'auto', note: 'Item width; the `itemWidth` prop overrides it.' },
+      { name: '--sb-fade-size', fallback: '2.5rem', note: 'The furthest a fade reaches. It is also the scroll padding, so a focused item stops clear of the fade.' },
+      { name: '--sb-btn-bg', fallback: '#1b1c22', note: 'Button background.' },
+      { name: '--sb-btn-fg', fallback: '#fff', note: 'Button chevron (16.99:1 on the fallback).' },
+      { name: '--sb-btn-size', fallback: '2.75rem', note: 'Button size: 44 px.' },
+      { name: '--sb-focus', fallback: '#5933d8', note: 'Focus ring on the region and the buttons.' },
+      { name: '--sb-scrollbar', fallback: 'rgb(0 0 0 / 0.35)', note: 'Scrollbar thumb, where scrollbar-color is supported. The scrollbar is never hidden.' },
+    ],
+    a11y: [
+      'The scroller is role="region" named by `label`, with tabindex="0": a keyboard focuses it and scrolls it with ← →. The items’ own links are ordinary tab stops, and a focused one is scrolled into view clear of the fade.',
+      'The fades are a visual hint only, drawn with a mask so they suit any background. Each shows only while that side has more to scroll; `npm run check` runs the measuring function the page actually ships.',
+      'The buttons are real buttons named “Scroll left” and “Scroll right”, 44 px, aria-controls naming the region. Each shows only while there is more that way; one that reaches its end while focused stays, dimmed and aria-disabled, until focus leaves it, so focus is never dropped. They are never the only way to scroll: the scrollbar always shows, and touch, trackpad, wheel and keys work as the browser’s own.',
+      'prefers-reduced-motion: a button press jumps at once instead of gliding. Nothing moves by itself.',
+      'Without JavaScript: a plain horizontal scroll with its scrollbar, no fades and no buttons.',
+    ],
+    usage: `<Scrollbox label="Recent projects" arrows snap itemWidth="min(80%, 16rem)">
+  {projects.map((p) => <article class="card">…<a href={p.url}>{p.title}</a></article>)}
+</Scrollbox>
+
+<Scrollbox label="Categories" gap="0.5rem">
+  {categories.map((c) => <a class="chip" href={c.url}>{c.name}</a>)}
+</Scrollbox>
+<!-- global.css: .sb { --sb-btn-bg: var(--brand); --sb-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/scrollbox/ (demo)' }],
+    file: 'src/library/scrollbox/Scrollbox.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'sticker',
+    name: 'Sticker',
+    aka: ['sale badge', 'sale sticker', 'corner ribbon', 'product badge', 'discount badge', 'new badge', 'price tag', 'WooCommerce sale flash'],
+    summary:
+      'A badge pinned to a corner of a card or image: a turned label, a round sticker or a ribbon across the corner, in three tones. The host places it inside a position: relative box. `label` gives the spoken name when the text is not the meaning (“-20%” is read “20% off”, automatically for a bare percentage or amount). No motion, no script.',
+    pitch: 'Mark the sale, the new arrival or the last few in stock right on the photo, where shoppers look first.',
+    // SE Ranking US, 2026-09-26: sale badge 90/mo, difficulty 7; sale sticker 80/7; css ribbon
+    // 90/16; discount badge 30/8. The pre-assigned "sale badge css" has no data. "sale tag"
+    // 240/8 and "new badge" 320/15 are mostly shoppers and gamers, left unclaimed.
+    search: { query: 'sale badge', alsoRanks: ['sale sticker', 'css ribbon', 'discount badge'] },
+    replaces: ['WooCommerce “Sale!” flash and badge plugins', 'page-builder ribbon and badge modules', 'corner-ribbon CSS snippets', 'sale stickers baked into product photos'],
+    goodFor: 'One short word or number on a product, offer, post or event card: Sale, New, -20%, Sold out, Last few, Free delivery.',
+    notFor:
+      'A list of labels (that is tags), a message the visitor must read (put it in the text: a sticker is decoration a screen reader still names, not the only place a price or a condition lives), or a banner across the page (announcement-bar). One sticker per card; two fight each other.',
+    props: [
+      { name: 'text', type: 'string', note: 'What it shows: “Sale”, “New”, “-20%”. Keep it short; a ribbon holds about eight characters. Required.' },
+      { name: 'label', type: 'string', note: 'What a screen reader says instead, when the text is not the meaning: “Buy one, get one free” for “2 for 1”. A bare “-20%” or “-$10” gets “20% off” / “$10 off” without it; other languages need it. `label=""` marks the sticker decorative on purpose.' },
+      { name: 'shape', type: "'label' | 'circle' | 'ribbon'", default: "'label'", note: 'A turned rectangle, a round sticker, or a band across the corner.' },
+      { name: 'corner', type: "'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'", default: "'top-left'", note: 'Which corner of the positioned parent.' },
+      { name: 'tone', type: "'accent' | 'sale' | 'dark'", default: "'accent'", note: 'Which pair of colours.' },
+      { name: 'class', type: 'string', note: 'Class on the sticker, for the host to theme or nudge it.' },
+    ],
+    theming: [
+      { name: '--sk-accent-bg / --sk-accent-fg', fallback: '#5933d8 / #fff', note: 'tone="accent" (7.27:1).' },
+      { name: '--sk-sale-bg / --sk-sale-fg', fallback: '#b42318 / #fff', note: 'tone="sale" (6.57:1).' },
+      { name: '--sk-dark-bg / --sk-dark-fg', fallback: '#1e283c / #fff', note: 'tone="dark" (14.75:1). If you map any pair to brand colours, keep 4.5:1.' },
+      { name: '--sk-offset', fallback: '0.75rem', note: 'Distance from the edges (label and circle; the ribbon sits flush).' },
+      { name: '--sk-size', fallback: '4.5rem', note: 'Diameter of the circle.' },
+      { name: '--sk-ribbon-size', fallback: '6.5rem', note: 'The square corner box the ribbon crosses.' },
+      { name: '--sk-radius', fallback: '4px', note: 'Corners of the label.' },
+      { name: '--sk-rotate / --sk-circle-rotate', fallback: '-3deg / -12deg', note: 'The label’s and the circle’s turn. 0deg for a straight one.' },
+      { name: '--sk-font-size / --sk-weight / --sk-transform', fallback: '0.8125rem / 800 / uppercase', note: 'Type.' },
+      { name: '--sk-shadow', fallback: '0 1px 3px rgb(0 0 0 / 0.25)', note: 'box-shadow, to lift it off a photo.' },
+      { name: '--sk-z', fallback: '1', note: 'Stacking inside the card.' },
+    ],
+    a11y: [
+      'Read as written, where it sits in the source: put it before the card’s title and a screen reader says “Sale, Evening print”.',
+      'When the text is not the meaning, `label` is read and the text is hidden from assistive technology. “-20%” and “-$10” get “20% off” and “$10 off” by themselves (English). `label=""` hides a sticker that only repeats what the card already says.',
+      'The fallback colours of all three tones clear 4.5:1 (7.27, 6.57 and 14.75 to 1); `npm run check` computes them. A transparent border draws it in forced-colours mode.',
+      'It ignores the pointer, so a tap on it reaches the card’s link. It is never focusable and never interactive.',
+      'No motion at all, so nothing to reduce. No JavaScript, so nothing differs without it.',
+    ],
+    usage: `<article class="product">
+  <div class="product__media">          <!-- position: relative (the host's job) -->
+    <Sticker shape="circle" tone="sale" text="-20%" />   <!-- read "20% off" -->
+    <img src="/images/table.webp" alt="" />
+  </div>
+  <h3><a href="/shop/oak-table/">Oak side table</a></h3>
+  <p>$96, was $120</p>
+</article>
+
+<Sticker shape="ribbon" corner="top-right" tone="sale" text="Sale" />
+<Sticker text="2 for 1" label="Buy one, get one free" tone="dark" />
+<!-- global.css: .sk { --sk-accent-bg: var(--brand); --sk-sale-bg: var(--red-700); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/sticker/ (demo)' }],
+    file: 'src/library/sticker/Sticker.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
