@@ -32,6 +32,7 @@ import ModalDemo from './ModalDemo.astro';
 import AnnouncementBarDemo from './AnnouncementBarDemo.astro';
 import MenuButtonDemo from './MenuButtonDemo.astro';
 import RadioGroupDemo from './RadioGroupDemo.astro';
+import StepperDemo from './StepperDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,4 +63,5 @@ export const demos: Record<string, AstroComponent> = {
   'announcement-bar': AnnouncementBarDemo,
   'menu-button': MenuButtonDemo,
   'radio-group': RadioGroupDemo,
+  stepper: StepperDemo,
 };

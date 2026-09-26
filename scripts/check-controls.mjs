@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * npm run check (after check-catalog.mjs, which builds dist/) — pins the controls added in round 4
- * (menu-button and radio-group). Each is read from its built demo page and from
+ * npm run check (after check-catalog.mjs, which builds dist/) — pins the three controls added in
+ * round 4: menu-button, radio-group and stepper. Each is read from its built demo page and from
  * the gallery index (which renders every demo on one page), i.e. exactly what a visitor without
  * JavaScript gets, plus the runtime script as the page emits it.
  *
@@ -21,7 +21,12 @@
  *   aria-labelledby / aria-describedby pointing at text. No role and no tabindex (the keyboard is
  *   native). The demo form's successful controls are computed as a browser would post them.
  *   Chunky icons are Font Awesome Free. The script dispatches a bubbling `data-changed`.
- * All of them
+ * stepper
+ *   An <ol>, named (by the <nav> when a step links, by the list otherwise); each step's state
+ *   equals the emitted script's `<st-states>` rule for `data-current`; aria-current="step" on
+ *   exactly the current step (none when all are done); done steps say "Completed:" and show the
+ *   check, and link exactly when they have an href; current and upcoming steps never link.
+ * All three
  *   The runtime is emitted once per page. Every inlined <path> in the three element files is a
  *   Font Awesome Free glyph, byte for byte. Each CSS variable has one fallback throughout its
  *   file, and the text pairs among those fallbacks clear 4.5:1 (3:1 for the radio ring).
@@ -343,10 +348,102 @@ async function checkRadioGroup(html, where, demo) {
   return out;
 }
 
+// =================================================================== stepper
+async function checkStepper(html, where, demo) {
+  const out = [];
+  const rts = scripts(html).filter((s) => /window\.__superheroStepper = \{ go \}/.test(s));
+  const found = [...roots(html, 'nav', 'data-st'), ...roots(html, 'div', 'data-st')].sort((a, b) => a.index - b.index);
+  if (found.length && rts.length !== 1) out.push(`${where}: the stepper runtime is on the page ${rts.length} times; it must be emitted once.`);
+  let states = null;
+  const rule = rts[0] && between(rts[0], 'st-states');
+  if (found.length && !rule) out.push(`${where}: the emitted script has no // <st-states> block.`);
+  else if (rule) {
+    try {
+      ({ stStates: states } = await load(rule, 'stStates'));
+    } catch (e) {
+      out.push(`${where}: the <st-states> block does not run: ${e.message}`);
+    }
+  }
+  if (states) {
+    const golden = [
+      [1, 4, ['current', 'upcoming', 'upcoming', 'upcoming']],
+      [2, 4, ['done', 'current', 'upcoming', 'upcoming']],
+      [4, 4, ['done', 'done', 'done', 'current']],
+      [5, 4, ['done', 'done', 'done', 'done']],
+    ];
+    for (const [n, c, want] of golden) if (!eq(states(n, c), want)) out.push(`${where}: stStates(${n}, ${c}) gave ${JSON.stringify(states(n, c))}, expected ${JSON.stringify(want)}.`);
+  }
+  const rt = rts[0] ?? '';
+  for (const [re, what] of [
+    [/Math\.min\(Math\.max\(1, Math\.round\(n\)\), steps\.length \+ 1\)/, 'clamps go(id, n) to 1 … steps + 1'],
+    [/setAttribute\('aria-current', 'step'\)/, 'sets aria-current="step" on the new current step'],
+    [/removeAttribute\('aria-current'\)/, 'removes aria-current from the others'],
+    [/'Completed: '/, 'writes "Completed: " for done steps'],
+  ])
+    if (found.length && rt && !re.test(rt)) out.push(`${where}: the emitted script no longer ${what}.`);
+
+  const orient = new Set();
+  for (const r of found) {
+    const id = attr(r.open, 'id');
+    const at = `${where}, stepper #${id}`;
+    orient.add(r.open.match(/\bst--(auto|vertical)\b/)?.[1]);
+    const isNav = r.open.startsWith('<nav');
+    const ol = r.html.match(/<ol\b[^>]*>/);
+    if (!ol) {
+      out.push(`${at}: the steps are not an <ol>.`);
+      continue;
+    }
+    const name = isNav ? attr(r.open, 'aria-label') : attr(ol[0], 'aria-label');
+    if (!name) out.push(`${at}: no accessible name (aria-label on the ${isNav ? '<nav>' : '<ol>'}).`);
+    const lis = tags(r.html, /<li\b[^>]*>/g).map((t) => ({ ...t, html: block(r.html, t.index, 'li') }));
+    const current = Number(attr(r.open, 'data-current'));
+    const got = lis.map((l) => l.open.match(/\bst__step--(done|current|upcoming)\b/)?.[1]);
+    if (states) {
+      const want = states(current, lis.length);
+      if (!eq(got, want)) out.push(`${at}: rendered states ${JSON.stringify(got)} for data-current=${current}, but the script's rule gives ${JSON.stringify(want)}.`);
+    }
+    const marked = lis.filter((l) => attr(l.open, 'aria-current') !== undefined);
+    const wantMarked = current <= lis.length ? 1 : 0;
+    if (marked.length !== wantMarked) out.push(`${at}: ${marked.length} steps carry aria-current; expected ${wantMarked}.`);
+    for (const l of marked) {
+      if (attr(l.open, 'aria-current') !== 'step') out.push(`${at}: aria-current="${attr(l.open, 'aria-current')}"; a step is aria-current="step".`);
+      if (!/st__step--current/.test(l.open)) out.push(`${at}: aria-current is on a step that is not the current one.`);
+    }
+    const anyHref = lis.some((l) => attr(l.open, 'data-href'));
+    if (anyHref !== isNav) out.push(`${at}: ${isNav ? 'a <nav> with no step that links' : 'steps link but the root is not a <nav>'}.`);
+    lis.forEach((l, i) => {
+      const s = got[i];
+      const sr = text(l.html.match(/<span class="st__sr[^"]*"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? '');
+      const link = l.html.match(/<a\b[^>]*>/);
+      const href = attr(l.open, 'data-href');
+      const label = text(l.html.match(/<span class="st__label[^"]*"[^>]*>([\s\S]*?)<\/span>\s*(?:<span class="st__text|<\/span>)/)?.[1] ?? '');
+      if (!label) out.push(`${at}: step ${i + 1} has no label.`);
+      if (!/<span class="st__marker[^"]*" aria-hidden="true"/.test(l.html)) out.push(`${at}: step ${i + 1}'s marker is not aria-hidden (the list already numbers it).`);
+      if (s === 'done') {
+        if (sr !== 'Completed:') out.push(`${at}: done step ${i + 1} does not say "Completed:" to screen readers.`);
+        if (!/class="st__check"/.test(l.html)) out.push(`${at}: done step ${i + 1} has no check.`);
+        if (href && (!link || attr(link[0], 'href') !== href)) out.push(`${at}: done step ${i + 1} has an href but is not a link to it.`);
+        if (!href && link) out.push(`${at}: done step ${i + 1} links without an href.`);
+      } else {
+        if (link) out.push(`${at}: ${s} step ${i + 1} is a link; only done steps link.`);
+        if (sr) out.push(`${at}: ${s} step ${i + 1} says "${sr}".`);
+      }
+    });
+    faSvgs(r.html, at, out);
+  }
+  if (demo) {
+    if (found.length !== 2) out.push(`${where}: expected the demo's 2 steppers, found ${found.length}.`);
+    if (!orient.has('auto') || !orient.has('vertical')) out.push(`${where}: the demo needs an auto and a vertical stepper.`);
+    if (!found.some((r) => /\sid="demo-st-checkout"/.test(r.open))) out.push(`${where}: the demo's go() target #demo-st-checkout is missing.`);
+  }
+  return out;
+}
+
 // =================================================================== run on the pages
 const checks = {
   'menu-button': checkMenuButton,
   'radio-group': checkRadioGroup,
+  stepper: checkStepper,
 };
 // A check runs when its element is in the catalogue (ids read as text, as check-four does).
 const inCatalog = new Set([...readFileSync(join(root, 'src/data/catalog.ts'), 'utf8').matchAll(/^\s{4}id: '([a-z0-9-]+)'/gm)].map((m) => m[1]));
@@ -364,6 +461,7 @@ finish('built pages');
 const files = {
   'menu-button': 'src/library/menu-button/MenuButton.astro',
   'radio-group': 'src/library/radio-group/RadioGroup.astro',
+  stepper: 'src/library/stepper/Stepper.astro',
 };
 const fallbacks = {};
 for (const [id, rel] of Object.entries(files)) {
@@ -404,6 +502,9 @@ const pairs = [
   ['radio-group', '--rg-muted', '--rg-bg-checked', 4.5],
   ['radio-group', '--rg-border', '--rg-bg', 3],
   ['radio-group', '--rg-accent', '--rg-bg', 3],
+  ['stepper', '--st-accent-fg', '--st-accent', 4.5],
+  ['stepper', '--st-upcoming', '--st-bg', 4.5],
+  ['stepper', '--st-muted', '#fff', 4.5],
 ];
 const measured = [];
 for (const [id, fg, bg, min] of pairs) {
@@ -452,6 +553,15 @@ const mutants = {
     ['required dropped from the contact group', swapRe(/(name="contact" value="email") required/, '$1')],
     ['the legend missing', swapRe(/<legend class="rg__legend"[^>]*>[\s\S]*?<\/legend>/, '')],
     ['data-changed no longer dispatched', swap("new CustomEvent('data-changed'", "new CustomEvent('changed'")],
+  ],
+  stepper: [
+    ['aria-current removed', swapRe(/ aria-current="step"/, '')],
+    ['aria-current="page" for a step', swapRe(/aria-current="step"/, 'aria-current="page"')],
+    ['aria-current on an upcoming step too', swapRe(/(<li class="st__step st__step--upcoming"[^>]*?)>/, '$1 aria-current="step">')],
+    ['the state rule shifted by one', swap("(i + 1 < n ? 'done'", "(i + 1 <= n ? 'done'")],
+    ['a link on the current step', swapRe(/(<li class="st__step st__step--current"[^>]*>\s*)<span class="st__link"([^>]*)>/, '$1<a class="st__link" href="#x"$2>')],
+    ['"Completed:" dropped from a done step', swapRe(/Completed: /, '')],
+    ['go() clamp removed', swap('Math.min(Math.max(1, Math.round(n)), steps.length + 1)', 'n')],
   ],
 };
 let caught = 0;

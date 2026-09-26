@@ -1569,6 +1569,71 @@ import { analytics } from '../data/site';
     file: 'src/library/radio-group/RadioGroup.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'stepper',
+    name: 'Stepper',
+    aka: ['step indicator', 'progress steps', 'stepped progress indicator', 'checkout steps', 'wizard steps', 'multi-step form progress bar', 'Gravity Forms progress bar', 'WPForms page break progress'],
+    summary:
+      'An ordered list of steps, each done (with a check, optionally linked back), current (aria-current="step") or upcoming, joined by connector lines: horizontal when it has 40rem of its own width, vertical below. Static as rendered; window.__superheroStepper.go(id, n) advances it for a form that does not reload.',
+    pitch: 'Show people where they are in a checkout or a sign-up, how far they have come and what is left, on a laptop or a phone.',
+    // SE Ranking US, 2026-09-26: step indicator 210/mo, difficulty 12; wizard steps 170/12;
+    // progress indicator 260/42; steps ui 90/7. "progress steps html", the phrase the round-4
+    // brief pre-assigned, has no measurable volume; "stepper" alone is 14,800/78 and mostly
+    // exercise machines.
+    search: { query: 'step indicator', alsoRanks: ['wizard steps', 'progress indicator', 'steps ui'] },
+    replaces: ['Gravity Forms and WPForms multi-page progress bars (the “steps” style)', 'WooCommerce multi-step checkout plugins’ step bars', 'page-builder “process steps” widgets used as a progress bar'],
+    goodFor: 'A sequence of three to six steps someone goes through once: a checkout, a booking, an application or quote form split into pages, an onboarding checklist.',
+    notFor:
+      'A history or a process you describe rather than one the visitor is in: that is a timeline (info-list). Percent-done for a single task: that is a progress bar. More than about six steps: group them. And navigation between pages people can visit in any order: those are tabs or links.',
+    props: [
+      { name: 'steps', type: 'Step[]', note: '`{ label, href?, text? }`. A done step with an `href` links back to it; current and upcoming steps are never links. `text` is a short line under the label.' },
+      { name: 'current', type: 'number', default: '1', note: 'The 1-based current step. `steps.length + 1` marks every step done.' },
+      { name: 'label', type: 'string', default: '“Progress”', note: 'Accessible name: of the <nav> when any step has an href, otherwise of the list, so a purely visual stepper adds no landmark.' },
+      { name: 'orientation', type: "'auto' | 'vertical'", default: "'auto'", note: 'Auto is horizontal from 40rem of its own width and vertical below, so it turns vertical on a phone and in a sidebar. Vertical always stacks.' },
+      { name: 'id', type: 'string', default: '“stepper-<n>”', note: 'The id `window.__superheroStepper.go(id, n)` takes.' },
+      { name: 'go(id, n)', type: 'window.__superheroStepper', note: 'Makes step n current (clamped; steps.length + 1 = all done), earlier steps done and linked, later upcoming. Returns true, or false for an unknown id. Moves no focus: move it to your form section’s heading.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--st-accent', fallback: '#5933d8', note: 'Done and current markers, lines behind the current step.' },
+      { name: '--st-accent-fg', fallback: '#fff', note: 'Number or check on a filled marker (7.27:1 on the fallback accent).' },
+      { name: '--st-ring', fallback: 'accent at 22%', note: 'Halo around the current marker.' },
+      { name: '--st-upcoming', fallback: '#6b6f80', note: 'Upcoming marker ring and number (4.99:1 on white).' },
+      { name: '--st-bg', fallback: '#fff', note: 'Upcoming marker fill.' },
+      { name: '--st-line', fallback: '#d5d7e0', note: 'Connector ahead of the current step (decorative).' },
+      { name: '--st-fg', fallback: 'inherit', note: 'Labels.' },
+      { name: '--st-muted', fallback: '#585c6e', note: 'Upcoming labels and step text (6.62:1 on white).' },
+      { name: '--st-focus', fallback: '#5933d8', note: 'Focus ring on links to done steps.' },
+      { name: '--st-size', fallback: '2rem', note: 'Marker diameter.' },
+    ],
+    a11y: [
+      'An ordered list, so a screen reader announces the count and each step’s position. The current step’s item has aria-current="step"; exactly one does, or none once every step is done.',
+      'A done step is announced “Completed: <label>” (visually hidden text) and shows a check, so state is never colour alone: done has a check, current a halo and a bolder label, upcoming an outline.',
+      'Only done steps link. The whole stepper is a <nav> named by `label` when any step can link, and just a named list otherwise.',
+      'go() changes the states and links in place and moves no focus and announces nothing: the form should move focus to its next section’s heading, which is what a screen reader user needs to hear.',
+      'Links have a visible 3px focus ring. In forced-colors mode done and current markers use Highlight.',
+      'prefers-reduced-motion: no colour transition when it advances.',
+      'Without JavaScript it is exactly as rendered: the static state is right for a page per step, the common case.',
+    ],
+    usage: `<!-- A page per step: the build renders the right state. -->
+<Stepper label="Checkout progress" current={2} steps={[
+  { label: 'Basket', href: '/basket/' },
+  { label: 'Delivery', href: '/checkout/delivery/' },
+  { label: 'Payment' },
+  { label: 'Review' },
+]} />
+
+<!-- One page, a form that advances: -->
+<Stepper id="quote-steps" label="Quote progress" steps={steps} />
+<script>
+  window.__superheroStepper.go('quote-steps', 3);   // then focus the step's heading
+</script>
+<!-- .checkout { --st-accent: var(--brand); --st-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/stepper/ (demo)' }],
+    file: 'src/library/stepper/Stepper.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
