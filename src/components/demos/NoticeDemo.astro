@@ -14,43 +14,43 @@ interface Props {
   assetBase?: string;
 }
 ---
-<div class="demo-nt">
+<div class="demo-ntc">
   <Notice kind="info" title="Classes resume on Monday" text="The studio is closed this week while the floor is refinished. Your booking moves with it." />
   <Notice kind="success" text="Your changes were saved." />
   <Notice kind="warning" dismissible key="demo-notice-warning" version="1">
     Only 3 places are left on the June course. <a href="#book">Book a place</a>
   </Notice>
   <Notice kind="danger" title="We could not take the payment" text="Nothing was charged. Check the card number and try again." />
-  <p class="demo-nt__note">
-    <button class="demo-nt__btn" type="button" data-demo-nt-reset>Bring it back</button>
-    <span aria-live="polite" data-demo-nt-said></span>
+  <p class="demo-ntc__note">
+    <button class="demo-ntc__btn" type="button" data-demo-ntc-reset>Bring it back</button>
+    <span aria-live="polite" data-demo-ntc-said></span>
   </p>
 </div>
 
 <script is:inline>
   document.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('[data-demo-nt-reset]');
+    const b = e.target.closest && e.target.closest('[data-demo-ntc-reset]');
     if (!b || !window.__superheroNotice) return;
     window.__superheroNotice.reset('demo-notice-warning');
-    const said = document.querySelector('[data-demo-nt-said]');
+    const said = document.querySelector('[data-demo-ntc-said]');
     if (said) said.textContent = 'The warning is back.';
   });
 </script>
 
 <style>
-  .demo-nt {
+  .demo-ntc {
     display: grid;
     gap: 0.9rem;
     color: var(--ink, #1e283c);
   }
-  .demo-nt__note {
+  .demo-ntc__note {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
     margin: 0.25rem 0 0;
   }
-  .demo-nt__btn {
+  .demo-ntc__btn {
     min-height: 2.75rem;
     padding: 0.5rem 1.1rem;
     border: 2px solid var(--purple, #5933d8);
@@ -61,7 +61,7 @@ interface Props {
     font-weight: 700;
     cursor: pointer;
   }
-  .demo-nt__btn:focus-visible {
+  .demo-ntc__btn:focus-visible {
     outline: 3px solid var(--purple-dark, #3f1fb0);
     outline-offset: 3px;
   }

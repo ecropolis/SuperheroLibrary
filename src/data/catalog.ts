@@ -1458,14 +1458,14 @@ import { analytics } from '../data/site';
       { name: 'class', type: 'string', note: 'Class on the notice.' },
     ],
     theming: [
-      { name: '--nt-info-bg / -fg / -accent', fallback: '#edf4fc / #12385f / #1c5fa8', note: 'kind="info": ground, text (10.79:1), edge and icon (5.83:1).' },
-      { name: '--nt-success-bg / -fg / -accent', fallback: '#ebf6ee / #14502b / #1d7a3b', note: 'kind="success": text 8.57:1, accent 4.86:1.' },
-      { name: '--nt-warning-bg / -fg / -accent', fallback: '#fdf4de / #553800 / #9a5b00', note: 'kind="warning": text 9.82:1, accent 4.95:1.' },
-      { name: '--nt-danger-bg / -fg / -accent', fallback: '#fcecec / #7a1717 / #b42318', note: 'kind="danger": text 9.35:1, accent 5.74:1.' },
-      { name: '--nt-radius', fallback: '8px', note: 'Corners.' },
-      { name: '--nt-padding', fallback: '0.875rem 1rem', note: 'Inside the notice.' },
-      { name: '--nt-font-size', fallback: '1rem', note: 'Text size.' },
-      { name: '--nt-focus', fallback: 'currentColor', note: 'Focus ring on links and the close button.' },
+      { name: '--ntc-info-bg / -fg / -accent', fallback: '#edf4fc / #12385f / #1c5fa8', note: 'kind="info": ground, text (10.79:1), edge and icon (5.83:1).' },
+      { name: '--ntc-success-bg / -fg / -accent', fallback: '#ebf6ee / #14502b / #1d7a3b', note: 'kind="success": text 8.57:1, accent 4.86:1.' },
+      { name: '--ntc-warning-bg / -fg / -accent', fallback: '#fdf4de / #553800 / #9a5b00', note: 'kind="warning": text 9.82:1, accent 4.95:1.' },
+      { name: '--ntc-danger-bg / -fg / -accent', fallback: '#fcecec / #7a1717 / #b42318', note: 'kind="danger": text 9.35:1, accent 5.74:1.' },
+      { name: '--ntc-radius', fallback: '8px', note: 'Corners.' },
+      { name: '--ntc-padding', fallback: '0.875rem 1rem', note: 'Inside the notice.' },
+      { name: '--ntc-font-size', fallback: '1rem', note: 'Text size.' },
+      { name: '--ntc-focus', fallback: 'currentColor', note: 'Focus ring on links and the close button.' },
     ],
     a11y: [
       'role="status" for info and success, role="alert" for warning and danger. A screen reader announces a live region when its content arrives or changes: a notice the host inserts after an action is announced, one rendered with the page is read in place.',
@@ -1480,7 +1480,7 @@ import { analytics } from '../data/site';
 <Notice kind="warning" title="Only 3 places left" dismissible key="june-course">
   The June course is nearly full. <a href="/book/">Book a place</a>
 </Notice>
-<!-- global.css: .nt { --nt-info-accent: var(--brand); --nt-radius: var(--radius); } -->`,
+<!-- global.css: .ntc { --ntc-info-accent: var(--brand); --ntc-radius: var(--radius); } -->`,
     license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
     usedOn: [{ site: 'superherotech.ai', where: '/elements/notice/ (demo)' }],
     file: 'src/library/notice/Notice.astro',

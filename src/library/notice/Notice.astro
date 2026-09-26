@@ -32,13 +32,13 @@
  * while the parser is still there, so a notice closed earlier in the visit never flashes.
  *
  * Theming (each has a fallback; `<kind>` is info, success, warning or danger):
- *   --nt-<kind>-bg       the ground            info #edf4fc  success #ebf6ee  warning #fdf4de  danger #fcecec
- *   --nt-<kind>-fg       the text              info #12385f  success #14502b  warning #553800  danger #7a1717
- *   --nt-<kind>-accent   the edge and icon     info #1c5fa8  success #1d7a3b  warning #9a5b00  danger #b42318
- *   --nt-radius          corners               (8px)
- *   --nt-padding         inside                (0.875rem 1rem)
- *   --nt-font-size       text size             (1rem)
- *   --nt-focus           focus ring            (currentColor)
+ *   --ntc-<kind>-bg       the ground            info #edf4fc  success #ebf6ee  warning #fdf4de  danger #fcecec
+ *   --ntc-<kind>-fg       the text              info #12385f  success #14502b  warning #553800  danger #7a1717
+ *   --ntc-<kind>-accent   the edge and icon     info #1c5fa8  success #1d7a3b  warning #9a5b00  danger #b42318
+ *   --ntc-radius          corners               (8px)
+ *   --ntc-padding         inside                (0.875rem 1rem)
+ *   --ntc-font-size       text size             (1rem)
+ *   --ntc-focus           focus ring            (currentColor)
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -118,34 +118,34 @@ const get=(k)=>{try{const v=sessionStorage.getItem(k);return v===null?(mem[k]??n
 const set=(k,v)=>{if(v===null)delete mem[k];else mem[k]=v;try{v===null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch{}};
 const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
 const focusAfter=(el)=>{for(const f of document.querySelectorAll(FOCUSABLE)){if(el.contains(f)||!(el.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING)||!f.getClientRects().length)continue;f.focus({preventScroll:true});return}document.activeElement&&document.activeElement.blur&&document.activeElement.blur()};
-const mount=(el)=>{if(!el||all.has(el))return;let c;try{c=JSON.parse(el.getAttribute('data-nt')||'')}catch{return}el.ntCfg=c;all.add(el);
+const mount=(el)=>{if(!el||all.has(el))return;let c;try{c=JSON.parse(el.getAttribute('data-ntc')||'')}catch{return}el.ntcCfg=c;all.add(el);
 if(get(c.key)===c.version)el.hidden=true;
-const b=el.querySelector('[data-nt-close]');if(!b)return;b.hidden=false;
+const b=el.querySelector('[data-ntc-close]');if(!b)return;b.hidden=false;
 b.addEventListener('click',()=>{set(c.key,c.version);const had=el.contains(document.activeElement);el.hidden=true;if(had)focusAfter(el);el.dispatchEvent(new CustomEvent('notice-dismiss',{bubbles:true,detail:{key:c.key}}))})};
-return{mount,reset:(key)=>all.forEach((el)=>{if(key&&el.ntCfg.key!==key)return;set(el.ntCfg.key,null);el.hidden=false})};
+return{mount,reset:(key)=>all.forEach((el)=>{if(key&&el.ntcCfg.key!==key)return;set(el.ntcCfg.key,null);el.hidden=false})};
 })();`;
 const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount(document.currentScript.previousElementSibling);`;
 ---
 
-<div class:list={['nt', `nt--${kind}`, className]} role={role} data-nt={config}>
+<div class:list={['ntc', `ntc--${kind}`, className]} role={role} data-ntc={config}>
   {
     mark && (
-      <svg class="nt__icon" viewBox={mark.viewBox} aria-hidden="true" focusable="false">
+      <svg class="ntc__icon" viewBox={mark.viewBox} aria-hidden="true" focusable="false">
         <path fill="currentColor" d={mark.d} />
       </svg>
     )
   }
-  <div class="nt__body">
-    {title && <p class="nt__title"><span class="nt__sr">{said}</span>{title}</p>}
+  <div class="ntc__body">
+    {title && <p class="ntc__title"><span class="ntc__sr">{said}</span>{title}</p>}
     {
       slotHtml ? (
-        <div class="nt__text">
-          {!title && <span class="nt__sr">{said}</span>}
+        <div class="ntc__text">
+          {!title && <span class="ntc__sr">{said}</span>}
           <Fragment set:html={slotHtml} />
         </div>
       ) : (
-        <p class="nt__text">
-          {!title && <span class="nt__sr">{said}</span>}
+        <p class="ntc__text">
+          {!title && <span class="ntc__sr">{said}</span>}
           {text}
         </p>
       )
@@ -153,7 +153,7 @@ const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount
   </div>
   {
     close && (
-      <button class="nt__close" type="button" aria-label={dismissLabel} data-nt-close hidden>
+      <button class="ntc__close" type="button" aria-label={dismissLabel} data-ntc-close hidden>
         <svg viewBox={close.viewBox} width="1em" height="1em" aria-hidden="true" focusable="false">
           <path fill="currentColor" d={close.d} />
         </svg>
@@ -164,78 +164,78 @@ const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount
 {dismissible && <script is:inline set:html={mountScript} />}
 
 <style>
-  .nt {
+  .ntc {
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    padding: var(--nt-padding, 0.875rem 1rem);
-    border: 1px solid var(--_nt-accent);
+    padding: var(--ntc-padding, 0.875rem 1rem);
+    border: 1px solid var(--_ntc-accent);
     border-inline-start-width: 4px;
-    border-radius: var(--nt-radius, 8px);
-    font-size: var(--nt-font-size, 1rem);
+    border-radius: var(--ntc-radius, 8px);
+    font-size: var(--ntc-font-size, 1rem);
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
-  .nt[hidden] {
+  .ntc[hidden] {
     display: none;
   }
-  .nt--info {
-    background: var(--nt-info-bg, #edf4fc);
-    color: var(--nt-info-fg, #12385f);
-    --_nt-accent: var(--nt-info-accent, #1c5fa8);
+  .ntc--info {
+    background: var(--ntc-info-bg, #edf4fc);
+    color: var(--ntc-info-fg, #12385f);
+    --_ntc-accent: var(--ntc-info-accent, #1c5fa8);
   }
-  .nt--success {
-    background: var(--nt-success-bg, #ebf6ee);
-    color: var(--nt-success-fg, #14502b);
-    --_nt-accent: var(--nt-success-accent, #1d7a3b);
+  .ntc--success {
+    background: var(--ntc-success-bg, #ebf6ee);
+    color: var(--ntc-success-fg, #14502b);
+    --_ntc-accent: var(--ntc-success-accent, #1d7a3b);
   }
-  .nt--warning {
-    background: var(--nt-warning-bg, #fdf4de);
-    color: var(--nt-warning-fg, #553800);
-    --_nt-accent: var(--nt-warning-accent, #9a5b00);
+  .ntc--warning {
+    background: var(--ntc-warning-bg, #fdf4de);
+    color: var(--ntc-warning-fg, #553800);
+    --_ntc-accent: var(--ntc-warning-accent, #9a5b00);
   }
-  .nt--danger {
-    background: var(--nt-danger-bg, #fcecec);
-    color: var(--nt-danger-fg, #7a1717);
-    --_nt-accent: var(--nt-danger-accent, #b42318);
+  .ntc--danger {
+    background: var(--ntc-danger-bg, #fcecec);
+    color: var(--ntc-danger-fg, #7a1717);
+    --_ntc-accent: var(--ntc-danger-accent, #b42318);
   }
-  .nt__icon {
+  .ntc__icon {
     flex: none;
     width: 1.25em;
     height: 1.25em;
     margin-top: 0.125em;
-    color: var(--_nt-accent);
+    color: var(--_ntc-accent);
   }
-  .nt__body {
+  .ntc__body {
     flex: 1 1 auto;
     min-width: 0;
   }
-  .nt__title {
+  .ntc__title {
     margin: 0 0 0.125rem;
     font-weight: 700;
   }
-  .nt__text {
+  .ntc__text {
     margin: 0;
   }
-  .nt__text > :global(:first-child) {
+  .ntc__text > :global(:first-child) {
     margin-top: 0;
   }
-  .nt__text > :global(:last-child) {
+  .ntc__text > :global(:last-child) {
     margin-bottom: 0;
   }
-  .nt__text :global(a) {
+  .ntc__text :global(a) {
     color: inherit;
     font-weight: 600;
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .nt__text :global(a:focus-visible),
-  .nt__close:focus-visible {
-    outline: 2px solid var(--nt-focus, currentColor);
+  .ntc__text :global(a:focus-visible),
+  .ntc__close:focus-visible {
+    outline: 2px solid var(--ntc-focus, currentColor);
     outline-offset: 2px;
   }
-  .nt__close {
+  .ntc__close {
     flex: none;
     display: grid;
     place-items: center;
@@ -249,13 +249,13 @@ const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount
     color: inherit;
     cursor: pointer;
   }
-  .nt__close[hidden] {
+  .ntc__close[hidden] {
     display: none;
   }
-  .nt__close:hover {
+  .ntc__close:hover {
     background: rgb(127 127 127 / 0.16);
   }
-  .nt__sr {
+  .ntc__sr {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -267,10 +267,10 @@ const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount
     border: 0;
   }
   @media (forced-colors: active) {
-    .nt {
+    .ntc {
       border-color: CanvasText;
     }
-    .nt__icon {
+    .ntc__icon {
       color: CanvasText;
     }
   }

@@ -265,7 +265,7 @@ if (ids.has('notice')) {
   /** The rules for one built page. */
   const noticePage = (html, rel, demo) => {
     const out = [];
-    const roots = [...html.matchAll(/<div\b[^>]*\sclass="nt nt--([a-z]+)\b[^"]*"[^>]*>/g)];
+    const roots = [...html.matchAll(/<div\b[^>]*\sclass="ntc ntc--([a-z]+)\b[^"]*"[^>]*>/g)];
     if (demo) {
       const kinds = roots.map((r) => r[1]).sort().join(',');
       if (kinds !== 'danger,info,success,warning') out.push(`${rel}: expected the demo's four notices, one of each kind; found ${kinds || 'none'}.`);
@@ -281,12 +281,12 @@ if (ids.has('notice')) {
       }
       if (attr(tag, 'role') !== ROLE[kind]) out.push(`${where}: role="${attr(tag, 'role')}", expected "${ROLE[kind]}" for a ${kind} notice.`);
       if (attr(tag, 'hidden') !== undefined) out.push(`${where}: rendered hidden; without JavaScript a notice must show.`);
-      const sr = body.match(/<span\b[^>]*class="nt__sr"[^>]*>([^<]*)<\/span>/);
+      const sr = body.match(/<span\b[^>]*class="ntc__sr"[^>]*>([^<]*)<\/span>/);
       if (!sr || !/\S+: $/.test(decode(sr[1]))) out.push(`${where}: no visually hidden kind word ("Warning: ") before the message.`);
-      const icon = body.match(/<svg\b[^>]*class="nt__icon"[^>]*>/);
+      const icon = body.match(/<svg\b[^>]*class="ntc__icon"[^>]*>/);
       if (icon && (attr(icon[0], 'aria-hidden') !== 'true' || attr(icon[0], 'focusable') !== 'false')) out.push(`${where}: the icon must be aria-hidden="true" focusable="false".`);
-      const close = body.match(/<button\b[^>]*\sdata-nt-close[^>]*>/);
-      const cfgRaw = attr(tag, 'data-nt');
+      const close = body.match(/<button\b[^>]*\sdata-ntc-close[^>]*>/);
+      const cfgRaw = attr(tag, 'data-ntc');
       if (cfgRaw === undefined) {
         if (close) out.push(`${where}: a close button on a notice without a dismissal config.`);
         return;
@@ -296,7 +296,7 @@ if (ids.has('notice')) {
       try {
         cfg = JSON.parse(decode(cfgRaw));
       } catch {
-        out.push(`${where}: data-nt is not JSON.`);
+        out.push(`${where}: data-ntc is not JSON.`);
       }
       if (!cfg.key || !cfg.version) out.push(`${where}: the dismissal config has no key and version.`);
       if (!close) out.push(`${where}: dismissible, but no close button.`);
@@ -323,10 +323,10 @@ if (ids.has('notice')) {
     ratios.length = 0;
     for (const kind of Object.keys(ROLE)) {
       const rule = s.match(
-        new RegExp(`\\.nt--${kind} \\{\\s*background: var\\(--nt-${kind}-bg, (#[0-9a-f]{3,6})\\);\\s*color: var\\(--nt-${kind}-fg, (#[0-9a-f]{3,6})\\);\\s*--_nt-accent: var\\(--nt-${kind}-accent, (#[0-9a-f]{3,6})\\);`, 'i'),
+        new RegExp(`\\.ntc--${kind} \\{\\s*background: var\\(--ntc-${kind}-bg, (#[0-9a-f]{3,6})\\);\\s*color: var\\(--ntc-${kind}-fg, (#[0-9a-f]{3,6})\\);\\s*--_ntc-accent: var\\(--ntc-${kind}-accent, (#[0-9a-f]{3,6})\\);`, 'i'),
       );
       if (!rule) {
-        out.push(`${file}: no \`.nt--${kind} { background: var(--nt-${kind}-bg, #…); color: var(--nt-${kind}-fg, #…); --_nt-accent: var(--nt-${kind}-accent, #…); }\` rule to measure.`);
+        out.push(`${file}: no \`.ntc--${kind} { background: var(--ntc-${kind}-bg, #…); color: var(--ntc-${kind}-fg, #…); --_ntc-accent: var(--ntc-${kind}-accent, #…); }\` rule to measure.`);
         continue;
       }
       const [, bg, fg, accent] = rule;
@@ -336,8 +336,8 @@ if (ids.has('notice')) {
       if (t < 4.5) out.push(`notice "${kind}": text ${fg} on ${bg} is ${t.toFixed(2)}:1, under 4.5:1.`);
       if (a < 3) out.push(`notice "${kind}": accent ${accent} on ${bg} is ${a.toFixed(2)}:1, under 3:1 for the edge and icon.`);
     }
-    if (!/\.nt__close \{[^}]*width: 2\.75rem;[^}]*height: 2\.75rem;/.test(s)) out.push(`${file}: the close button must be 2.75rem (44px) square.`);
-    if (!/\.nt__text :global\(a\) \{\s*color: inherit;/.test(s)) out.push(`${file}: links in a notice must inherit its text colour, or their contrast needs measuring here too.`);
+    if (!/\.ntc__close \{[^}]*width: 2\.75rem;[^}]*height: 2\.75rem;/.test(s)) out.push(`${file}: the close button must be 2.75rem (44px) square.`);
+    if (!/\.ntc__text :global\(a\) \{\s*color: inherit;/.test(s)) out.push(`${file}: links in a notice must inherit its text colour, or their contrast needs measuring here too.`);
     return out;
   };
 
@@ -349,16 +349,16 @@ if (ids.has('notice')) {
   finish('notice');
 
   const pageRules = (h) => noticePage(h, demoRel, true);
-  mutation('notice', 'a warning given role="status"', demoHtml, (h) => h.replace(/(class="nt nt--warning"[^>]*\srole=)"alert"/, '$1"status"'), pageRules);
-  mutation('notice', 'an info notice given role="alert"', demoHtml, (h) => h.replace(/(class="nt nt--info"[^>]*\srole=)"status"/, '$1"alert"'), pageRules);
-  mutation('notice', 'a notice rendered hidden', demoHtml, (h) => h.replace(/(<div class="nt nt--success")/, '$1 hidden'), pageRules);
-  mutation('notice', 'the close button shown without JavaScript', demoHtml, (h) => h.replace(/(data-nt-close) hidden/, '$1'), pageRules);
+  mutation('notice', 'a warning given role="status"', demoHtml, (h) => h.replace(/(class="ntc ntc--warning"[^>]*\srole=)"alert"/, '$1"status"'), pageRules);
+  mutation('notice', 'an info notice given role="alert"', demoHtml, (h) => h.replace(/(class="ntc ntc--info"[^>]*\srole=)"status"/, '$1"alert"'), pageRules);
+  mutation('notice', 'a notice rendered hidden', demoHtml, (h) => h.replace(/(<div class="ntc ntc--success")/, '$1 hidden'), pageRules);
+  mutation('notice', 'the close button shown without JavaScript', demoHtml, (h) => h.replace(/(data-ntc-close) hidden/, '$1'), pageRules);
   mutation('notice', 'the mount script moved away from its notice', demoHtml, (h) => h.replace(/(<\/button><\/div>)(<script>)/, '$1<p>x</p>$2'), pageRules);
-  mutation('notice', 'the kind word removed', demoHtml, (h) => h.replace(/<span class="nt__sr"[^>]*>Error: <\/span>/, ''), pageRules);
+  mutation('notice', 'the kind word removed', demoHtml, (h) => h.replace(/<span class="ntc__sr"[^>]*>Error: <\/span>/, ''), pageRules);
   mutation('notice', 'the runtime emitted twice', demoHtml, (h) => h.replace(/(<\/body>)/, '<script>window.__superheroNotice=window.__superheroNotice||1</script>$1'), pageRules);
-  mutation('notice', 'warning text too light', src, (s) => s.replace('--nt-warning-fg, #553800', '--nt-warning-fg, #b08a3a'), noticeSource);
-  mutation('notice', 'danger accent too light', src, (s) => s.replace('--nt-danger-accent, #b42318', '--nt-danger-accent, #f0a8a8'), noticeSource);
-  mutation('notice', 'a 32px close button', src, (s) => s.replace(/(\.nt__close \{[^}]*)width: 2\.75rem;/, '$1width: 2rem;'), noticeSource);
+  mutation('notice', 'warning text too light', src, (s) => s.replace('--ntc-warning-fg, #553800', '--ntc-warning-fg, #b08a3a'), noticeSource);
+  mutation('notice', 'danger accent too light', src, (s) => s.replace('--ntc-danger-accent, #b42318', '--ntc-danger-accent, #f0a8a8'), noticeSource);
+  mutation('notice', 'a 32px close button', src, (s) => s.replace(/(\.ntc__close \{[^}]*)width: 2\.75rem;/, '$1width: 2rem;'), noticeSource);
   finish('notice mutations');
   summary.push(`notice: roles, no-JS render and mount order on 2 pages; contrast (text/accent) ${measured.join(', ')}`);
 }
