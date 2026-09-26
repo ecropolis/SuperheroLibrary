@@ -2247,6 +2247,196 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     file: 'src/library/responsive-table/ResponsiveTable.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'notice',
+    name: 'Notice',
+    aka: ['alert box', 'info box', 'callout box', 'Bootstrap alert', 'message box', 'UABB Info Box', 'Elementor Alert widget', 'inline message'],
+    summary:
+      'A message in the page, in one of four kinds (info, success, warning, danger), each with its colours and a Font Awesome Free icon, an optional title and an optional close button remembered for the visit. role="status" for info and success, role="alert" for warning and danger; the kind is also said in words.',
+    pitch: 'Say what just happened, or what needs attention, right where it applies, in a colour that says how much it matters.',
+    // SE Ranking US, 2026-09-26: inline alert 260/mo, difficulty 13; alert banner 210/12;
+    // css alert box 260/38; callout box 330/17. The pre-assigned "alert banner component" has
+    // no US volume, so the page targets "inline alert", which is also what this is (the banner
+    // across the top of a site is announcement-bar).
+    search: { query: 'inline alert', alsoRanks: ['alert banner', 'css alert box', 'callout box'] },
+    replaces: ['Bootstrap alerts', 'page-builder alert / info box / notice modules', 'hand-built callout boxes with a coloured border'],
+    goodFor:
+      'The state of the page or of a form after an action (“Your changes were saved”, “We could not take the payment”), a condition people need before they act (“Only 3 places left”), a note that holds for a while (“Classes resume on Monday”). One notice near what it is about.',
+    notFor:
+      'A message across the top of the whole site (that is announcement-bar), a confirmation that should vanish on its own (toast), or form-field errors, which belong beside their field with aria-describedby. And not several on one screen: when everything is a warning, nothing is.',
+    props: [
+      { name: 'kind', type: "'info' | 'success' | 'warning' | 'danger'", default: "'info'", note: 'Colours, icon, role and the word read before the message.' },
+      { name: 'title', type: 'string', note: 'A short bold line above the text.' },
+      { name: 'text', type: 'string', note: 'The message, when not given as the default slot. The slot takes links and paragraphs.' },
+      { name: 'icon', type: 'string | false', note: 'A Font Awesome Free solid icon name in place of the kind’s own (circle-info, circle-check, triangle-exclamation, circle-exclamation), or false for none. An unknown name fails the build.' },
+      { name: 'dismissible', type: 'boolean', default: 'false', note: 'A close button; the dismissal is kept in sessionStorage for the rest of the visit.' },
+      { name: 'key', type: 'string', default: 'from a hash of the content', note: 'sessionStorage key of the dismissal. Give a stable one when the notice’s words change often.' },
+      { name: 'version', type: 'string', default: 'a hash of the content', note: 'Change it to show the notice again to people who closed it; new words do that by themselves.' },
+      { name: 'dismissLabel', type: 'string', default: '“Dismiss”', note: 'Name of the close button.' },
+      { name: 'kindLabel', type: 'string', default: '“Information” / “Success” / “Warning” / “Error”', note: 'The kind in words, read (not shown) before the message.' },
+      { name: 'class', type: 'string', note: 'Class on the notice.' },
+    ],
+    theming: [
+      { name: '--ntc-info-bg / -fg / -accent', fallback: '#edf4fc / #12385f / #1c5fa8', note: 'kind="info": ground, text (10.79:1), edge and icon (5.83:1).' },
+      { name: '--ntc-success-bg / -fg / -accent', fallback: '#ebf6ee / #14502b / #1d7a3b', note: 'kind="success": text 8.57:1, accent 4.86:1.' },
+      { name: '--ntc-warning-bg / -fg / -accent', fallback: '#fdf4de / #553800 / #9a5b00', note: 'kind="warning": text 9.82:1, accent 4.95:1.' },
+      { name: '--ntc-danger-bg / -fg / -accent', fallback: '#fcecec / #7a1717 / #b42318', note: 'kind="danger": text 9.35:1, accent 5.74:1.' },
+      { name: '--ntc-radius', fallback: '8px', note: 'Corners.' },
+      { name: '--ntc-padding', fallback: '0.875rem 1rem', note: 'Inside the notice.' },
+      { name: '--ntc-font-size', fallback: '1rem', note: 'Text size.' },
+      { name: '--ntc-focus', fallback: 'currentColor', note: 'Focus ring on links and the close button.' },
+    ],
+    a11y: [
+      'role="status" for info and success, role="alert" for warning and danger. A screen reader announces a live region when its content arrives or changes: a notice the host inserts after an action is announced, one rendered with the page is read in place.',
+      'The kind is said in words as well as colour and icon: a visually hidden “Warning:” (or `kindLabel`) leads the title or the text. The icon is aria-hidden.',
+      'The close button is a real 44px <button> named “Dismiss”. After a dismiss, focus moves to the next focusable thing on the page.',
+      'Every kind’s fallback text is at least 4.5:1 on its ground and its accent at least 3:1; `npm run check` computes all eight. In forced-colours mode the edge and icon take the system text colour.',
+      'No motion.',
+      'Without JavaScript the notice shows and cannot be closed: the close button stays hidden rather than doing nothing.',
+    ],
+    usage: `<Notice kind="success" text="Your changes were saved." />
+
+<Notice kind="warning" title="Only 3 places left" dismissible key="june-course">
+  The June course is nearly full. <a href="/book/">Book a place</a>
+</Notice>
+<!-- global.css: .ntc { --ntc-info-accent: var(--brand); --ntc-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/notice/ (demo)' }],
+    file: 'src/library/notice/Notice.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'toast',
+    name: 'Toast',
+    aka: ['snackbar', 'toast notification', 'toastr', 'Notyf', 'flash message', 'pop-up notification', 'growl notification'],
+    summary:
+      'A short message in a corner after something happened, made by script: window.__superheroToast.show({ text, kind, action, timeout }) or a data-toast button. One polite live region per page; timers pause on hover, on focus and in a hidden tab; a toast with an action never leaves by itself; at most three at once; Escape closes the focused one; no slide under reduced motion. Without JavaScript nothing renders.',
+    pitch: 'A quiet “Saved” or “Link copied” in the corner that confirms the click and gets out of the way, with an Undo when one is needed.',
+    // SE Ranking US, 2026-09-26: toast notifications 320/mo, difficulty 32; toast notification
+    // 1,100/67; toast popup 210/33; html toast 70/26. The pre-assigned "toast notification html"
+    // has no US volume; the plural is the reachable head term and the singular a variant.
+    search: { query: 'toast notifications', alsoRanks: ['toast notification', 'toast popup', 'html toast'] },
+    replaces: ['toastr / Notyf / SweetAlert toasts', 'page-builder notification pop-ins', 'Material snackbars'],
+    goodFor:
+      'Confirming an action that worked where the visitor already is: saved, copied, sent, added to the cart, archived (with Undo). Short, and fine to miss, because the page already shows the result.',
+    notFor:
+      'Anything that must be read or that must exist without JavaScript: errors a visitor has to fix, a form’s result, a warning before they act. Those are a notice, in the page. Also not for marketing (that is modal or announcement-bar), and not a second <Toast /> on a page: there is one region.',
+    props: [
+      { name: 'position', type: "'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'", default: "'bottom-right'", note: 'The corner the region is fixed to. A bottom corner rises above the cookie-consent bar while that shows. On a phone the region spans the width.' },
+      { name: 'label', type: 'string', default: '“Notifications”', note: 'The region’s accessible name.' },
+      { name: 'timeout', type: 'number (ms)', default: '6000', note: 'How long a toast stays when show() does not say. 0 keeps toasts until closed. Anything under 4000 is raised to 4000.' },
+      { name: 'closeLabel', type: 'string', default: '“Dismiss notification”', note: 'Name of each toast’s close button.' },
+      { name: 'kindLabels', type: 'Partial<Record<kind, string>>', default: 'info none, then Success / Warning / Error', note: 'The word read (not shown) before a toast’s text.' },
+      { name: 'class', type: 'string', note: 'Class on the region.' },
+      { name: 'show({ text, kind?, action?, timeout? })', type: 'script API', note: 'window.__superheroToast.show() returns { element, dismiss(), open }. text is plain text. kind is info, success, warning or danger. action is { label, onClick?(event, handle) } or { label, href } (http(s), mailto, tel or relative; anything else is refused). Also clear() and count.' },
+      { name: 'data-toast', type: 'attribute', note: 'On any button: its value is the text. Optional data-toast-kind, data-toast-timeout, data-toast-action (a label) with data-toast-href.' },
+    ],
+    theming: [
+      { name: '--ts-bg', fallback: '#1e283c', note: 'The toast.' },
+      { name: '--ts-fg', fallback: '#fff', note: 'Its text (14.75:1).' },
+      { name: '--ts-action', fallback: '#c4b5ff', note: 'The action’s text, underlined (8.01:1).' },
+      { name: '--ts-info / --ts-success / --ts-warning / --ts-danger', fallback: '#8cc2ff / #7fdc9c / #ffd166 / #ffa3a3', note: 'Icon colours per kind, each at least 7:1 on the fallback ground.' },
+      { name: '--ts-focus', fallback: '#c4b5ff', note: 'Focus ring on the action and close button.' },
+      { name: '--ts-radius', fallback: '10px', note: 'Corners.' },
+      { name: '--ts-shadow', fallback: '0 0.75rem 2rem rgb(0 0 0 / 0.28)', note: 'Shadow.' },
+      { name: '--ts-width', fallback: '24rem', note: 'Width, never wider than the screen.' },
+      { name: '--ts-offset', fallback: '1rem', note: 'Distance from the corner.' },
+      { name: '--ts-font-size', fallback: '0.95rem', note: 'Text size.' },
+      { name: '--ts-z', fallback: '110', note: 'Stacking; the consent bar is 120.' },
+    ],
+    a11y: [
+      'One region per page, role="region" named “Notifications” with aria-live="polite": each toast is read once when it appears, without interrupting. The kind is said in words for success, warning and danger (“Error: …”); icons are aria-hidden.',
+      'Timing is adjustable: every timer pauses while the pointer is over a toast, while focus is in one and while the tab is hidden, and resumes with the time it had left. A toast with an action never leaves by itself, so its action can always be reached. Shorter than 4 s is raised to 4 s.',
+      'Each toast has a 44px close button named “Dismiss notification”, and Escape closes the toast with focus. When a focused toast leaves, focus goes to the next toast or back to where it was before, never to nowhere.',
+      'The region sits at the end of the page, so Tab reaches toasts after the content; screen-reader users can jump to the “Notifications” landmark.',
+      'Text is set as text, never parsed as HTML. An action href with a scheme other than http(s), mailto or tel (javascript:) is refused.',
+      'prefers-reduced-motion: toasts appear and leave at once, with no slide or fade.',
+      'Without JavaScript nothing renders: the region is hidden until the script mounts it, and a toast only exists because a script made one. Use a notice for anything that must exist without JavaScript.',
+    ],
+    usage: `<!-- Once, near the end of <body> in the layout: -->
+<Toast position="bottom-right" />
+
+<!-- Then, from any script after an action: -->
+<script>
+  const t = window.__superheroToast.show({ text: 'Conversation archived.', kind: 'success',
+    action: { label: 'Undo', onClick: () => restore() } });
+  // t.dismiss() closes it early.
+</script>
+
+<!-- Or with no script of your own: -->
+<button data-toast="Link copied to the clipboard." data-toast-kind="success">Copy link</button>
+<!-- global.css: .tst { --ts-bg: var(--navy); --ts-action: var(--tint); --ts-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/toast/ (demo)' }],
+    file: 'src/library/toast/Toast.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'loading',
+    name: 'Loading',
+    aka: ['spinner', 'loading spinner', 'skeleton screen', 'skeleton loader', 'preloader', 'busy indicator', 'loading animation', 'progress spinner'],
+    summary:
+      'Three ways to say “wait” in one element: an inline spinner with a name (role="status"), skeleton placeholders from CSS gradients (lines, avatar, card; aria-hidden), and a busy wrapper that, while data-busy is set, makes its content aria-busy and inert, covers it with the spinner and says what is happening. No motion under reduced motion; without JavaScript the busy content stays usable.',
+    pitch: 'Show people the page heard them: a spinner where something is working, grey shapes where content is on its way, and a form that cannot be clicked twice while it saves.',
+    // SE Ranking US, 2026-09-26: css loading animation 480/mo, difficulty 18; css skeleton
+    // 390/27; skeleton ui 480/23; loading spinner 720/33. The pre-assigned "skeleton loader
+    // css" has no US volume and "skeleton loader" is 20/45; the page targets the loading
+    // animation and ranks for the skeleton and spinner variants.
+    search: { query: 'css loading animation', alsoRanks: ['css skeleton', 'skeleton ui', 'loading spinner'] },
+    replaces: ['page-builder preloaders and loading animations', 'spinner GIFs', 'skeleton screen libraries', 'jQuery BlockUI-style busy overlays'],
+    goodFor:
+      'A wait longer than about a second: a spinner in a button or beside “Loading results”, a skeleton where a list or card is about to arrive (so the page does not jump when it does), and a busy wrapper round a form or panel while it saves, so it cannot be submitted twice.',
+    notFor:
+      'A whole-page preloader that hides a page which could already be read: show the content and mark only the part that is waiting. Waits under a second, which feel instant without one (the busy overlay waits 300 ms before it shows for that reason). And progress you can measure: a known percentage is a <progress> bar, not a spinner.',
+    props: [
+      { name: 'shape', type: "'spinner' | 'skeleton' | 'busy'", default: "'spinner'", note: 'Which indicator.' },
+      { name: 'label', type: 'string', default: '“Loading” (skeleton: none)', note: 'What a screen reader says. Spinner: its visually hidden name. Busy: the status while busy. Skeleton: when given, a hidden status beside the hidden shapes; without it the skeleton is silent.' },
+      { name: 'showLabel', type: 'boolean', default: 'false', note: 'Spinner: show the label beside the ring.' },
+      { name: 'size', type: "'sm' | 'md' | 'lg'", default: "'md'", note: 'Spinner and the busy overlay’s ring: 1.25rem, 2rem or 3rem.' },
+      { name: 'variant', type: "'lines' | 'avatar' | 'card'", default: "'lines'", note: 'Skeleton: text lines; a circle with two lines; a 16:9 block with a title and lines.' },
+      { name: 'lines', type: 'number (1–12)', default: '3', note: 'Skeleton: text lines for lines and card.' },
+      { name: 'busy', type: 'boolean', default: 'false', note: 'Busy: start busy once the script runs. Without JavaScript the content is usable whatever this says.' },
+      { name: 'slowText / slowAfter', type: 'string / number (ms)', default: '— / 5000', note: 'Busy: shown over the content and said when the wait runs past slowAfter.' },
+      { name: 'doneLabel', type: 'string', note: 'Busy: said when it clears (“Saved”). Default: nothing.' },
+      { name: 'class', type: 'string', note: 'Class on the root.' },
+      { name: 'data-busy / busy(el, on)', type: 'attribute / script API', note: 'Busy: toggle the data-busy attribute on the wrapper, or call window.__superheroLoading.busy(el, on) with the wrapper, anything inside it, or a selector. Returns false when there is no wrapper.' },
+    ],
+    theming: [
+      { name: '--ld-color', fallback: 'currentColor', note: 'The ring. Keep 3:1 against what is behind it.' },
+      { name: '--ld-track', fallback: 'rgb(127 127 127 / 0.25)', note: 'The ring’s track.' },
+      { name: '--ld-skel-base', fallback: '#e6e9ef', note: 'Skeleton shapes.' },
+      { name: '--ld-skel-shine', fallback: '#f5f7fa', note: 'The shimmer.' },
+      { name: '--ld-radius', fallback: '6px', note: 'Skeleton corners.' },
+      { name: '--ld-overlay', fallback: 'rgb(255 255 255 / 0.72)', note: 'Over busy content.' },
+      { name: '--ld-msg-bg / --ld-msg-fg', fallback: '#fff / #1e283c', note: 'The slow message (14.75:1).' },
+    ],
+    a11y: [
+      'Spinner: role="status" with a name (“Loading”, or `label`); the ring is aria-hidden. Rendered in place before the wait, it is read when reached; for an announcement, use busy.',
+      'Skeleton: the shapes are aria-hidden, because grey bars mean nothing read aloud. With `label`, a visually hidden status says it instead.',
+      'Busy: while data-busy is set the content is aria-busy="true" and inert, so it cannot be clicked, focused or submitted twice. The status that says `label` sits outside the busy content, because screen readers hold back changes inside an aria-busy region. If focus was in the content, it moves to the wrapper and back to the same control when the wait ends. `slowText` is said if the wait runs long; `doneLabel` when it clears.',
+      'prefers-reduced-motion: the ring stops turning and fades gently instead, the skeleton does not shimmer, and the busy overlay appears without a fade.',
+      'In forced-colours mode the ring and the skeleton shapes take the system text colour.',
+      'Without JavaScript a spinner and a skeleton render as given, and a busy wrapper renders its content, usable: the overlay, aria-busy and inert only ever come from the script.',
+    ],
+    usage: `<button type="submit">Search <Loading size="sm" label="Searching" /></button>
+
+<Loading shape="skeleton" variant="card" />
+
+<Loading shape="busy" label="Saving" doneLabel="Saved" slowText="Still saving…">
+  <form>…</form>
+</Loading>
+<script>
+  // Around a real request:
+  window.__superheroLoading.busy(form, true);
+  await save();
+  window.__superheroLoading.busy(form, false);
+</script>
+<!-- global.css: .ld { --ld-color: var(--brand); --ld-skel-base: var(--tint); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/loading/ (demo)' }],
+    file: 'src/library/loading/Loading.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

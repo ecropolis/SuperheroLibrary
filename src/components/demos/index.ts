@@ -42,6 +42,9 @@ import LinkEffectsDemo from './LinkEffectsDemo.astro';
 import TabcordionDemo from './TabcordionDemo.astro';
 import TooltipDemo from './TooltipDemo.astro';
 import ResponsiveTableDemo from './ResponsiveTableDemo.astro';
+import NoticeDemo from './NoticeDemo.astro';
+import ToastDemo from './ToastDemo.astro';
+import LoadingDemo from './LoadingDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,4 +85,7 @@ export const demos: Record<string, AstroComponent> = {
   tabcordion: TabcordionDemo,
   tooltip: TooltipDemo,
   'responsive-table': ResponsiveTableDemo,
+  notice: NoticeDemo,
+  toast: ToastDemo,
+  loading: LoadingDemo,
 };

@@ -1,0 +1,570 @@
+---
+/**
+ * Toast — a short message that appears in a corner after something happened ("Saved",
+ * "Link copied", "Message sent. Undo") and leaves by itself. Snackbar, toastr, Notyf and the
+ * "notification" pop-ins of page builders.
+ *
+ * Pattern from Rocketbelt's notifications (Pier 1 Imports, 2020, MIT): a message with an icon,
+ * optional action, a corner and a timeout. Reimplemented here; none of its markup, styles or
+ * script is used, and the accessibility is done differently (it put role="alert" and
+ * aria-live="polite" on each message, which contradict each other).
+ *
+ * Put ONE <Toast /> on the page, near the end of <body>. It renders the region every toast
+ * goes into: role="region" named "Notifications", aria-live="polite", fixed at the corner
+ * given by `position`. A second <Toast /> on the same page renders nothing (and warns at
+ * build): there is one place for toasts, so screen readers have one live region to follow.
+ *
+ * Toasts are made by script:
+ *   const t = window.__superheroToast.show({ text, kind?, action?, timeout? });
+ *   t.dismiss();
+ *   - text: plain text (set with textContent, never parsed as HTML).
+ *   - kind: info (default) | success | warning | danger: an icon colour and, except for
+ *     info, a visually hidden word ("Error:") before the text.
+ *   - action: { label, onClick? , href? }: a button (onClick(event, handle)) or a link. A toast
+ *     with an action never leaves by itself: the visitor has to be able to reach the action.
+ *     href takes http(s), mailto, tel or a relative URL; anything else (javascript:) is dropped.
+ *   - timeout: ms before it leaves, default `timeout` (6000). 0 keeps it until closed. Shorter
+ *     than 4000 is raised to 4000: people need time to read it.
+ * or declaratively, for simple cases: <button data-toast="Link copied" data-toast-kind="success">.
+ * Optional data-toast-timeout, data-toast-action (a label) and data-toast-href.
+ *
+ * Behaviour:
+ *   - At most 3 at once: a fourth pushes the oldest out.
+ *   - Every timer pauses while the pointer is over a toast, while focus is in one, and while
+ *     the tab is hidden; each resumes with the time it had left.
+ *   - Escape closes the toast that has focus. Each has a 44px close button (`closeLabel`).
+ *     When a toast with focus leaves, focus goes to the next toast, or back to where it was
+ *     before it entered the region, never to nowhere.
+ *   - Toasts slide in and out; under prefers-reduced-motion they appear and leave at once.
+ *   - A bottom corner sits above the cookie-consent bar (#cc-banner) while that shows.
+ *
+ * Without JavaScript nothing renders: the region is `hidden` until the script mounts it, and
+ * a toast only ever exists because a script made one. Anything that must reach people without
+ * JavaScript, or must stay until read, is a notice, not a toast.
+ *
+ * ONE copy of the runtime: toastRuntime() below is serialised with toString() into the
+ * inline script, and scripts/check-feedback.mjs runs the source between the `<tst-runtime>`
+ * markers against a small DOM stand-in. It must reference nothing but its `win` argument and
+ * language globals.
+ *
+ * Styles are global (prefixed `tst`): toasts are built by script, so Astro's scoped-style
+ * attribute never reaches them.
+ *
+ * Theming (each has a fallback; the pairs are measured by the check):
+ *   --ts-bg / --ts-fg      the toast and its text          (#1e283c / #fff, 14.75:1)
+ *   --ts-action            action link or button text      (#c4b5ff, 8.01:1)
+ *   --ts-info / --ts-success / --ts-warning / --ts-danger   icon colours (#8cc2ff / #7fdc9c /
+ *                          #ffd166 / #ffa3a3, each ≥ 7:1 on the fallback ground)
+ *   --ts-focus             focus ring                      (#c4b5ff)
+ *   --ts-radius            corners                         (10px)
+ *   --ts-shadow            shadow                          (0 0.75rem 2rem rgb(0 0 0 / 0.28))
+ *   --ts-width             width                           (24rem, never wider than the screen)
+ *   --ts-offset            distance from the corner        (1rem)
+ *   --ts-font-size         text size                       (0.95rem)
+ *   --ts-z                 stacking                        (110; the consent bar is 120)
+ */
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+// <tst-runtime>
+export function toastRuntime(win: any) {
+  type Kind = 'info' | 'success' | 'warning' | 'danger';
+  interface Action {
+    label: string;
+    onClick?: (event: Event, handle: Handle) => void;
+    href?: string;
+  }
+  interface Options {
+    text: string;
+    kind?: Kind;
+    action?: Action;
+    timeout?: number;
+  }
+  interface Handle {
+    element: HTMLElement | null;
+    dismiss: () => void;
+    readonly open: boolean;
+  }
+  interface Toast {
+    el: HTMLElement;
+    sticky: boolean;
+    remaining: number;
+    started: number;
+    timer: number;
+    gone: boolean;
+  }
+  const doc = win.document;
+  const KINDS: Kind[] = ['info', 'success', 'warning', 'danger'];
+  const MAX = 3;
+  const MIN_MS = 4000;
+  const SCHEMES = ['http', 'https', 'mailto', 'tel'];
+  let region: HTMLElement | null = null;
+  let cfg = { timeout: 6000, closeLabel: 'Dismiss notification', labels: {} as Record<string, string>, bottom: true };
+  const live: Toast[] = [];
+  let hovering: Toast | null = null; // the toast under the pointer
+  let focused = false;
+  let returnTo: HTMLElement | null = null;
+
+  const now = () => win.Date.now();
+  const reduce = () => !!(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const paused = () => !!hovering || focused || !!doc.hidden;
+  const owner = (node: Node | null) => live.find((t) => t.el.contains(node));
+
+  /** Relative, http(s), mailto or tel; anything with another scheme is refused. */
+  const safeHref = (href: unknown) => {
+    if (typeof href !== 'string' || !href.trim()) return null;
+    const flat = href.replace(/[\u0000- \u007f]/g, '');
+    const scheme = flat.match(/^([a-z][a-z0-9+.-]*):/i);
+    return scheme && !SCHEMES.includes(scheme[1].toLowerCase()) ? null : href.trim();
+  };
+
+  const start = (t: Toast) => {
+    if (t.sticky || t.gone || t.timer || paused()) return;
+    t.started = now();
+    t.timer = win.setTimeout(() => {
+      t.timer = 0;
+      dismiss(t);
+    }, Math.max(0, t.remaining));
+  };
+  const stop = (t: Toast) => {
+    if (!t.timer) return;
+    win.clearTimeout(t.timer);
+    t.timer = 0;
+    t.remaining -= now() - t.started;
+  };
+  const sync = () => live.forEach((t) => (paused() ? stop(t) : start(t)));
+
+  const firstControl = (t: Toast | undefined) => t && (t.el.querySelector<HTMLElement>('[data-tst-action]') || t.el.querySelector<HTMLElement>('[data-tst-close]'));
+
+  function dismiss(t: Toast) {
+    if (t.gone) return;
+    t.gone = true;
+    stop(t);
+    const i = live.indexOf(t);
+    if (i >= 0) live.splice(i, 1);
+    const el = t.el;
+    if (el.contains(doc.activeElement)) {
+      const next = firstControl(live[i] || live[i - 1]);
+      if (next) next.focus();
+      else if (returnTo && returnTo.isConnected) returnTo.focus();
+      else if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur();
+    }
+    // The pointer was on this one: nothing is under it now, so the others' clocks run again
+    // (a move onto another toast pauses them again).
+    if (hovering === t) hovering = null;
+    if (!live.length) focused = false;
+    if (hovering === null || !live.length) sync();
+    if (reduce()) {
+      el.remove();
+      return;
+    }
+    el.classList.add('tst__item--out');
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.remove();
+    };
+    el.addEventListener('animationend', finish);
+    win.setTimeout(finish, 400);
+  }
+
+  const consentOffset = () => {
+    if (!region || !cfg.bottom) return;
+    const cc = doc.getElementById && doc.getElementById('cc-banner');
+    const off = cc && !cc.hidden ? Math.max(0, win.innerHeight - cc.getBoundingClientRect().top) : 0;
+    region.style.setProperty('--tst-consent-offset', `${Math.round(off)}px`);
+  };
+
+  const icon = (name: string) => {
+    const tpl = region && region.querySelector<HTMLTemplateElement>(`template[data-tst-icon="${name}"]`);
+    return tpl && tpl.content ? tpl.content.cloneNode(true) : null;
+  };
+
+  function show(input: Options | string): Handle {
+    const opts: Options = typeof input === 'string' ? { text: input } : input || { text: '' };
+    const text = String(opts.text ?? '').trim();
+    if (!region || !text) return { element: null, dismiss: () => {}, open: false };
+    const kind: Kind = KINDS.includes(opts.kind as Kind) ? (opts.kind as Kind) : 'info';
+    const el = doc.createElement('div');
+    el.className = `tst__item tst__item--${kind}`;
+    el.setAttribute('data-tst-item', kind);
+    const mark = icon(kind);
+    if (mark) el.append(mark);
+
+    const body = doc.createElement('p');
+    body.className = 'tst__text';
+    const word = cfg.labels[kind];
+    if (word) {
+      const sr = doc.createElement('span');
+      sr.className = 'tst__sr';
+      sr.textContent = `${word}: `;
+      body.append(sr);
+    }
+    const words = doc.createElement('span');
+    words.textContent = text;
+    body.append(words);
+    el.append(body);
+
+    const timeout = opts.timeout === undefined ? cfg.timeout : Number(opts.timeout);
+    const a = opts.action && String(opts.action.label ?? '').trim() ? opts.action : null;
+    const t: Toast = {
+      el,
+      sticky: !!a || !(timeout > 0) || timeout === Infinity,
+      remaining: Math.max(MIN_MS, timeout),
+      started: 0,
+      timer: 0,
+      gone: false,
+    };
+    const handle: Handle = {
+      element: el,
+      dismiss: () => dismiss(t),
+      get open() {
+        return !t.gone;
+      },
+    };
+
+    if (a) {
+      const href = safeHref(a.href);
+      if (a.href !== undefined && !href && win.console) win.console.warn('toast: action href refused (only http(s), mailto, tel or relative):', a.href);
+      const act = doc.createElement(href ? 'a' : 'button');
+      if (href) act.setAttribute('href', href);
+      else act.setAttribute('type', 'button');
+      act.className = 'tst__action';
+      act.setAttribute('data-tst-action', '');
+      act.textContent = String(a.label).trim();
+      act.addEventListener('click', (e: Event) => {
+        if (typeof a.onClick === 'function') {
+          try {
+            a.onClick(e, handle);
+          } catch (err) {
+            if (win.console) win.console.error(err);
+          }
+        }
+        dismiss(t);
+      });
+      el.append(act);
+    }
+
+    const close = doc.createElement('button');
+    close.setAttribute('type', 'button');
+    close.className = 'tst__close';
+    close.setAttribute('aria-label', cfg.closeLabel);
+    close.setAttribute('data-tst-close', '');
+    const x = icon('close');
+    if (x) close.append(x);
+    close.addEventListener('click', () => dismiss(t));
+    el.append(close);
+
+    consentOffset();
+    region.append(el);
+    live.push(t);
+    while (live.length > MAX) dismiss(live[0]);
+    start(t);
+    return handle;
+  }
+
+  function mount(r: HTMLElement | null) {
+    if (!r || region) return;
+    try {
+      cfg = { ...cfg, ...JSON.parse(r.getAttribute('data-tst') || '{}') };
+    } catch {
+      return;
+    }
+    region = r;
+    r.hidden = false;
+    r.addEventListener('pointerover', (e: PointerEvent) => {
+      hovering = owner(e.target as Node | null) || null;
+      sync();
+    });
+    r.addEventListener('pointerout', (e: PointerEvent) => {
+      if (r.contains(e.relatedTarget as Node | null)) return;
+      hovering = null;
+      sync();
+    });
+    r.addEventListener('focusin', () => {
+      focused = true;
+      sync();
+    });
+    r.addEventListener('focusout', (e: FocusEvent) => {
+      if (r.contains(e.relatedTarget as Node | null)) return;
+      focused = false;
+      sync();
+    });
+    r.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const t = owner(e.target as Node | null);
+      if (!t) return;
+      e.preventDefault();
+      dismiss(t);
+    });
+    doc.addEventListener('focusin', (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && !r.contains(target) && target !== doc.body) returnTo = target;
+    });
+    doc.addEventListener('visibilitychange', sync);
+    doc.addEventListener('click', (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const b = target && target.closest ? target.closest('[data-toast]') : null;
+      if (!b) return;
+      const timeout = b.getAttribute('data-toast-timeout');
+      const label = b.getAttribute('data-toast-action');
+      show({
+        text: b.getAttribute('data-toast') || '',
+        kind: (b.getAttribute('data-toast-kind') || undefined) as Kind | undefined,
+        timeout: timeout === null ? undefined : Number(timeout),
+        action: label ? { label, href: b.getAttribute('data-toast-href') || undefined } : undefined,
+      });
+    });
+  }
+
+  return {
+    mount,
+    show,
+    /** Close every toast. */
+    clear: () => [...live].forEach(dismiss),
+    /** How many are showing. */
+    get count() {
+      return live.length;
+    },
+  };
+}
+// </tst-runtime>
+
+type Position = 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+const POSITIONS: Position[] = ['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+
+interface Props {
+  /** The corner the toasts appear in. Default bottom-right. */
+  position?: Position;
+  /** The region's accessible name. Default "Notifications". */
+  label?: string;
+  /** Default ms a toast stays, for toasts that do not say. Default 6000; 0 keeps them until closed. */
+  timeout?: number;
+  /** Name of each toast's close button. Default "Dismiss notification". */
+  closeLabel?: string;
+  /** The words read before a toast's text, per kind. Default: none for info, then Success, Warning, Error. */
+  kindLabels?: Partial<Record<'info' | 'success' | 'warning' | 'danger', string>>;
+  class?: string;
+}
+
+const { position = 'bottom-right', label = 'Notifications', timeout = 6000, closeLabel = 'Dismiss notification', kindLabels = {}, class: className } = Astro.props as Props;
+
+if (!POSITIONS.includes(position)) throw new Error(`Toast: position "${position}" is not one of ${POSITIONS.join(', ')}.`);
+if (!(Number.isFinite(timeout) && timeout >= 0)) throw new Error('Toast: timeout must be a number of milliseconds (0 keeps toasts until closed).');
+
+const locals = Astro.locals as Record<string, unknown>;
+const duplicate = !!locals.__toastRegion;
+locals.__toastRegion = true;
+if (duplicate) console.warn('Toast: a second <Toast /> on one page renders nothing; toasts all go to the first region.');
+
+// Glyphs from Font Awesome Free, read at build into <template>s the script clones.
+const require = createRequire(import.meta.url);
+const faRoot = dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+const glyph = (name: string) => {
+  const svg = readFileSync(join(faRoot, 'svgs', 'solid', `${name}.svg`), 'utf8');
+  return { viewBox: (svg.match(/\sviewBox="([^"]+)"/) || [])[1] ?? '0 0 512 512', d: (svg.match(/<path[^>]*\sd="([^"]+)"/) || [])[1] ?? '' };
+};
+const icons = [
+  ['info', 'circle-info'],
+  ['success', 'circle-check'],
+  ['warning', 'triangle-exclamation'],
+  ['danger', 'circle-exclamation'],
+  ['close', 'xmark'],
+].map(([name, fa]) => ({ name, ...glyph(fa) }));
+
+const config = JSON.stringify({
+  timeout,
+  closeLabel,
+  labels: { info: '', success: 'Success', warning: 'Warning', danger: 'Error', ...kindLabels },
+  bottom: position.startsWith('bottom'),
+});
+const script = `window.__superheroToast=window.__superheroToast||(${toastRuntime.toString()})(window);window.__superheroToast.mount(document.currentScript.previousElementSibling);`;
+---
+
+{
+  !duplicate && (
+    <div class:list={['tst', `tst--${position}`, className]} role="region" aria-label={label} aria-live="polite" data-tst={config} hidden>
+      {
+        icons.map((i) => (
+          <template data-tst-icon={i.name}>
+            <svg class={i.name === 'close' ? 'tst__x' : 'tst__icon'} viewBox={i.viewBox} aria-hidden="true" focusable="false">
+              <path fill="currentColor" d={i.d} />
+            </svg>
+          </template>
+        ))
+      }
+    </div>
+  )
+}
+{!duplicate && <script is:inline set:html={script} />}
+
+<style is:global>
+  .tst {
+    box-sizing: border-box;
+    position: fixed;
+    z-index: var(--ts-z, 110);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(var(--ts-width, 24rem), calc(100vw - 2 * var(--ts-offset, 1rem)));
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+  }
+  .tst[hidden] {
+    display: none;
+  }
+  .tst--top-left,
+  .tst--top-center,
+  .tst--top-right {
+    top: var(--ts-offset, 1rem);
+  }
+  .tst--bottom-left,
+  .tst--bottom-center,
+  .tst--bottom-right {
+    bottom: calc(var(--ts-offset, 1rem) + var(--tst-consent-offset, 0px));
+  }
+  .tst--top-left,
+  .tst--bottom-left {
+    left: var(--ts-offset, 1rem);
+  }
+  .tst--top-right,
+  .tst--bottom-right {
+    right: var(--ts-offset, 1rem);
+  }
+  .tst--top-center,
+  .tst--bottom-center {
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+  }
+  .tst__item {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.5rem;
+    padding: 0.375rem 0.375rem 0.375rem 0.875rem;
+    border-radius: var(--ts-radius, 10px);
+    background: var(--ts-bg, #1e283c);
+    color: var(--ts-fg, #fff);
+    box-shadow: var(--ts-shadow, 0 0.75rem 2rem rgb(0 0 0 / 0.28));
+    font-size: var(--ts-font-size, 0.95rem);
+    line-height: 1.4;
+    pointer-events: auto;
+  }
+  .tst__icon {
+    flex: none;
+    width: 1.15em;
+    height: 1.15em;
+  }
+  .tst__item--info .tst__icon {
+    color: var(--ts-info, #8cc2ff);
+  }
+  .tst__item--success .tst__icon {
+    color: var(--ts-success, #7fdc9c);
+  }
+  .tst__item--warning .tst__icon {
+    color: var(--ts-warning, #ffd166);
+  }
+  .tst__item--danger .tst__icon {
+    color: var(--ts-danger, #ffa3a3);
+  }
+  .tst__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0.375rem 0;
+    overflow-wrap: anywhere;
+  }
+  .tst__action {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.625rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ts-action, #c4b5ff);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .tst__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .tst__x {
+    width: 1em;
+    height: 1em;
+  }
+  .tst__action:hover,
+  .tst__close:hover {
+    background: rgb(255 255 255 / 0.1);
+  }
+  .tst__action:focus-visible,
+  .tst__close:focus-visible {
+    outline: 2px solid var(--ts-focus, #c4b5ff);
+    outline-offset: -2px;
+  }
+  .tst__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tst__item {
+      animation: tst-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .tst__item.tst__item--out {
+      animation: tst-out 0.18s ease-in forwards;
+    }
+    .tst--top-left .tst__item,
+    .tst--top-center .tst__item,
+    .tst--top-right .tst__item {
+      --tst-from: -0.75rem;
+    }
+  }
+  @keyframes tst-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--tst-from, 0.75rem));
+    }
+  }
+  @keyframes tst-out {
+    to {
+      opacity: 0;
+      transform: translateY(var(--tst-from, 0.75rem));
+    }
+  }
+  @media (forced-colors: active) {
+    .tst__item {
+      border: 1px solid CanvasText;
+    }
+  }
+  @media print {
+    .tst {
+      display: none !important;
+    }
+  }
+</style>

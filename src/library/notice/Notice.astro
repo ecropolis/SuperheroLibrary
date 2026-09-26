@@ -1,0 +1,277 @@
+---
+/**
+ * Notice — a message in the page, where it applies: "Your changes were saved", "This course is
+ * full", "We could not reach the payment provider". Four kinds, info, success, warning and
+ * danger, each with its own colours and a Font Awesome Free icon. Bootstrap's "alert",
+ * page-builder "alert box" / "info box" / "notice" modules, and the callout boxes people build
+ * by hand with a coloured border.
+ *
+ * Pattern from Rocketbelt's messages and notices (Pier 1 Imports, 2020, MIT): a notice says
+ * the state of the page or of a component, and may be closed. Reimplemented here; none of its
+ * markup, styles or script is used.
+ *
+ * Accessibility:
+ *   - role="status" for info and success (polite), role="alert" for warning and danger
+ *     (assertive). A screen reader announces a live region when its content arrives or
+ *     changes, not when the page loads with it: a notice rendered with the page is read in
+ *     place like any other text, and one the host inserts later is announced.
+ *   - The kind is said in words too, not only by colour and icon: a visually hidden
+ *     "Warning:" (per `kindLabel`) leads the title or the text. The icon is aria-hidden.
+ *   - `dismissible` adds a real 44px close button named by `dismissLabel`. Dismissal is kept
+ *     in sessionStorage as `key` = `version`, so it stays closed for the rest of the visit;
+ *     both default to a hash of the content, so a notice with new words shows again. After a
+ *     dismiss, focus moves to the next focusable thing on the page, not to nowhere.
+ *   - The fallback text colour of every kind is ≥ 4.5:1 on its ground, and the accent (the
+ *     edge and the icon) ≥ 3:1; scripts/check-feedback.mjs computes them. Keep that when
+ *     theming.
+ *   - No motion.
+ *
+ * Without JavaScript the notice shows, and it cannot be closed: the close button is `hidden`
+ * until the script can make it work. The script is emitted only when a notice is dismissible,
+ * once per page, and each dismissible notice is settled by a one-line call straight after it,
+ * while the parser is still there, so a notice closed earlier in the visit never flashes.
+ *
+ * Theming (each has a fallback; `<kind>` is info, success, warning or danger):
+ *   --ntc-<kind>-bg       the ground            info #edf4fc  success #ebf6ee  warning #fdf4de  danger #fcecec
+ *   --ntc-<kind>-fg       the text              info #12385f  success #14502b  warning #553800  danger #7a1717
+ *   --ntc-<kind>-accent   the edge and icon     info #1c5fa8  success #1d7a3b  warning #9a5b00  danger #b42318
+ *   --ntc-radius          corners               (8px)
+ *   --ntc-padding         inside                (0.875rem 1rem)
+ *   --ntc-font-size       text size             (1rem)
+ *   --ntc-focus           focus ring            (currentColor)
+ */
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+type Kind = 'info' | 'success' | 'warning' | 'danger';
+const KINDS: Kind[] = ['info', 'success', 'warning', 'danger'];
+const ICONS: Record<Kind, string> = { info: 'circle-info', success: 'circle-check', warning: 'triangle-exclamation', danger: 'circle-exclamation' };
+const LABELS: Record<Kind, string> = { info: 'Information', success: 'Success', warning: 'Warning', danger: 'Error' };
+
+interface Props {
+  /** Which message this is. Default info. */
+  kind?: Kind;
+  /** A short bold line above the text. */
+  title?: string;
+  /** The message, when not given as the default slot. */
+  text?: string;
+  /** A Font Awesome Free solid icon name in place of the kind's own, or false for none. */
+  icon?: string | false;
+  /** Offer a close button, remembered for the visit (sessionStorage). Default false. */
+  dismissible?: boolean;
+  /** Storage key of the dismissal. Default: from a hash of the content. */
+  key?: string;
+  /** Bump it to show the notice again to people who closed it. Default: a hash of the content. */
+  version?: string;
+  /** Name of the close button. Default "Dismiss". */
+  dismissLabel?: string;
+  /** The kind in words, read before the message. Default Information / Success / Warning / Error. */
+  kindLabel?: string;
+  class?: string;
+}
+
+const { kind = 'info', title, text, icon, dismissible = false, key, version, dismissLabel = 'Dismiss', kindLabel, class: className } = Astro.props;
+
+if (!KINDS.includes(kind)) throw new Error(`Notice: kind "${kind}" is not info, success, warning or danger.`);
+const slotHtml = Astro.slots.has('default') ? await Astro.slots.render('default') : '';
+if (!slotHtml.trim() && !(text && text.trim())) throw new Error('Notice: give it `text` or a default slot.');
+
+// One solid glyph from Font Awesome Free, read at build: nothing of the package ships.
+const require = createRequire(import.meta.url);
+const faRoot = dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+const glyph = (name: string) => {
+  let svg: string;
+  try {
+    svg = readFileSync(join(faRoot, 'svgs', 'solid', `${name}.svg`), 'utf8');
+  } catch {
+    throw new Error(`Notice: no Font Awesome Free solid icon named "${name}". Browse https://fontawesome.com/search?ic=free&s=solid`);
+  }
+  return {
+    viewBox: (svg.match(/\sviewBox="([^"]+)"/) || [])[1] ?? '0 0 512 512',
+    d: (svg.match(/<path[^>]*\sd="([^"]+)"/) || [])[1] ?? '',
+  };
+};
+const mark = icon === false ? null : glyph(icon || ICONS[kind]);
+const close = dismissible ? glyph('xmark') : null;
+
+const role = kind === 'warning' || kind === 'danger' ? 'alert' : 'status';
+const said = `${kindLabel ?? LABELS[kind]}: `;
+
+// A short, stable hash of what the notice says: new words are a new notice.
+const hash = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(36);
+};
+const contentHash = hash([kind, title, text, slotHtml].join('|'));
+const config = dismissible ? JSON.stringify({ key: key || `notice:${contentHash}`, version: String(version ?? contentHash) }) : undefined;
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = dismissible && !locals.__noticeScript;
+if (dismissible) locals.__noticeScript = true;
+
+// The runtime, defined once per page. Plain JavaScript: it is emitted as written.
+const runtime = `window.__superheroNotice=window.__superheroNotice||(()=>{
+const mem={};const all=new Set();
+const get=(k)=>{try{const v=sessionStorage.getItem(k);return v===null?(mem[k]??null):v}catch{return mem[k]??null}};
+const set=(k,v)=>{if(v===null)delete mem[k];else mem[k]=v;try{v===null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch{}};
+const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+const focusAfter=(el)=>{for(const f of document.querySelectorAll(FOCUSABLE)){if(el.contains(f)||!(el.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING)||!f.getClientRects().length)continue;f.focus({preventScroll:true});return}document.activeElement&&document.activeElement.blur&&document.activeElement.blur()};
+const mount=(el)=>{if(!el||all.has(el))return;let c;try{c=JSON.parse(el.getAttribute('data-ntc')||'')}catch{return}el.ntcCfg=c;all.add(el);
+if(get(c.key)===c.version)el.hidden=true;
+const b=el.querySelector('[data-ntc-close]');if(!b)return;b.hidden=false;
+b.addEventListener('click',()=>{set(c.key,c.version);const had=el.contains(document.activeElement);el.hidden=true;if(had)focusAfter(el);el.dispatchEvent(new CustomEvent('notice-dismiss',{bubbles:true,detail:{key:c.key}}))})};
+return{mount,reset:(key)=>all.forEach((el)=>{if(key&&el.ntcCfg.key!==key)return;set(el.ntcCfg.key,null);el.hidden=false})};
+})();`;
+const mountScript = `${firstOnPage ? runtime : ''}window.__superheroNotice.mount(document.currentScript.previousElementSibling);`;
+---
+
+<div class:list={['ntc', `ntc--${kind}`, className]} role={role} data-ntc={config}>
+  {
+    mark && (
+      <svg class="ntc__icon" viewBox={mark.viewBox} aria-hidden="true" focusable="false">
+        <path fill="currentColor" d={mark.d} />
+      </svg>
+    )
+  }
+  <div class="ntc__body">
+    {title && <p class="ntc__title"><span class="ntc__sr">{said}</span>{title}</p>}
+    {
+      slotHtml ? (
+        <div class="ntc__text">
+          {!title && <span class="ntc__sr">{said}</span>}
+          <Fragment set:html={slotHtml} />
+        </div>
+      ) : (
+        <p class="ntc__text">
+          {!title && <span class="ntc__sr">{said}</span>}
+          {text}
+        </p>
+      )
+    }
+  </div>
+  {
+    close && (
+      <button class="ntc__close" type="button" aria-label={dismissLabel} data-ntc-close hidden>
+        <svg viewBox={close.viewBox} width="1em" height="1em" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d={close.d} />
+        </svg>
+      </button>
+    )
+  }
+</div>
+{dismissible && <script is:inline set:html={mountScript} />}
+
+<style>
+  .ntc {
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: var(--ntc-padding, 0.875rem 1rem);
+    border: 1px solid var(--_ntc-accent);
+    border-inline-start-width: 4px;
+    border-radius: var(--ntc-radius, 8px);
+    font-size: var(--ntc-font-size, 1rem);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .ntc[hidden] {
+    display: none;
+  }
+  .ntc--info {
+    background: var(--ntc-info-bg, #edf4fc);
+    color: var(--ntc-info-fg, #12385f);
+    --_ntc-accent: var(--ntc-info-accent, #1c5fa8);
+  }
+  .ntc--success {
+    background: var(--ntc-success-bg, #ebf6ee);
+    color: var(--ntc-success-fg, #14502b);
+    --_ntc-accent: var(--ntc-success-accent, #1d7a3b);
+  }
+  .ntc--warning {
+    background: var(--ntc-warning-bg, #fdf4de);
+    color: var(--ntc-warning-fg, #553800);
+    --_ntc-accent: var(--ntc-warning-accent, #9a5b00);
+  }
+  .ntc--danger {
+    background: var(--ntc-danger-bg, #fcecec);
+    color: var(--ntc-danger-fg, #7a1717);
+    --_ntc-accent: var(--ntc-danger-accent, #b42318);
+  }
+  .ntc__icon {
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+    margin-top: 0.125em;
+    color: var(--_ntc-accent);
+  }
+  .ntc__body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .ntc__title {
+    margin: 0 0 0.125rem;
+    font-weight: 700;
+  }
+  .ntc__text {
+    margin: 0;
+  }
+  .ntc__text > :global(:first-child) {
+    margin-top: 0;
+  }
+  .ntc__text > :global(:last-child) {
+    margin-bottom: 0;
+  }
+  .ntc__text :global(a) {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .ntc__text :global(a:focus-visible),
+  .ntc__close:focus-visible {
+    outline: 2px solid var(--ntc-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .ntc__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -0.625rem -0.625rem -0.625rem 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .ntc__close[hidden] {
+    display: none;
+  }
+  .ntc__close:hover {
+    background: rgb(127 127 127 / 0.16);
+  }
+  .ntc__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (forced-colors: active) {
+    .ntc {
+      border-color: CanvasText;
+    }
+    .ntc__icon {
+      color: CanvasText;
+    }
+  }
+</style>
