@@ -17,10 +17,13 @@
  * next day or week (`every`) in the business's zone, across DST; with `evergreen`, a fresh run
  * from that moment.
  *
- * NOT a live region. The wrapper is role="img" with an aria-label giving the absolute end
- * ("Ends Oct 3, 5:00 PM CDT"), or `endedText` once ended; the digits change visually only, so a
- * screen reader is never read seconds. The label changes only when the end itself does (a
- * repeat, an evergreen start).
+ * role="timer", whose implicit aria-live is "off", and no aria-live attribute: nothing is
+ * announced as the digits tick, so a screen reader is never read seconds. The wrapper's
+ * aria-label gives the absolute end ("Ends Oct 3, 5:00 PM CDT"), or `endedText` once ended, and
+ * changes only when the end itself does (a repeat, an evergreen start). The digits stay
+ * readable for someone who navigates into them: each unit is its number and its word, with the
+ * zero-padded number hidden from screen readers and an unpadded copy read instead, so it reads
+ * "3 days 4 hours", not "zero three 4".
  *
  * No layout shift: the digits are rendered from the build's clock, hidden, and the inline script
  * placed right after the element shows and corrects them while the parser is still there,
@@ -258,6 +261,8 @@ function countdownClient(time: ReturnType<typeof countdownTime>) {
       if (!box) continue;
       const v = values[u];
       const num = box.querySelector<HTMLElement>('[data-cd-num]')!;
+      const sr = box.querySelector<HTMLElement>('[data-cd-sr]');
+      if (sr && sr.textContent !== String(v)) sr.textContent = String(v);
       const s = pad(v);
       if (num.textContent !== s) {
         num.textContent = s;
@@ -440,12 +445,12 @@ const mountScript = `${n === 1 ? define : ''}window.__superheroCountdown.mount(d
 
 <div
   class:list={['cd', `cd--${style}`, { 'cd--show-end': showEnd }, className]}
-  role="img"
+  role="timer"
   aria-label={label}
   data-cd={config}
   hidden={endedAtBuild && onEnd === 'hide'}
 >
-  <div class="cd__units" aria-hidden="true" data-cd-units hidden>
+  <div class="cd__units" data-cd-units hidden>
     {
       units.map((u) => (
         <div class="cd__unit" data-cd-unit={u}>
@@ -455,7 +460,8 @@ const mountScript = `${n === 1 ? define : ''}window.__superheroCountdown.mount(d
               <circle class="cd__arc" cx="50" cy="50" r="46" pathLength="100" data-cd-arc />
             </svg>
           )}
-          <span class="cd__num" data-cd-num>{String(values[u]).padStart(2, '0')}</span>
+          <span class="cd__num" aria-hidden="true" data-cd-num>{String(values[u]).padStart(2, '0')}</span>
+          <span class="cd__sr" data-cd-sr>{values[u]}</span>{' '}
           <span class="cd__label" data-cd-label={pairs[u].join('|')}>{pairs[u][values[u] === 1 ? 0 : 1]}</span>
         </div>
       ))
@@ -498,6 +504,18 @@ const mountScript = `${n === 1 ? define : ''}window.__superheroCountdown.mount(d
     align-content: center;
     min-width: 4.5rem;
   }
+  /* The unpadded number, for screen readers only; the padded one is what is seen. */
+  .cd__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
   .cd__num {
     display: block;
     font-family: var(--cd-font, inherit);
@@ -507,9 +525,10 @@ const mountScript = `${n === 1 ? define : ''}window.__superheroCountdown.mount(d
     line-height: 1.1;
   }
   .cd__label {
-    font-size: 0.8rem;
     letter-spacing: 0.04em;
-    text-transform: uppercase;
+    /* Small capitals, not text-transform: uppercase, which Chrome passes to screen readers as "DAYS". */
+    font-variant-caps: all-small-caps;
+    font-size: 0.95rem;
     color: var(--cd-label, color-mix(in srgb, currentColor 80%, transparent));
   }
   .cd__ends,

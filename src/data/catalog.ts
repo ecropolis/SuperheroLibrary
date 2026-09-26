@@ -1433,7 +1433,7 @@ import { analytics } from '../data/site';
     name: 'Countdown',
     aka: ['UABB Countdown', 'Elementor Countdown', 'countdown timer', 'evergreen countdown timer', 'sale timer', 'deadline timer', 'order cut-off timer'],
     summary:
-      'Days, hours, minutes and seconds to a wall-clock moment in the business’s time zone, or an evergreen run that starts per visitor and is remembered in localStorage. Square, circle or plain. At zero it shows a message, hides, or counts to the next day’s or week’s occurrence. A named image to screen readers (“Ends Oct 3, 5:00 PM CDT”), never a live region; the digits tick visually only.',
+      'Days, hours, minutes and seconds to a wall-clock moment in the business’s time zone, or an evergreen run that starts per visitor and is remembered in localStorage. Square, circle or plain. At zero it shows a message, hides, or counts to the next day’s or week’s occurrence. A role="timer" named by its end (“Ends Oct 3, 5:00 PM CDT”) with no aria-live, so nothing is announced as it ticks; the digits stay readable on demand.',
     pitch: 'Show exactly how long is left — to the end of a sale, the start of an event or today’s order cut-off — in your time zone, not the visitor’s guess.',
     // SE Ranking US, 2026-09-26: countdown timer widget 320/mo, difficulty 36; countdown timer
     // html 320/53; sales countdown timer 40/44; evergreen countdown timer 10/13. "countdown
@@ -1476,7 +1476,8 @@ import { analytics } from '../data/site';
       { name: '--cd-font', fallback: 'inherit', note: 'Digit font family; the digits are tabular so they do not jitter.' },
     ],
     a11y: [
-      'Not a live region. The wrapper is role="img" named by the absolute end, “Ends Oct 3, 5:00 PM CDT”, or by `endedText` once ended; the digits are aria-hidden and change visually only, so a screen reader is never read seconds.',
+      'role="timer", whose implicit aria-live is “off”, with no aria-live attribute: nothing is announced as the digits tick, so a screen reader is never read seconds. The wrapper’s aria-label gives the absolute end, “Ends Oct 3, 5:00 PM CDT”, or `endedText` once ended.',
+      'The digits stay readable when someone navigates into them: each unit is its number and its word, and screen readers get the number unpadded, so it reads “3 days 4 hours”, not “zero three 4”.',
       'The name changes only when the end does: a daily repeat rolling over, or an evergreen run starting.',
       'Without JavaScript: the static line “Ends Oct 3, 5:00 PM CDT” in a <time datetime> (an evergreen one reads “Ends in 30 minutes”). The digits from the build’s clock are not shown, because they would be stale and never tick.',
       'No layout shift: the script placed right after the element shows and corrects the digits before the first paint.',

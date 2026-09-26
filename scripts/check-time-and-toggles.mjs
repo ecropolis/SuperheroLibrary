@@ -14,8 +14,11 @@
  *           golden cases: wall-clock instants (DST gap, half-hour zones), `repeat` next
  *           occurrence (daily across the fall-back, weekly, exactly at the end), unit splitting,
  *           the evergreen start (kept, fresh, future or garbage), the end text.
- *   page    role="img" named "Ends …" (or the ended text), no live region anywhere in it, the
- *           digits aria-hidden and hidden until the script runs, a "Ends <date>" line with a
+ *   page    role="timer" named "Ends …" (or the ended text) and no aria-live attribute anywhere
+ *           in it (timer's implicit aria-live is "off", so nothing is announced as it ticks);
+ *           the digits readable, not aria-hidden: each unit a padded number hidden from screen
+ *           readers, the same number unpadded for them, and its unit word; the digits hidden
+ *           until the script runs; a "Ends <date>" line with a
  *           parseable <time datetime>, the mounting script straight after the element, the
  *           runtime defined once per page.
  *   source  motion only under prefers-reduced-motion: no-preference; evergreen in localStorage,
@@ -235,15 +238,27 @@ function countdownPageFailures(html, { demo = false } = {}) {
     } catch {
       out.push(`${where}: data-cd is not JSON.`);
     }
-    if (attr(el.open, 'role') !== 'img') out.push(`${where}: the wrapper must be role="img", so its name is the one thing read and the digits are not.`);
+    if (attr(el.open, 'role') !== 'timer') out.push(`${where}: the wrapper must be role="timer" (implicit aria-live "off"), not "${attr(el.open, 'role')}".`);
     const name = decode(attr(el.open, 'aria-label') || '');
     if (!name) out.push(`${where}: the wrapper has no aria-label giving the end.`);
     else if (!name.startsWith(cfg.ends || 'Ends') && name !== cfg.ended && !name.startsWith('Ends in')) out.push(`${where}: aria-label "${name}" does not give the end ("${cfg.ends} …") or the ended text.`);
-    if (/aria-live=|role="(?:timer|status|alert|log|marquee)"/.test(el.html)) out.push(`${where}: a live region; the digits must update visually only.`);
+    if (/aria-live=/.test(el.html)) out.push(`${where}: an aria-live attribute; the timer's implicit "off" is the contract, and nothing may be announced as it ticks.`);
+    if (/role="(?:img|status|alert|log|marquee)"/.test(el.html)) out.push(`${where}: a role inside or on the countdown that hides the digits or announces them.`);
     const units = el.html.match(/<div\b[^>]*\sdata-cd-units[^>]*>/);
     if (!units) out.push(`${where}: no digits container.`);
     else {
-      if (attr(units[0], 'aria-hidden') !== 'true') out.push(`${where}: the digits are not aria-hidden="true".`);
+      if (attr(units[0], 'aria-hidden') !== undefined) out.push(`${where}: the digits are aria-hidden; someone who navigates into the timer must be able to read them.`);
+      const unitEls = roots(el.html, 'div', 'data-cd-unit');
+      if (!unitEls.length) out.push(`${where}: no units.`);
+      for (const u of unitEls) {
+        const name = attr(u.open, 'data-cd-unit');
+        const num = u.html.match(/<span\b[^>]*\sdata-cd-num[^>]*>([^<]*)<\/span>/);
+        const sr = u.html.match(/<span\b[^>]*\sdata-cd-sr[^>]*>([^<]*)<\/span>/);
+        const word = u.html.match(/<span\b[^>]*\sdata-cd-label="([^"]*)"[^>]*>([^<]*)<\/span>/);
+        if (!num || attr(num[0], 'aria-hidden') !== 'true') out.push(`${where}, ${name}: the zero-padded number must be aria-hidden ("03" is read "zero three").`);
+        if (!sr || !/^\d+$/.test(sr[1]) || (num && Number(sr[1]) !== Number(num[1])) || /^0\d/.test(sr[1])) out.push(`${where}, ${name}: no unpadded number for screen readers matching the digits.`);
+        if (!word || !word[2].trim() || !decode(word[1]).split('|').includes(word[2].trim())) out.push(`${where}, ${name}: the number has no unit word beside it, so it would read "3 4" rather than "3 days 4 hours".`);
+      }
       if (attr(units[0], 'hidden') === undefined) out.push(`${where}: the digits are visible without JavaScript; built-time digits are stale and never tick.`);
     }
     const ends = el.html.match(/<p\b[^>]*\sdata-cd-ends[^>]*>([\s\S]*?)<\/p>/);
@@ -310,9 +325,13 @@ const cdMutants = await mutants(
   (await mutants(
     'countdown',
     [
-      ['a live region on the wrapper', (h) => h.replace('role="img"', 'role="img" aria-live="polite"')],
-      ['role="timer" instead of img', (h) => h.replace('role="img"', 'role="timer"')],
-      ['the digits exposed to screen readers', (h) => h.replace('aria-hidden="true" data-cd-units', 'data-cd-units')],
+      ['a live region on the wrapper', (h) => h.replace('role="timer"', 'role="timer" aria-live="polite"')],
+      ['an explicit aria-live="off" (the contract is no attribute at all)', (h) => h.replace('role="timer"', 'role="timer" aria-live="off"')],
+      ['role="img" instead of timer', (h) => h.replace('role="timer"', 'role="img"')],
+      ['the digits hidden from screen readers', (h) => h.replace('<div class="cd__units" data-cd-units', '<div class="cd__units" aria-hidden="true" data-cd-units')],
+      ['the padded number read out', (h) => h.replace('class="cd__num" aria-hidden="true" data-cd-num', 'class="cd__num" data-cd-num')],
+      ['no unpadded number for screen readers', (h) => h.replace(/<span class="cd__sr" data-cd-sr[^>]*>\d+<\/span>/, '')],
+      ['a unit word dropped', (h) => h.replace(/(data-cd-label="[^"]*"[^>]*>)[^<]+(<\/span>)/, '$1$2')],
       ['the digits visible without JavaScript', (h) => h.replace(/(<div class="cd__units"[^>]*?) hidden/, '$1')],
       ['no aria-label', (h) => h.replace(/(<div\b[^>]*?)\saria-label="[^"]*"([^>]*data-cd=)/, '$1$2')],
       ['the mount script moved away from the element', (h) => h.replace(/<script>window\.__superheroCountdown\.mount/, '<p></p><script>window.__superheroCountdown.mount')],
