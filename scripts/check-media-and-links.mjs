@@ -23,6 +23,19 @@
  * 3. Motion (animation, transition, scale on hover) sits only inside
  *    `@media (prefers-reduced-motion: no-preference)`.
  *
+ * map
+ * 4. The URL builders (`<map-urls>` block): search, directions and embed URLs with the query
+ *    encoded, zoom rounded, tel: digits.
+ * 5. On the demo page and the index: every card has an <address>, an "Open in Google Maps" and a
+ *    "Directions" link to Google's keyless Maps URLs, named with the place; a facade, when
+ *    there is one, is hidden until the script runs, is a <button type="button"> named
+ *    "Show the map of <name>" and described by a notice that names Google, and carries a
+ *    www.google.com/maps?…&output=embed URL; no iframe at load; the runtime creates the iframe
+ *    with loading="lazy" and the title; the mount script is straight after each map; the pin
+ *    is Font Awesome Free's location-dot, path for path.
+ * 6. The fallback colours pass 4.5:1 (text, links, notice on the card; the button's text on
+ *    its fill); motion only under no-preference.
+ *
  * Mutation tests: each element's checks are also run against deliberately broken copies of its
  * input (an iframe injected, a name removed, a colour darkened, …). A mutation the checks do
  * not catch fails the run: a check that cannot fail is not a check.
@@ -271,4 +284,186 @@ for (const m of run(checkGalleryMotion, vgSources.gallery)) fail(m);
 }
 finish('video-gallery');
 
-console.log(`check-media-and-links ok: ${pages.length} built pages load nothing from Google, YouTube or Vimeo; video-gallery parser is video-player's, its no-JS render and ARIA hold on 2 pages; ${mutations} mutations caught.`);
+// ---------------------------------------------------------------- contrast
+const hexOf = (c) => {
+  let h = c.replace('#', '');
+  if (h.length === 3) h = [...h].map((x) => x + x).join('');
+  return h;
+};
+const lum = (c) =>
+  [0, 2, 4]
+    .map((i) => parseInt(hexOf(c).slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+/** Every `var(--name, #hex)` fallback in `css`, which must agree wherever the token is used. */
+const fallbacks = (css, file, fail) => {
+  const seen = {};
+  for (const [, name, value] of css.matchAll(/var\((--[\w-]+),\s*(#[0-9a-f]{3,6})\s*\)/gi)) {
+    if (seen[name] && seen[name] !== value.toLowerCase()) fail(`${file}: ${name} falls back to ${seen[name]} in one place and ${value} in another.`);
+    seen[name] = value.toLowerCase();
+  }
+  return seen;
+};
+const pairs = (tokens, list, file, fail, report) => {
+  for (const [fg, bg, min, what] of list) {
+    if (!tokens[fg] || !tokens[bg]) {
+      fail(`${file}: no hex fallback for ${!tokens[fg] ? fg : bg}, so ${what} cannot be measured.`);
+      continue;
+    }
+    const r = contrast(tokens[fg], tokens[bg]);
+    report?.push(`${what} ${r.toFixed(2)}:1`);
+    if (r < min) fail(`${file}: ${what} is ${tokens[fg]} on ${tokens[bg]}, ${r.toFixed(2)}:1, under ${min}:1.`);
+  }
+};
+
+// ---------------------------------------------------------------------- map
+const MAP = 'src/library/map/LocationMap.astro';
+const mapSrc = src(MAP);
+const mapBlock = block(mapSrc, 'map-urls');
+if (!mapBlock) {
+  fail(`${MAP} has no \`// <map-urls>\` … \`// </map-urls>\` block.`);
+  finish('map urls');
+}
+const { mapUrls, telHref } = await import(
+  `data:text/javascript;base64,${Buffer.from(`${stripTypeScriptTypes(mapBlock, { mode: 'strip' })}\nexport { mapUrls, telHref };`).toString('base64')}`
+);
+{
+  const u = mapUrls('Joe’s Café & Bar, 1 Main St,  Springfield, IL', 15.4);
+  const q = 'Joe%E2%80%99s%20Caf%C3%A9%20%26%20Bar%2C%201%20Main%20St%2C%20Springfield%2C%20IL';
+  const want = {
+    open: `https://www.google.com/maps/search/?api=1&query=${q}`,
+    directions: `https://www.google.com/maps/dir/?api=1&destination=${q}`,
+    embed: `https://www.google.com/maps?q=${q}&z=15&output=embed`,
+  };
+  for (const k of Object.keys(want)) if (u[k] !== want[k]) fail(`mapUrls ${k}: ${u[k]}, expected ${want[k]}.`);
+  if (mapUrls('x').embed !== 'https://www.google.com/maps?q=x&output=embed') fail('mapUrls without zoom must not add &z=.');
+  for (const [p, want] of [['(312) 555-0142', 'tel:3125550142'], ['+44 20 7946 0958', 'tel:+442079460958'], ['+1-312-555-0142 ext', 'tel:+13125550142']]) {
+    if (telHref(p) !== want) fail(`telHref("${p}") = ${telHref(p)}, expected ${want}.`);
+  }
+}
+finish('map urls');
+
+const MOUNT_MAP = '<script>window.__superheroMap.mount(document.currentScript.previousElementSibling);</script>';
+const faPin = readFileSync(join(root, 'node_modules/@fortawesome/fontawesome-free/svgs/solid/location-dot.svg'), 'utf8').match(/<path[^>]*\sd="([^"]+)"/)[1];
+const checkMapPage = ({ rel, html, demo }, fail) => {
+  const roots = [...html.matchAll(/<div\b[^>]*\sdata-map(?=[\s>])[^>]*>/g)];
+  if (demo && roots.length !== 2) fail(`${rel}: expected the demo's 2 maps, found ${roots.length}.`);
+  let facades = 0;
+  let photos = 0;
+  let panels = 0;
+  roots.forEach((r, mi) => {
+    const where = `${rel}, map ${mi + 1}`;
+    const end = html.indexOf(MOUNT_MAP, r.index);
+    if (end < 0) {
+      fail(`${where}: no mount script after it.`);
+      return;
+    }
+    const chunk = html.slice(r.index, end);
+    if (!/<\/div>\s*$/.test(chunk) || (roots[mi + 1] && roots[mi + 1].index < end)) fail(`${where}: the mount script must come straight after the map, or the facades appear after the first paint.`);
+    if (/<iframe\b/i.test(chunk)) fail(`${where}: an <iframe> at load; the map loads on a click.`);
+    const cards = chunk.split(/(?=<(?:li|div)\b[^>]*class="map__card)/).slice(1);
+    if (!cards.length) fail(`${where}: no cards.`);
+    cards.forEach((card, ci) => {
+      const nameEl = card.match(/<(h2|h3|h4)\b[^>]*class="map__name"[^>]*>([\s\S]*?)<\/\1>/);
+      const name = nameEl ? text(nameEl[2]) : '';
+      const w = `${where}, card ${ci + 1} ("${name}")`;
+      if (!name) fail(`${w}: no heading with the place's name.`);
+      const addr = card.match(/<address\b[^>]*>([\s\S]*?)<\/address>/);
+      if (!addr || !text(addr[1])) fail(`${w}: no <address>.`);
+      const tel = addr && addr[1].match(/<a\b[^>]*href="([^"]*)"/);
+      if (tel && !/^tel:\+?\d{7,}$/.test(tel[1])) fail(`${w}: the phone link ${tel[1]} is not tel:<digits>.`);
+      const open = card.match(/<a\b[^>]*\sdata-map-open[^>]*>([\s\S]*?)<\/a>/);
+      const dir = card.match(/<a\b[^>]*\sdata-map-directions[^>]*>([\s\S]*?)<\/a>/);
+      for (const [a, base, label] of [
+        [open, 'https://www.google.com/maps/search/?api=1&query=', 'Open in Google Maps'],
+        [dir, 'https://www.google.com/maps/dir/?api=1&destination=', 'Directions'],
+      ]) {
+        if (!a) {
+          fail(`${w}: no "${label}" link.`);
+          continue;
+        }
+        const href = decode(attr(a[0], 'href')) || '';
+        if (!href.startsWith(base) || href.length === base.length) fail(`${w}: "${label}" goes to ${href}, not ${base}<query>.`);
+        if (/[?&]key=/.test(href)) fail(`${w}: "${label}" carries an API key.`);
+        const nameAttr = decode(attr(a[0], 'aria-label')) || '';
+        if (!nameAttr.startsWith(text(a[1])) || !nameAttr.includes(name)) fail(`${w}: "${label}" is named "${nameAttr}"; it must start with its visible words and name the place.`);
+      }
+      const media = card.match(/<div\b[^>]*\sdata-map-media[^>]*>/);
+      if (!media) return;
+      facades++;
+      if (attr(media[0], 'hidden') === undefined) fail(`${w}: the facade must be hidden until the script can make it work.`);
+      const btn = card.match(/<button\b[^>]*\sdata-map-load=[^>]*>/);
+      if (!btn) {
+        fail(`${w}: a facade without its button.`);
+        return;
+      }
+      if (attr(btn[0], 'type') !== 'button') fail(`${w}: the facade button needs type="button".`);
+      if (decode(attr(btn[0], 'aria-label')) !== `Show the map of ${name}`) fail(`${w}: the facade button is named "${decode(attr(btn[0], 'aria-label'))}", expected "Show the map of ${name}".`);
+      const desc = attr(btn[0], 'aria-describedby');
+      const note = desc && card.match(new RegExp(`<p\\b[^>]*\\sid="${desc}"[^>]*>([\\s\\S]*?)</p>`));
+      if (!note || !/Google/.test(text(note[1]))) fail(`${w}: the facade button must be described by a visible notice that the map loads from Google.`);
+      const load = decode(attr(btn[0], 'data-map-load')) || '';
+      if (!/^https:\/\/www\.google\.com\/maps\?q=[^&]+(?:&z=\d+)?&output=embed$/.test(load)) fail(`${w}: the embed URL ${load} is not www.google.com/maps?q=…&output=embed.`);
+      if (decode(attr(btn[0], 'data-map-title')) !== `Map of ${name}`) fail(`${w}: the map would be titled "${decode(attr(btn[0], 'data-map-title'))}", expected "Map of ${name}".`);
+      if (/<img\b[^>]*class="map__photo"/.test(card)) {
+        photos++;
+        const img = card.match(/<img\b[^>]*class="map__photo"[^>]*>/)[0];
+        if (attr(img, 'alt') !== '') fail(`${w}: the facade photo sits inside a named button; it must be alt="".`);
+      } else {
+        panels++;
+        const d = (card.match(/<svg\b[^>]*class="map__pin"[\s\S]*?<path\b[^>]*\sd="([^"]+)"/) || [])[1];
+        if (d !== faPin) fail(`${w}: the pin is not Font Awesome Free's location-dot.`);
+      }
+    });
+  });
+  if (demo && !(photos && panels)) fail(`${rel}: the demo needs a photo facade and a neutral one.`);
+  if (demo && !facades) fail(`${rel}: the demo has no facade.`);
+  const runtimes = (html.match(/window\.__superheroMap = \{/g) || []).length;
+  if (roots.length && runtimes !== 1) fail(`${rel}: the map runtime is on the page ${runtimes} times; it must be once.`);
+  if (roots.length && !(/f\.loading = 'lazy'/.test(html) && /f\.title = btn\.dataset\.mapTitle/.test(html))) fail(`${rel}: the runtime must create the iframe with loading="lazy" and its title.`);
+};
+const mapPages = [
+  { rel: 'dist/map/index.html', html: built('dist/map/index.html'), demo: true },
+  { rel: 'dist/index.html', html: built('dist/index.html'), demo: false },
+];
+for (const p of mapPages) for (const m of run(checkMapPage, p)) fail(m);
+const mapContrast = [];
+const checkMapStyle = (component, fail, report) => {
+  const css = styleOf(component);
+  const t = fallbacks(css, MAP, fail);
+  pairs(
+    t,
+    [
+      ['--map-text', '--map-surface', 4.5, 'card text'],
+      ['--map-link', '--map-surface', 4.5, 'links'],
+      ['--map-notice', '--map-surface', 4.5, 'notice'],
+      ['--map-on-accent', '--map-accent', 4.5, 'button text'],
+    ],
+    MAP,
+    fail,
+    report,
+  );
+  if (/\b(?:animation|transition)\s*:/.test(outsideNoPreference(css))) fail(`${MAP}: an animation or transition outside @media (prefers-reduced-motion: no-preference).`);
+};
+checkMapStyle(mapSrc, fail, mapContrast);
+{
+  const demo = mapPages[0];
+  const re = (a, b) => (x) => ({ ...x, html: x.html.replace(a, b) });
+  mutate('a facade shows without JavaScript', checkMapPage, demo, re(/(class="map__media") hidden/, '$1'));
+  mutate('the facade button loses its name', checkMapPage, demo, re(/aria-label="Show the map of Navy Pier"/, ''));
+  mutate('the Google notice is gone', checkMapPage, demo, re(/Loads a map from Google\./, 'Loads a map.'));
+  mutate('a map iframe at load', checkMapPage, demo, re('<address', '<iframe src="https://www.google.com/maps?q=x&amp;output=embed"></iframe><address'));
+  mutate('the JavaScript API instead of the embed URL', checkMapPage, demo, re(/data-map-load="https:\/\/www\.google\.com\/maps\?q=/, 'data-map-load="https://www.google.com/maps/embed/v1/place?key=K&amp;q='));
+  mutate('"Directions" loses the place in its name', checkMapPage, demo, re(/aria-label="Directions to Navy Pier"/, 'aria-label="Directions"'));
+  mutate('a card without <address>', checkMapPage, demo, re(/<address\b([^>]*)>([\s\S]*?)<\/address>/, '<div$1>$2</div>'));
+  mutate('a pin that is not Font Awesome Free', checkMapPage, demo, re(/(class="map__pin"[\s\S]*?<path\b[^>]*\sd=")M0/, '$1M1'));
+  mutate('the lazy iframe dropped from the runtime', checkMapPage, demo, re("f.loading = 'lazy';", ''));
+  mutate('a pale button fill', (s, f) => checkMapStyle(s, f), mapSrc, (s) => s.replaceAll('var(--map-accent, #5933d8)', 'var(--map-accent, #a894f0)'));
+}
+finish('map');
+
+console.log(`check-media-and-links ok: ${pages.length} built pages load nothing from Google, YouTube or Vimeo; video-gallery parser is video-player's, its no-JS render and ARIA hold on 2 pages; map URLs, facades and links hold on 2 pages, contrast ${mapContrast.join(', ')}; ${mutations} mutations caught.`);

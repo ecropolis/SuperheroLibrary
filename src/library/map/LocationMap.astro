@@ -1,0 +1,435 @@
+---
+/**
+ * LocationMap (the `map` element) — where to find you: one card per location with the address, phone, an optional hours
+ * line, and "Open in Google Maps" and "Directions" links, plus an optional map that loads only
+ * when someone asks for it. WordPress calls it UABB's or PowerPack's "Google Map" module,
+ * Elementor's Google Maps widget, WP Google Maps or a pasted Google Maps <iframe>.
+ *
+ * Why this is NOT the Google Maps JavaScript API: the API needs a key (a billing account, and a
+ * secret to restrict per domain), loads Google's script on every visit whether or not anyone
+ * looks at the map, and adds maps.googleapis.com and maps.gstatic.com to every client's CSP and
+ * consent policy. A styled, branded, interactive map needs exactly that, and is the one thing
+ * this element does not do (see the catalogue's notFor). Everything else people use a map for
+ * — "where is it" and "how do I get there" — is two links, which open the Maps app on a phone.
+ *
+ * The links (Google's documented Maps URLs, no key):
+ *   Open in Google Maps   https://www.google.com/maps/search/?api=1&query=<query>
+ *   Directions            https://www.google.com/maps/dir/?api=1&destination=<query>
+ * `query` is what to search for; by default the address lines joined with commas. Give the
+ * business name plus address when Google knows the business, so its place card opens.
+ *
+ * The click-to-load embed (`embed`): a facade — the location's `photo`, or a neutral panel with
+ * Font Awesome Free's map pin — that is a real <button> named "Show the map of <name>" and
+ * described by the one-line notice under it, "Loads a map from Google." Nothing is requested
+ * from Google until it is pressed. Then the button is replaced by
+ *   <iframe src="https://www.google.com/maps?q=<query>&output=embed" loading="lazy" title="Map of <name>">
+ * (no key needed for this URL), and focus moves into the map. A client's CSP needs
+ * `frame-src https://www.google.com` for it; nothing else.
+ *
+ * Without JavaScript: the cards and their links, no facade (a button that could not work is
+ * not rendered visible). The one-line script after the element shows the facades before the
+ * first paint, so nothing shifts.
+ *
+ * Out of scope on purpose: LocalBusiness JSON-LD. business-hours owns it (its `jsonLd` prop),
+ * and two elements emitting it for one business would contradict each other.
+ *
+ * The pin is read at build from `@fortawesome/fontawesome-free` (a devDependency, as for the
+ * icon element), only when a card has an embed without a photo. A site that copies this file
+ * without that package can set PIN below to the one `d` from svgs/solid/location-dot.svg.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --map-min           narrowest card before the list drops a column  (18rem)
+ *   --map-gap           gap between cards                              (1.25rem)
+ *   --map-surface / --map-text / --map-border   the card               (#fff / #1e283c / #d5dae6)
+ *   --map-radius        corners of cards, media and buttons            (0.75rem)
+ *   --map-accent / --map-on-accent   "Open in Google Maps" button      (#5933d8 / #fff)
+ *   --map-link          "Directions" and the phone link                (#4a2bb8)
+ *   --map-aspect        the map's width / height                       (16 / 10)
+ *   --map-panel / --map-panel-line   the neutral facade and its streets (#e9ecf3 / #d3d8e4)
+ *   --map-pin           the pin on the neutral facade                  (#5933d8)
+ *   --map-focus         focus rings                                    (#5933d8)
+ *   --map-notice        the "Loads a map from Google." line            (#4b5468)
+ */
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+export interface MapLocation {
+  /** The place's name: the card's heading, and the map's title. */
+  name: string;
+  /** Address lines, as on an envelope. */
+  address: string[];
+  /** Shown as a tel: link. */
+  phone?: string;
+  /** One line, e.g. "Open daily, 8 AM to 6 PM". For full opening hours use business-hours. */
+  hours?: string;
+  /** What Google should search for. Default: the address lines joined with commas. */
+  query?: string;
+  /** The facade image for the embed, served by your site. Default: a neutral panel with a pin. */
+  photo?: string;
+  /** Override the element's `embed` for this card. */
+  embed?: boolean;
+}
+interface Props {
+  locations: MapLocation[];
+  /** Offer the click-to-load Google map on each card. Default false: links only. */
+  embed?: boolean;
+  /** Zoom of the embedded map, 1 (world) to 21 (building). Default: Google's choice. */
+  zoom?: number;
+  /** 'stack' puts the map above the details; 'split' puts them side by side when there is room. */
+  layout?: 'stack' | 'split';
+  /** Element for each card's name. Default 'h3'. */
+  titleTag?: 'h2' | 'h3' | 'h4';
+  /** Words, for a non-English site. */
+  openLabel?: string;
+  directionsLabel?: string;
+  showLabel?: string;
+  notice?: string;
+  class?: string;
+}
+
+// <map-urls>
+/** Google's documented Maps URLs. None needs an API key. */
+function mapUrls(query: string, zoom?: number) {
+  const q = encodeURIComponent(query.trim().replace(/\s+/g, ' '));
+  return {
+    open: `https://www.google.com/maps/search/?api=1&query=${q}`,
+    directions: `https://www.google.com/maps/dir/?api=1&destination=${q}`,
+    embed: `https://www.google.com/maps?q=${q}${zoom ? `&z=${Math.round(zoom)}` : ''}&output=embed`,
+  };
+}
+/** A phone number as a tel: URL: the digits, and a leading + if there is one. */
+function telHref(phone: string): string {
+  const p = phone.trim();
+  return `tel:${p.startsWith('+') ? '+' : ''}${p.replace(/\D/g, '')}`;
+}
+// </map-urls>
+
+const {
+  locations,
+  embed = false,
+  zoom,
+  layout = 'stack',
+  titleTag = 'h3',
+  openLabel = 'Open in Google Maps',
+  directionsLabel = 'Directions',
+  showLabel = 'Show the map',
+  notice = 'Loads a map from Google.',
+  class: className,
+} = Astro.props;
+
+if (!Array.isArray(locations) || !locations.length) throw new Error('Map: `locations` needs at least one { name, address }.');
+if (layout !== 'stack' && layout !== 'split') throw new Error(`Map: layout "${layout}" is not 'stack' or 'split'.`);
+if (zoom !== undefined && !(Number.isFinite(zoom) && zoom >= 1 && zoom <= 21)) throw new Error(`Map: zoom must be 1 to 21, not ${zoom}.`);
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__mapScript;
+locals.__mapScript = true;
+const n = ((locals.__mapCount as number) ?? 0) + 1;
+locals.__mapCount = n;
+
+const cards = locations.map((l, i) => {
+  const name = String(l?.name ?? '').trim();
+  if (!name) throw new Error(`Map: location ${i + 1} has no \`name\`.`);
+  const lines = (Array.isArray(l.address) ? l.address : [l.address]).map((s) => String(s ?? '').trim()).filter(Boolean);
+  if (!lines.length) throw new Error(`Map "${name}": \`address\` needs at least one line.`);
+  const query = (l.query ?? lines.join(', ')).trim();
+  const phone = l.phone?.trim();
+  if (phone && telHref(phone).replace(/\D/g, '').length < 7) throw new Error(`Map "${name}": phone "${phone}" has too few digits for a tel: link.`);
+  return {
+    name,
+    lines,
+    phone,
+    tel: phone ? telHref(phone) : undefined,
+    hours: l.hours,
+    photo: l.photo,
+    embed: l.embed ?? embed,
+    urls: mapUrls(query, zoom),
+    id: `map-${n}-${i + 1}`,
+  };
+});
+
+// Font Awesome Free's location-dot, read at build like the icon element does, and only when a
+// neutral facade needs it.
+let PIN: { viewBox: string; d: string } | null = null;
+if (cards.some((c) => c.embed && !c.photo)) {
+  const require = createRequire(import.meta.url);
+  const fa = dirname(require.resolve('@fortawesome/fontawesome-free/package.json'));
+  const svg = readFileSync(join(fa, 'svgs/solid/location-dot.svg'), 'utf8');
+  PIN = { viewBox: (svg.match(/\sviewBox="([^"]+)"/) || [])[1] ?? '0 0 384 512', d: (svg.match(/<path[^>]*\sd="([^"]+)"/) || [])[1] ?? '' };
+}
+
+const Title = titleTag;
+const List = cards.length > 1 ? 'ul' : 'div';
+const Item = cards.length > 1 ? 'li' : 'div';
+---
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroMap) return;
+        const mount = (root) => {
+          if (!root || root.dataset.mapReady) return;
+          root.dataset.mapReady = '1';
+          // The facades are ours only once this runs; without it the links do the job.
+          root.querySelectorAll('[data-map-media]').forEach((m) => (m.hidden = false));
+          root.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-map-load]');
+            if (!btn) return;
+            const f = document.createElement('iframe');
+            f.src = btn.dataset.mapLoad;
+            f.title = btn.dataset.mapTitle;
+            f.loading = 'lazy';
+            f.allowFullscreen = true;
+            // Google's own embed code sends the referrer this way.
+            f.referrerPolicy = 'no-referrer-when-downgrade';
+            const media = btn.closest('[data-map-media]');
+            btn.replaceWith(f);
+            media.dataset.mapLoaded = '';
+            f.focus();
+          });
+        };
+        window.__superheroMap = { mount };
+      })();
+    </script>
+  )
+}
+<div class:list={['map', `map--${layout}`, className]} data-map>
+  <List class="map__list" role={List === 'ul' ? 'list' : undefined}>
+    {
+      cards.map((c) => (
+        <Item class="map__card">
+          {c.embed && (
+            <div class="map__media" hidden data-map-media>
+              <button
+                class="map__load"
+                type="button"
+                aria-label={`${showLabel} of ${c.name}`}
+                aria-describedby={`${c.id}-notice`}
+                data-map-load={c.urls.embed}
+                data-map-title={`Map of ${c.name}`}
+              >
+                {c.photo ? (
+                  <img class="map__photo" src={c.photo} alt="" loading="lazy" decoding="async" />
+                ) : (
+                  <span class="map__panel" aria-hidden="true">
+                    <svg class="map__pin" viewBox={PIN!.viewBox} width="1em" height="1em" focusable="false">
+                      <path fill="currentColor" d={PIN!.d} />
+                    </svg>
+                  </span>
+                )}
+                <span class="map__cta">{showLabel}</span>
+              </button>
+              <p class="map__notice" id={`${c.id}-notice`}>{notice}</p>
+            </div>
+          )}
+          <div class="map__body">
+            <Title class="map__name">{c.name}</Title>
+            <address class="map__address">
+              {c.lines.map((line, i) => (
+                <>
+                  {line}
+                  {i < c.lines.length - 1 && <br />}
+                </>
+              ))}
+              {c.phone && (
+                <>
+                  <br />
+                  <a class="map__tel" href={c.tel}>{c.phone}</a>
+                </>
+              )}
+            </address>
+            {c.hours && <p class="map__hours">{c.hours}</p>}
+            <p class="map__actions">
+              {/* Named with the place, starting with the visible words (WCAG 2.5.3), so a list of links still makes sense. */}
+              <a class="map__btn map__btn--primary" href={c.urls.open} aria-label={`${openLabel}: ${c.name}`} data-map-open>
+                {openLabel}
+              </a>
+              <a class="map__btn" href={c.urls.directions} aria-label={`${directionsLabel} to ${c.name}`} data-map-directions>
+                {directionsLabel}
+              </a>
+            </p>
+          </div>
+        </Item>
+      ))
+    }
+  </List>
+</div>
+<script is:inline>window.__superheroMap.mount(document.currentScript.previousElementSibling);</script>
+
+<style>
+  .map__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--map-min, 18rem)), 1fr));
+    gap: var(--map-gap, 1.25rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .map--split .map__list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .map__card {
+    display: grid;
+    align-content: start;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--map-border, #d5dae6);
+    border-radius: var(--map-radius, 0.75rem);
+    background: var(--map-surface, #fff);
+    color: var(--map-text, #1e283c);
+  }
+  /* Split: the map and the details side by side once each has 18rem; stacked below that. */
+  .map--split .map__card {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+  .map__media {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-width: 0;
+  }
+  .map__media[hidden] {
+    display: none;
+  }
+  .map__load,
+  .map__media > :global(iframe) {
+    display: block;
+    width: 100%;
+    aspect-ratio: var(--map-aspect, 16 / 10);
+    height: auto;
+    border: 0;
+  }
+  .map--split .map__load,
+  .map--split .map__media > :global(iframe) {
+    height: 100%;
+    min-height: 14rem;
+  }
+  .map__load {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    overflow: hidden;
+    background: var(--map-panel, #e9ecf3);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .map__load:focus-visible {
+    outline: 3px solid var(--map-focus, #5933d8);
+    outline-offset: -3px;
+  }
+  .map__photo,
+  .map__panel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .map__photo {
+    object-fit: cover;
+  }
+  /* A neutral street grid, drawn in CSS: never a Google static map, which needs a key too. */
+  .map__panel {
+    display: grid;
+    place-items: center;
+    background:
+      linear-gradient(115deg, transparent 47%, var(--map-panel-line, #d3d8e4) 47% 53%, transparent 53%),
+      repeating-linear-gradient(0deg, transparent 0 2.2rem, var(--map-panel-line, #d3d8e4) 2.2rem 2.5rem),
+      repeating-linear-gradient(90deg, transparent 0 3.1rem, var(--map-panel-line, #d3d8e4) 3.1rem 3.4rem),
+      var(--map-panel, #e9ecf3);
+  }
+  .map__pin {
+    translate: 0 -40%;
+    color: var(--map-pin, #5933d8);
+    font-size: 2.75rem;
+    filter: drop-shadow(0 0.2rem 0.3rem rgb(0 0 0 / 0.25));
+  }
+  .map__cta {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    translate: -50% 0;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: var(--map-surface, #fff);
+    color: var(--map-text, #1e283c);
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.2);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .map__cta {
+      transition: scale 0.18s ease;
+    }
+    .map__load:hover .map__cta,
+    .map__load:focus-visible .map__cta {
+      scale: 1.05;
+    }
+  }
+  .map__notice {
+    margin: 0;
+    padding: 0.4rem 1rem;
+    color: var(--map-notice, #4b5468);
+    font-size: 0.85em;
+  }
+  .map__body {
+    min-width: 0;
+    padding: 1rem 1.25rem 1.25rem;
+  }
+  .map__name {
+    margin: 0 0 0.5rem;
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+  .map__address {
+    margin: 0;
+    font-style: normal;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .map__hours {
+    margin: 0.5rem 0 0;
+  }
+  .map__tel {
+    color: var(--map-link, #4a2bb8);
+  }
+  .map__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0 0;
+  }
+  .map__btn {
+    display: inline-block;
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding: 0.55rem 1rem;
+    line-height: 1.4;
+    border: 1.5px solid currentColor;
+    border-radius: var(--map-radius, 0.75rem);
+    color: var(--map-link, #4a2bb8);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .map__btn--primary {
+    border-color: var(--map-accent, #5933d8);
+    background: var(--map-accent, #5933d8);
+    color: var(--map-on-accent, #fff);
+  }
+  .map__btn:hover {
+    text-decoration: underline;
+  }
+  .map__btn:focus-visible,
+  .map__tel:focus-visible {
+    outline: 3px solid var(--map-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  @media print {
+    .map__media {
+      display: none !important;
+    }
+  }
+</style>

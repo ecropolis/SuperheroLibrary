@@ -1506,6 +1506,78 @@ import { analytics } from '../data/site';
     file: 'src/library/video-gallery/VideoGallery.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'map',
+    name: 'Map and directions',
+    aka: ['UABB Google Map', 'PowerPack Google Map', 'Elementor Google Maps', 'WP Google Maps', 'Google Maps embed', 'store locator', 'location card', 'get directions button'],
+    summary:
+      'A card per location with the address, phone and an optional hours line, “Open in Google Maps” and “Directions” links, and an optional map that loads from Google only when someone presses “Show the map”. No API key, and nothing from Google at page load.',
+    pitch: 'Show people where you are and get them there in one tap, without a Google script on every page.',
+    // SE Ranking US, 2026-09-26: google map embed code for website 170/mo, difficulty 35;
+    // google maps embed 590/41; google maps directions link 390/34; google maps link 320/20.
+    // The round-3 note's "map embed without api key" (and "google map embed without api key")
+    // have no data. "store locator" 2,400/65 is a different product (search by distance) and
+    // stays an aka.
+    search: { query: 'google map embed code for website', alsoRanks: ['google maps embed', 'google maps directions link', 'google maps link'] },
+    replaces: ['UABB / PowerPack “Google Map” modules (Beaver Builder)', 'Elementor’s Google Maps widget', 'WP Google Maps and similar plugins', 'a Google Maps <iframe> pasted into the footer'],
+    goodFor: 'A contact or visit page, a footer with the address, several branches each with its own card. Anywhere the question is “where is it and how do I get there”.',
+    notFor:
+      'A styled, branded or interactive map: custom colours, your own markers, clustering, a store locator that searches by distance. That needs the Google Maps JavaScript API, which needs an API key and a billing account, loads Google’s script on every visit, and adds Google’s map origins to the site’s CSP and consent policy; quote it as its own piece of work. Full opening hours are business-hours, which also owns the LocalBusiness structured data.',
+    props: [
+      { name: 'locations', type: '{ name, address, phone?, hours?, query?, photo?, embed? }[]', note: 'Required. `address` is its lines, as on an envelope. `query` is what Google searches for, by default the address; give “Business name, address” when Google knows the business, so its place card opens. `photo` is the facade image for the embed. `embed` overrides the element’s for this card.' },
+      { name: 'embed', type: 'boolean', default: 'false', note: 'Offer the click-to-load map on each card. Off, the cards are links only.' },
+      { name: 'zoom', type: 'number (1–21)', default: 'Google’s choice', note: 'Zoom of the embedded map: 15 is a neighbourhood, 18 a street.' },
+      { name: 'layout', type: "'stack' | 'split'", default: "'stack'", note: 'Stack: the map above the details, cards in a grid. Split: the map beside the details when there is room, one card per row.' },
+      { name: 'titleTag', type: "'h2' | 'h3' | 'h4'", default: "'h3'", note: 'Element for each card’s name.' },
+      { name: 'openLabel / directionsLabel / showLabel / notice', type: 'string', default: '“Open in Google Maps” / “Directions” / “Show the map” / “Loads a map from Google.”', note: 'Words, for a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--map-min', fallback: '18rem', note: 'Narrowest card before the list drops a column.' },
+      { name: '--map-gap', fallback: '1.25rem', note: 'Gap between cards.' },
+      { name: '--map-surface', fallback: '#fff', note: 'Card background, and the “Show the map” pill.' },
+      { name: '--map-text', fallback: '#1e283c', note: 'Card text (14.75:1 on the fallback surface).' },
+      { name: '--map-border', fallback: '#d5dae6', note: 'Card outline.' },
+      { name: '--map-radius', fallback: '0.75rem', note: 'Corners of cards and buttons.' },
+      { name: '--map-accent', fallback: '#5933d8', note: '“Open in Google Maps” button fill.' },
+      { name: '--map-on-accent', fallback: '#fff', note: 'Its text. Keep 4.5:1 against --map-accent (the fallbacks are 7.27:1; `npm run check` computes them).' },
+      { name: '--map-link', fallback: '#4a2bb8', note: '“Directions” and the phone number.' },
+      { name: '--map-aspect', fallback: '16 / 10', note: 'The map’s width / height.' },
+      { name: '--map-panel', fallback: '#e9ecf3', note: 'The neutral facade (no photo).' },
+      { name: '--map-panel-line', fallback: '#d3d8e4', note: 'Its street lines.' },
+      { name: '--map-pin', fallback: '#5933d8', note: 'The pin on the neutral facade.' },
+      { name: '--map-focus', fallback: '#5933d8', note: 'Focus rings.' },
+      { name: '--map-notice', fallback: '#4b5468', note: 'The “Loads a map from Google.” line.' },
+    ],
+    a11y: [
+      'Each address is an <address> under the location’s heading; the phone number is a tel: link.',
+      'The links name their place for a screen reader (“Open in Google Maps: Navy Pier”, “Directions to Navy Pier”), so a list of links still makes sense. Both are at least 44px tall.',
+      'The facade is a real <button> named “Show the map of <name>”, described by the visible notice “Loads a map from Google.”, so nobody loads a third party without being told. Pressed, it becomes an <iframe> titled “Map of <name>” and focus moves into it.',
+      'Nothing moves except the button’s pill growing slightly on hover, which prefers-reduced-motion removes.',
+      'Without JavaScript the cards and their links are all there, and the facade is not shown: a button that could not work is not rendered.',
+    ],
+    usage: `---
+import LocationMap from '../components/LocationMap.astro';   // not "Map": that would shadow JavaScript's Map
+---
+<LocationMap
+  embed
+  locations={[{
+    name: 'The Garden Shop',
+    address: ['123 Main St', 'Springfield, IL 62701'],
+    phone: '(217) 555-0100',
+    hours: 'Open daily, 8 AM to 6 PM',
+    query: 'The Garden Shop, 123 Main St, Springfield, IL 62701',
+    photo: '/images/storefront.webp',
+  }]}
+  layout="split"
+/>
+<!-- _headers: the embed needs frame-src https://www.google.com in the site's CSP; the links need nothing. -->`,
+    license:
+      'No API key and no Google account are involved. The links are Google’s public Maps URLs, and the map you choose to load is Google’s own embed, shown under Google’s terms with its attribution inside the frame. The pin on the plain facade is Font Awesome Free (CC BY 4.0).',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/map/ (demo)' }],
+    file: 'src/library/map/LocationMap.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
