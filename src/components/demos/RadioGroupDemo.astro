@@ -1,0 +1,112 @@
+---
+/**
+ * Demo for `radio-group`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets (the chunky icons are Font Awesome Free, inlined at
+ * build), and every host token has a fallback.
+ *
+ * All three looks in ONE real <form method="get">, because being a form control is the point:
+ *   - chunky: how the order arrives, a card each with an icon and a line;
+ *   - segmented: the billing period;
+ *   - default: how to reach you, `required`, with one option disabled.
+ * Without JavaScript "Continue" submits the form and the choices arrive in the address bar as
+ * ?delivery=…&billing=…&contact=…. With it, the demo shows the same `name=value` pairs the form
+ * would post instead of leaving the page, and a line reports each `data-changed` event.
+ */
+import RadioGroup from '../../library/radio-group/RadioGroup.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+---
+<form class="demo-rg" method="get" action="" data-demo-rg>
+  <RadioGroup
+    legend="How would you like your order?"
+    name="delivery"
+    style="chunky"
+    value="pickup"
+    options={[
+      { value: 'delivery', label: 'Delivery', text: 'To your door in 2 to 3 working days.', icon: 'truck' },
+      { value: 'pickup', label: 'Pick up', text: 'From the shop on Main Street, ready in an hour.', icon: 'store' },
+      { value: 'courier', label: 'Same-day courier', text: 'Order before noon, delivered by 6 PM.', icon: 'bolt' },
+    ]}
+  />
+
+  <RadioGroup
+    legend="Billing period"
+    name="billing"
+    style="segmented"
+    value="monthly"
+    options={[
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'yearly', label: 'Yearly (2 months free)' },
+    ]}
+  />
+
+  <RadioGroup
+    legend="How should we reach you?"
+    name="contact"
+    hint="We only get in touch about this order."
+    required
+    options={[
+      { value: 'email', label: 'Email' },
+      { value: 'phone', label: 'Phone call' },
+      { value: 'sms', label: 'Text message', text: 'Coming soon.', disabled: true },
+    ]}
+  />
+
+  <div class="demo-rg__actions">
+    <button class="demo-rg__submit" type="submit">Continue</button>
+    <p class="demo-rg__out" aria-live="polite" data-demo-rg-out>Pick how to reach you, then continue.</p>
+  </div>
+</form>
+
+<script is:inline>
+  (() => {
+    const form = document.currentScript.previousElementSibling;
+    const out = form.querySelector('[data-demo-rg-out]');
+    form.addEventListener('data-changed', (e) => {
+      out.textContent = `data-changed: ${e.detail.name} is now “${e.detail.label}”.`;
+    });
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      out.textContent = `The form would send: ${new URLSearchParams(new FormData(form)).toString()}`;
+    });
+  })();
+</script>
+
+<style>
+  .demo-rg {
+    display: grid;
+    gap: 2rem;
+    color: var(--ink, #16192a);
+    --rg-accent: var(--purple, #5933d8);
+    --rg-focus: var(--purple, #5933d8);
+    --rg-radius: var(--radius, 10px);
+  }
+  .demo-rg__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+  .demo-rg__submit {
+    min-height: 2.75rem;
+    padding: 0.6rem 1.4rem;
+    border: 0;
+    border-radius: var(--radius, 10px);
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-rg__submit:focus-visible {
+    outline: 3px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+  .demo-rg__out {
+    margin: 0;
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
+  }
+</style>

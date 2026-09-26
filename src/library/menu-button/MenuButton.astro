@@ -1,0 +1,501 @@
+---
+/**
+ * Menu button — a button that opens a short menu of actions or links: "Share", "Export",
+ * "Sort by", the ⋮ "More options" on a card. The WAI-ARIA Authoring Practices menu button
+ * pattern. Behaviour and accessibility intent from Rocketbelt's dropdowns (Pier 1 Imports, 2020,
+ * MIT); reimplemented here, no code copied.
+ *
+ * Not site navigation (that is mega-menu, or plain header links: a nav is links, and a menu
+ * role would make a screen reader expect application keys), and not choosing a form value
+ * (that is a native <select>, or radio-group).
+ *
+ * Markup, rendered once:
+ *   - a <button aria-haspopup="menu" aria-expanded aria-controls>, rendered `hidden`;
+ *   - a <details><summary> holding the SAME label, then the <ul> of items.
+ * Without JavaScript the <details> is the element: the summary opens and closes the list, and
+ * the links in it work. Items without an href are <button>s and do nothing without JavaScript,
+ * so give an item an href when it must work without it (a settings menu can link to ?sort=…).
+ * With JavaScript the list moves out of the <details>, which is removed, the button is shown,
+ * and the list becomes role="menu" with each item role="menuitem" (or "menuitemradio" with
+ * aria-checked when `mode="radio"`) and tabindex="-1".
+ *
+ * Keyboard (APG): on the button, Enter, Space or ↓ open the menu and focus the first item (the
+ * checked one in a radio menu), ↑ opens it on the last. In the menu, ↓ ↑ move and wrap, Home and
+ * End jump, a letter moves to the next item starting with it, Enter or Space activate, Escape
+ * closes and returns focus to the button, Tab closes and moves on. A click outside or focus
+ * leaving closes it. Disabled items are focusable and announced, not activatable.
+ *
+ * Activating an item dispatches `data-selected` (bubbles, cancelable) on the root with
+ * `detail: { value, label, href }`. For a link, calling preventDefault() on it keeps the
+ * browser from following the link, so a host can handle it in place. A radio menu also moves
+ * aria-checked and the check mark to the chosen item.
+ *
+ * Placement: below the button, or above it when the room below is short and there is more
+ * above; measured on every open. `align="end"` lines the menu up with the button's end edge;
+ * either way it shifts to the other edge if it would leave the viewport.
+ *
+ * Motion: the menu fades in over 120 ms; nothing under prefers-reduced-motion.
+ *
+ * The runtime is emitted once per page (the first menu button carries it) and mounts every
+ * menu button on the page.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --mb-bg / --mb-fg / --mb-border   the button                     (#fff / #1e283c / #c9ccd8)
+ *   --mb-radius                       button and menu corners        (8px)
+ *   --mb-menu-bg / --mb-menu-fg       the menu                       (#fff / #1e283c)
+ *   --mb-hover                        focused and hovered item       (#eef0f7)
+ *   --mb-accent                       check mark in a radio menu     (#5933d8)
+ *   --mb-muted                        disabled items                 (#6b6f80)
+ *   --mb-focus                        keyboard focus ring            (#5933d8)
+ *   --mb-shadow                       menu shadow                    (0 12px 32px rgb(0 0 0 / 0.16))
+ *   --mb-z                            menu stacking                  (30)
+ *   --mb-min-width / --mb-max-height  menu size                      (12rem / 20rem, then it scrolls)
+ *
+ * Icons: the chevron, the ⋮ and the check are Font Awesome Free 7.3.1 solid glyphs
+ * (chevron-down, ellipsis-vertical, check), inlined with their CC BY 4.0 attribution comment.
+ */
+export interface MenuItem {
+  label: string;
+  /** A link item. Without it the item is a button that dispatches `data-selected`. */
+  href?: string;
+  /** Sent in the event's detail. Default: the label. */
+  value?: string;
+  disabled?: boolean;
+  /** `mode="radio"` only: the item that starts checked. */
+  checked?: boolean;
+}
+interface Props {
+  /** The button's text, or its accessible name when `iconOnly`. Required. */
+  label: string;
+  items: MenuItem[];
+  /** 'actions' (menuitem) or 'radio' (menuitemradio with aria-checked, one checked). */
+  mode?: 'actions' | 'radio';
+  /** Show only a ⋮ glyph; `label` becomes the button's aria-label. */
+  iconOnly?: boolean;
+  /** Which edge of the button the menu lines up with. */
+  align?: 'start' | 'end';
+  /** Base id; the button is <id>-button and the menu <id>-menu. Default: generated. */
+  id?: string;
+  class?: string;
+}
+
+const { label, items, mode = 'actions', iconOnly = false, align = 'start', id: givenId, class: className } = Astro.props;
+
+if (!label || !String(label).trim()) throw new Error('MenuButton: `label` is required; it names the button (and the menu).');
+if (!Array.isArray(items) || !items.length) throw new Error(`MenuButton "${label}": \`items\` is empty; a menu needs at least one item.`);
+if (!['actions', 'radio'].includes(mode)) throw new Error(`MenuButton "${label}": mode "${mode}" is not actions or radio.`);
+if (!['start', 'end'].includes(align)) throw new Error(`MenuButton "${label}": align "${align}" is not start or end.`);
+for (const it of items) if (!it.label || !String(it.label).trim()) throw new Error(`MenuButton "${label}": an item has no label.`);
+if (mode === 'radio' && items.filter((it) => it.checked).length > 1) throw new Error(`MenuButton "${label}": more than one item is checked in a radio menu.`);
+if (mode === 'actions' && items.some((it) => it.checked)) throw new Error(`MenuButton "${label}": \`checked\` needs mode="radio".`);
+if (givenId !== undefined && !/^[A-Za-z][\w-]*$/.test(givenId)) throw new Error(`MenuButton: id "${givenId}" must start with a letter and hold only letters, digits, - and _.`);
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__menuButtonCount as number) || 0) + 1;
+locals.__menuButtonCount = n;
+const firstOnPage = !locals.__menuButtonScript;
+locals.__menuButtonScript = true;
+const id = givenId || `menu-button-${n}`;
+
+const FA = '<!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc. -->';
+const glyph = (viewBox: string, d: string, cls: string) =>
+  `<svg class="${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" aria-hidden="true" focusable="false">${FA}<path fill="currentColor" d="${d}"/></svg>`;
+const chevron = glyph('0 0 448 512', 'M201.4 406.6c12.5 12.5 32.8 12.5 45.3 0l192-192c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 338.7 54.6 169.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l192 192z', 'mb__chevron');
+const kebab = glyph('0 0 128 512', 'M64 144a56 56 0 1 1 0-112 56 56 0 1 1 0 112zm0 224c30.9 0 56 25.1 56 56s-25.1 56-56 56-56-25.1-56-56 25.1-56 56-56zm56-112c0 30.9-25.1 56-56 56s-56-25.1-56-56 25.1-56 56-56 56 25.1 56 56z', 'mb__kebab');
+const check = glyph('0 0 448 512', 'M434.8 70.1c14.3 10.4 17.5 30.4 7.1 44.7l-256 352c-5.5 7.6-14 12.3-23.4 13.1s-18.5-2.7-25.1-9.3l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l101.5 101.5 234-321.7c10.4-14.3 30.4-17.5 44.7-7.1z', 'mb__check');
+---
+
+<div class:list={['mb', `mb--${align}`, { 'mb--icon': iconOnly }, className]} id={id} data-mb data-mode={mode}>
+  <button
+    class="mb__button"
+    type="button"
+    id={`${id}-button`}
+    aria-haspopup="menu"
+    aria-expanded="false"
+    aria-controls={`${id}-menu`}
+    aria-label={iconOnly ? label : undefined}
+    hidden
+  >
+    {iconOnly ? <Fragment set:html={kebab} /> : <><span class="mb__label">{label}</span><Fragment set:html={chevron} /></>}
+  </button>
+  <details class="mb__details">
+    <summary class="mb__button mb__summary" aria-label={iconOnly ? label : undefined}>
+      {iconOnly ? <Fragment set:html={kebab} /> : <><span class="mb__label">{label}</span><Fragment set:html={chevron} /></>}
+    </summary>
+    <ul class="mb__list" id={`${id}-menu`}>
+      {
+        items.map((it) => {
+          const value = it.value ?? it.label;
+          const cls = ['mb__item', { 'mb__item--checked': it.checked }];
+          const inner = (
+            <>
+              {mode === 'radio' && <span class="mb__mark" set:html={check} />}
+              <span class="mb__text">{it.label}</span>
+            </>
+          );
+          return (
+            <li>
+              {it.href && !it.disabled ? (
+                <a class:list={cls} href={it.href} data-value={value}>{inner}</a>
+              ) : (
+                <button class:list={cls} type="button" data-value={value} data-href={it.href} disabled={it.disabled}>{inner}</button>
+              )}
+            </li>
+          );
+        })
+      }
+    </ul>
+  </details>
+</div>
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroMenuButton) return;
+
+        // <mb-keys> Pure: what each key does. npm run check runs this block from the built page.
+        const mbKeys = {
+          /** In an open menu: { to: index } moves focus, { act } acts, null lets the key through. */
+          key(key, i, labels) {
+            const n = labels.length;
+            if (!n) return null;
+            if (key === 'ArrowDown') return { to: (i + 1) % n };
+            if (key === 'ArrowUp') return { to: (i - 1 + n) % n };
+            if (key === 'Home') return { to: 0 };
+            if (key === 'End') return { to: n - 1 };
+            if (key === 'Escape') return { act: 'close' };
+            if (key === 'Tab') return { act: 'tab' };
+            if (key === 'Enter' || key === ' ') return { act: 'activate' };
+            if (key.length === 1 && key.trim()) {
+              const c = key.toLowerCase();
+              for (let k = 1; k <= n; k++) {
+                const j = (i + k) % n;
+                if (labels[j].trim().toLowerCase().startsWith(c)) return { to: j };
+              }
+            }
+            return null;
+          },
+          /** On the closed button: the item an opening key focuses (-1 = the last), or null. */
+          open(key) {
+            if (key === 'ArrowDown' || key === 'Enter' || key === ' ') return 0;
+            if (key === 'ArrowUp') return -1;
+            return null;
+          },
+          /** Opens upward only when the menu does not fit below and there is more room above. */
+          place(below, above, height) {
+            return below < height && above > below ? 'up' : 'down';
+          },
+        };
+        // </mb-keys>
+
+        const menus = new Set();
+
+        const mount = (root) => {
+          if (root.dataset.ready) return;
+          const button = root.querySelector(':scope > .mb__button');
+          const details = root.querySelector(':scope > .mb__details');
+          const list = details && details.querySelector('.mb__list');
+          if (!button || !list) return;
+          root.dataset.ready = '1';
+          const radio = root.dataset.mode === 'radio';
+
+          root.append(list);
+          details.remove();
+          button.hidden = false;
+          list.setAttribute('role', 'menu');
+          list.setAttribute('aria-labelledby', button.id);
+          list.tabIndex = -1;
+          list.hidden = true;
+          const items = [...list.querySelectorAll('.mb__item')];
+          items.forEach((it) => {
+            it.parentElement.setAttribute('role', 'none');
+            it.setAttribute('role', radio ? 'menuitemradio' : 'menuitem');
+            it.tabIndex = -1;
+            if (radio) it.setAttribute('aria-checked', String(it.classList.contains('mb__item--checked')));
+            // Disabled items stay focusable in a menu (APG), so `disabled` becomes aria-disabled.
+            if (it.disabled) {
+              it.disabled = false;
+              it.setAttribute('aria-disabled', 'true');
+            }
+          });
+          const labels = items.map((it) => it.textContent.replace(/\s+/g, ' ').trim());
+          const isOpen = () => button.getAttribute('aria-expanded') === 'true';
+
+          const place = () => {
+            root.classList.remove('mb--up', 'mb--flip');
+            const b = button.getBoundingClientRect();
+            root.classList.toggle('mb--up', mbKeys.place(innerHeight - b.bottom, b.top, list.offsetHeight + 8) === 'up');
+            const m = list.getBoundingClientRect();
+            if (m.right > document.documentElement.clientWidth - 4 || m.left < 4) root.classList.add('mb--flip');
+          };
+          const focusItem = (i) => {
+            if (!items.length) return;
+            items[(i + items.length) % items.length].focus();
+          };
+          const open = (first) => {
+            if (!isOpen()) {
+              menus.forEach((m) => m !== api && m.close(false));
+              button.setAttribute('aria-expanded', 'true');
+              list.hidden = false;
+              place();
+            }
+            focusItem(first);
+          };
+          const close = (returnFocus) => {
+            if (!isOpen()) return;
+            button.setAttribute('aria-expanded', 'false');
+            list.hidden = true;
+            if (returnFocus) button.focus();
+          };
+          const api = { root, close };
+          menus.add(api);
+          const checkedIndex = () => Math.max(0, items.findIndex((it) => it.getAttribute('aria-checked') === 'true'));
+
+          button.addEventListener('click', () => (isOpen() ? close(true) : open(radio ? checkedIndex() : 0)));
+          button.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return; // Enter and Space arrive as a click.
+            e.preventDefault();
+            const to = mbKeys.open(e.key);
+            open(to === 0 && radio ? checkedIndex() : to);
+          });
+
+          const activate = (it, e) => {
+            if (it.getAttribute('aria-disabled') === 'true') {
+              e.preventDefault();
+              return;
+            }
+            const detail = { value: it.dataset.value, label: labels[items.indexOf(it)], href: it.getAttribute('href') || it.dataset.href || null };
+            const go = root.dispatchEvent(new CustomEvent('data-selected', { bubbles: true, cancelable: true, detail }));
+            if (radio) {
+              items.forEach((x) => {
+                const on = x === it;
+                x.setAttribute('aria-checked', String(on));
+                x.classList.toggle('mb__item--checked', on);
+              });
+            }
+            if (it.tagName === 'A' && go) {
+              close(false); // The browser follows the link.
+              return;
+            }
+            e.preventDefault();
+            close(true);
+          };
+          list.addEventListener('click', (e) => {
+            const it = e.target.closest('.mb__item');
+            if (it && list.contains(it)) activate(it, e);
+          });
+          list.addEventListener('keydown', (e) => {
+            const i = items.indexOf(document.activeElement);
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+            // Focus on the list itself (a click on its padding): ↓ reaches the first item, ↑ the last.
+            const from = i >= 0 ? i : e.key === 'ArrowUp' ? 0 : items.length - 1;
+            const r = mbKeys.key(e.key, from, labels);
+            if (!r) return;
+            if (r.act === 'tab') return close(false); // Focus moves on by itself.
+            e.preventDefault();
+            if (r.act === 'close') close(true);
+            else if (r.act === 'activate' && i >= 0) items[i].click();
+            else if (r.to !== undefined) focusItem(r.to);
+          });
+          // Safari does not focus a button on click, so pressing the open menu's own button blurs
+          // the item to <body>. That focusout must not close the menu, or the click reopens it.
+          let pressing = false;
+          root.addEventListener('pointerdown', () => (pressing = true));
+          document.addEventListener('pointerup', () => setTimeout(() => (pressing = false)));
+          root.addEventListener('focusout', (e) => {
+            if (!pressing && isOpen() && !root.contains(e.relatedTarget)) close(false);
+          });
+          document.addEventListener('pointerdown', (e) => {
+            if (isOpen() && !root.contains(e.target)) close(false);
+          });
+        };
+
+        const boot = () => document.querySelectorAll('[data-mb]').forEach(mount);
+        window.__superheroMenuButton = { mount: boot };
+        document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+      })();
+    </script>
+  )
+}
+
+<style>
+  .mb {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .mb [hidden] {
+    display: none !important;
+  }
+  .mb__button {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.9rem 0.55rem 1rem;
+    border: 1px solid var(--mb-border, #c9ccd8);
+    border-radius: var(--mb-radius, 8px);
+    background: var(--mb-bg, #fff);
+    color: var(--mb-fg, #1e283c);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    list-style: none;
+  }
+  .mb__summary::-webkit-details-marker {
+    display: none;
+  }
+  .mb--icon .mb__button {
+    justify-content: center;
+    min-width: 2.75rem;
+    padding: 0;
+  }
+  .mb__button :global(.mb__chevron) {
+    width: 0.75em;
+    height: 0.75em;
+    transition: rotate 120ms ease;
+  }
+  .mb__button[aria-expanded='true'] :global(.mb__chevron),
+  .mb__details[open] > .mb__summary :global(.mb__chevron) {
+    rotate: 180deg;
+  }
+  .mb__button :global(.mb__kebab) {
+    width: 1em;
+    height: 1.1em;
+  }
+  .mb__button:hover {
+    border-color: currentColor;
+  }
+  .mb :focus-visible {
+    outline: 3px solid var(--mb-focus, #5933d8);
+    outline-offset: 2px;
+  }
+
+  .mb__list {
+    box-sizing: border-box;
+    position: absolute;
+    z-index: var(--mb-z, 30);
+    top: calc(100% + 0.35rem);
+    inset-inline-start: 0;
+    /* Its containing block is the button's width, so size to the items, within bounds. */
+    width: max-content;
+    min-width: max(100%, var(--mb-min-width, 12rem));
+    max-width: min(22rem, calc(100vw - 2rem));
+    max-height: var(--mb-max-height, 20rem);
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    border: 1px solid var(--mb-border, #c9ccd8);
+    border-radius: var(--mb-radius, 8px);
+    background: var(--mb-menu-bg, #fff);
+    color: var(--mb-menu-fg, #1e283c);
+    box-shadow: var(--mb-shadow, 0 12px 32px rgb(0 0 0 / 0.16));
+    text-align: start;
+  }
+  /* Without JavaScript the list sits in a closed <details> and shows when it opens. */
+  .mb__details:not([open]) .mb__list {
+    display: none;
+  }
+  .mb--end .mb__list,
+  .mb--start.mb--flip .mb__list {
+    inset-inline: auto 0;
+  }
+  .mb--end.mb--flip .mb__list {
+    inset-inline: 0 auto;
+  }
+  .mb--up .mb__list {
+    top: auto;
+    bottom: calc(100% + 0.35rem);
+  }
+  .mb__list li {
+    margin: 0;
+    padding: 0;
+  }
+  .mb__item {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.75rem;
+    border: 0;
+    border-radius: calc(var(--mb-radius, 8px) - 3px);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .mb__item:hover,
+  .mb__item:focus {
+    background: var(--mb-hover, #eef0f7);
+  }
+  .mb__item:focus {
+    outline: none;
+  }
+  .mb__item:focus-visible {
+    outline: 2px solid var(--mb-focus, #5933d8);
+    outline-offset: -2px;
+  }
+  .mb__item:disabled,
+  .mb__item[aria-disabled='true'] {
+    color: var(--mb-muted, #6b6f80);
+    cursor: not-allowed;
+  }
+  .mb__mark {
+    display: inline-grid;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    color: var(--mb-accent, #5933d8);
+    visibility: hidden;
+  }
+  .mb__mark :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .mb__item--checked .mb__mark {
+    visibility: visible;
+  }
+  .mb__item--checked {
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mb__list:not([hidden]) {
+      animation: mb-in 120ms ease-out;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mb__button :global(.mb__chevron) {
+      transition: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .mb__item:focus {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+  }
+  @keyframes mb-in {
+    from {
+      opacity: 0;
+      translate: 0 -0.25rem;
+    }
+  }
+  .mb--up .mb__list:not([hidden]) {
+    animation-name: mb-in-up;
+  }
+  @keyframes mb-in-up {
+    from {
+      opacity: 0;
+      translate: 0 0.25rem;
+    }
+  }
+</style>

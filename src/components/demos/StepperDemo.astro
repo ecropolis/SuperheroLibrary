@@ -1,0 +1,147 @@
+---
+/**
+ * Demo for `stepper`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Two steppers:
+ *   - A checkout that advances in place. Back and Next call
+ *     window.__superheroStepper.go('demo-st-checkout', n), as a multi-step form would, and move
+ *     focus to the step's heading. Done steps link to #demo-st-panel. Without JavaScript the
+ *     buttons stay hidden and the stepper shows step 2, as rendered.
+ *   - An onboarding checklist, always vertical, with a line of text per step: static.
+ * Resize the window (or read the page on a phone) to see the checkout turn vertical below 40rem.
+ */
+import Stepper from '../../library/stepper/Stepper.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+const checkout = [
+  { label: 'Basket', href: '#demo-st-panel' },
+  { label: 'Delivery', href: '#demo-st-panel' },
+  { label: 'Payment', href: '#demo-st-panel' },
+  { label: 'Review', href: '#demo-st-panel' },
+];
+---
+<div class="demo-st">
+  <section class="demo-st__box" data-demo-st>
+    <Stepper id="demo-st-checkout" label="Checkout progress" steps={checkout} current={2} />
+    <div class="demo-st__panel" id="demo-st-panel">
+      <h3 class="demo-st__h" tabindex="-1" data-demo-st-heading>Step 2 of 4: Delivery</h3>
+      <p class="demo-st__p">In a real checkout the form for this step sits here.</p>
+      <div class="demo-st__actions" hidden data-demo-st-actions>
+        <button type="button" class="demo-st__btn" data-demo-st-go="-1">Back</button>
+        <button type="button" class="demo-st__btn demo-st__btn--primary" data-demo-st-go="1">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo-st__box" id="demo-st-onboarding">
+    <h3 class="demo-st__h">Getting started</h3>
+    <Stepper
+      label="Getting started"
+      orientation="vertical"
+      current={3}
+      steps={[
+        { label: 'Create your account', text: 'Done in under a minute.', href: '#demo-st-onboarding' },
+        { label: 'Add your business details', text: 'Name, address and opening hours.', href: '#demo-st-onboarding' },
+        { label: 'Invite your team', text: 'They get an email with a link to join.' },
+        { label: 'Go live', text: 'Publish the site when you are happy with it.' },
+      ]}
+    />
+  </section>
+</div>
+
+<script is:inline>
+  (() => {
+    const box = document.currentScript.previousElementSibling.querySelector('[data-demo-st]');
+    const names = ['Basket', 'Delivery', 'Payment', 'Review'];
+    const heading = box.querySelector('[data-demo-st-heading]');
+    const actions = box.querySelector('[data-demo-st-actions]');
+    let n = 2;
+    actions.hidden = false;
+    const show = () => {
+      const [back, next] = actions.querySelectorAll('button');
+      back.disabled = n === 1;
+      next.textContent = n === names.length ? 'Place order' : n > names.length ? 'Start again' : 'Next';
+      heading.textContent = n > names.length ? 'Order placed. Thank you.' : `Step ${n} of ${names.length}: ${names[n - 1]}`;
+    };
+    actions.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-demo-st-go]');
+      if (!b || !window.__superheroStepper) return;
+      const d = Number(b.dataset.demoStGo);
+      n = d > 0 && n > names.length ? 1 : Math.max(1, n + d);
+      window.__superheroStepper.go('demo-st-checkout', n);
+      show();
+      heading.focus();
+    });
+    show();
+  })();
+</script>
+
+<style>
+  .demo-st {
+    display: grid;
+    gap: 2rem;
+    color: var(--ink, #16192a);
+    --st-accent: var(--purple, #5933d8);
+    --st-focus: var(--purple, #5933d8);
+  }
+  .demo-st__box {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    border: 1px solid var(--line, #d9dae6);
+    border-radius: var(--radius, 10px);
+    background: var(--white, #fff);
+  }
+  .demo-st__panel {
+    display: grid;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line, #d9dae6);
+  }
+  .demo-st__h {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  .demo-st__h:focus-visible {
+    outline: 3px solid var(--purple, #5933d8);
+    outline-offset: 3px;
+  }
+  .demo-st__p {
+    margin: 0;
+  }
+  .demo-st__actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+  .demo-st__actions[hidden] {
+    display: none;
+  }
+  .demo-st__btn {
+    min-height: 2.75rem;
+    padding: 0.55rem 1.2rem;
+    border: 1px solid var(--line, #c9ccd8);
+    border-radius: var(--radius, 10px);
+    background: var(--white, #fff);
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .demo-st__btn--primary {
+    border-color: var(--purple, #5933d8);
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+  }
+  .demo-st__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .demo-st__btn:focus-visible {
+    outline: 3px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+</style>

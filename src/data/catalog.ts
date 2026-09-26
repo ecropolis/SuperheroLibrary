@@ -2437,6 +2437,212 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     file: 'src/library/loading/Loading.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'menu-button',
+    name: 'Menu button',
+    aka: ['dropdown button', 'action menu', 'kebab menu', 'three-dot menu', 'more options menu', 'Bootstrap dropdown'],
+    summary:
+      'The WAI-ARIA menu button: a <button aria-haspopup="menu"> that opens a role="menu" of links or actions (or a radio menu for a setting), with arrow keys, Home/End, type-ahead, Escape back to the button, click-outside to close, and a flip upward when there is no room below. Without JavaScript it is a <details> holding the same links.',
+    pitch: 'Tuck a handful of actions — share, export, edit, delete — behind one tidy button that works the same with a mouse, a keyboard or a screen reader.',
+    // SE Ranking US, 2026-09-26: menu button 720/mo, difficulty 23; dropdown button 190/27;
+    // action menu 170/6; dropdown menu button 10/60 (the phrase the round-4 brief pre-assigned;
+    // kept as a variant). "dropdown menu" 2,400/68 is out of reach and mostly means navigation.
+    search: { query: 'menu button', alsoRanks: ['dropdown button', 'action menu', 'dropdown menu button'] },
+    replaces: ['Bootstrap’s dropdown component', 'page-builder “dropdown button” modules', 'hand-rolled hover dropdowns that a keyboard cannot open'],
+    goodFor: 'A few actions that do not each deserve a button: Share, Export, Download as…, the ⋮ on a card or a table row, a Sort by or View as setting on a listing.',
+    notFor:
+      'Site navigation: a header of pages is a list of links, and role="menu" makes a screen reader expect application keys; use mega-menu (or plain header links). Choosing a value in a form: that is a native <select>, or radio-group when the options deserve to be seen. And more than about ten items, which is a page, not a menu.',
+    props: [
+      { name: 'label', type: 'string', note: 'The button’s text, or its accessible name when `iconOnly`. Required.' },
+      { name: 'items', type: 'MenuItem[]', note: '`{ label, href?, value?, disabled?, checked? }`. With `href` the item is a link; without it, a button that only acts through the `data-selected` event, so give an item an href when it must work without JavaScript.' },
+      { name: 'mode', type: "'actions' | 'radio'", default: "'actions'", note: 'Radio makes the items menuitemradio with aria-checked and a check mark, for a setting such as Sort by. At most one item `checked`.' },
+      { name: 'iconOnly', type: 'boolean', default: 'false', note: 'A 44px ⋮ button (Font Awesome Free ellipsis-vertical); `label` becomes its aria-label, so write it in full: “More options for Spring newsletter”.' },
+      { name: 'align', type: "'start' | 'end'", default: "'start'", note: 'Which edge of the button the menu lines up with. It moves to the other edge by itself if it would leave the viewport.' },
+      { name: 'id', type: 'string', default: '“menu-button-<n>”', note: 'Base id: the button is <id>-button, the menu <id>-menu. Also `event.target.id` for a host listening on a parent.' },
+      { name: 'data-selected', type: 'event', note: 'Dispatched on the root when an item is activated: bubbles, cancelable, `detail: { value, label, href }`. preventDefault() on a link item keeps the browser from following it.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--mb-bg', fallback: '#fff', note: 'Button fill.' },
+      { name: '--mb-fg', fallback: '#1e283c', note: 'Button text (14.75:1 on the fallback fill).' },
+      { name: '--mb-border', fallback: '#c9ccd8', note: 'Button and menu border.' },
+      { name: '--mb-radius', fallback: '8px', note: 'Button and menu corners.' },
+      { name: '--mb-menu-bg', fallback: '#fff', note: 'Menu fill.' },
+      { name: '--mb-menu-fg', fallback: '#1e283c', note: 'Menu text.' },
+      { name: '--mb-hover', fallback: '#eef0f7', note: 'Focused and hovered item (menu text stays above 4.5:1 on it).' },
+      { name: '--mb-accent', fallback: '#5933d8', note: 'Check mark in a radio menu.' },
+      { name: '--mb-muted', fallback: '#6b6f80', note: 'Disabled items.' },
+      { name: '--mb-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+      { name: '--mb-shadow', fallback: '0 12px 32px rgb(0 0 0 / 0.16)', note: 'Menu shadow.' },
+      { name: '--mb-z', fallback: '30', note: 'Menu stacking level.' },
+      { name: '--mb-min-width / --mb-max-height', fallback: '12rem / 20rem', note: 'Menu size; past the height it scrolls.' },
+    ],
+    a11y: [
+      'The WAI-ARIA Authoring Practices menu button: the button has aria-haspopup="menu", aria-expanded and aria-controls; the menu is role="menu", labelled by the button, and its items are role="menuitem" (or "menuitemradio" with aria-checked) with tabindex="-1", so the menu is one Tab stop.',
+      'On the button, Enter, Space and ↓ open the menu on the first item (the checked one in a radio menu) and ↑ opens it on the last. In the menu, ↓ ↑ move and wrap, Home and End jump, a letter moves to the next item starting with it, Enter and Space activate, Escape closes and returns focus to the button, Tab closes and moves on.',
+      'A click outside or focus leaving the element closes the menu. A disabled item is aria-disabled: reachable and announced, not activatable.',
+      'The menu opens below the button, or above it when the room below is short and there is more above, measured each time it opens; it never runs off the side of the viewport.',
+      'Buttons and items are at least 44px tall; the icon-only button is 44px square with its full label as aria-label.',
+      'prefers-reduced-motion: the menu appears without its 120 ms fade.',
+      'Without JavaScript it is a <details>: the summary shows the same label and opens the same list, and link items work. No menu roles are rendered until the script can honour them.',
+    ],
+    usage: `<MenuButton label="Share" items={[
+  { label: 'Copy link', value: 'copy' },
+  { label: 'Email this page', href: 'mailto:?subject=…' },
+]} />
+
+<!-- A setting: links keep it working without JavaScript. -->
+<MenuButton label="Sort by" mode="radio" items={[
+  { label: 'Newest first', href: '?sort=newest', checked: true },
+  { label: 'Price, low to high', href: '?sort=price-asc' },
+]} />
+
+<!-- ⋮ on a card -->
+<MenuButton label="More options for {post.title}" iconOnly align="end" items={actions} />
+
+<script>
+  document.addEventListener('data-selected', (e) => { if (e.detail.value === 'copy') navigator.clipboard.writeText(location.href); });
+</script>
+<!-- .toolbar { --mb-accent: var(--brand); --mb-focus: var(--brand); --mb-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/menu-button/ (demo)' }],
+    file: 'src/library/menu-button/MenuButton.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'radio-group',
+    name: 'Radio group',
+    aka: ['chunky radio buttons', 'radio cards', 'card radio buttons', 'segmented control', 'segmented buttons', 'toggle button group', 'custom radio buttons', 'styled radio buttons', 'Gravity Forms radio', 'WPForms multiple choice'],
+    summary:
+      'One choice from a few, as real <input type="radio">s in a <fieldset> with a <legend>: a styled list, chunky cards with a Font Awesome Free icon, a title and a line, or a segmented pill row. Native keyboard, visible focus, posts name=value in a plain form, and a data-changed event for hosts.',
+    pitch: 'Let people pick one option at a glance — as a list, as big cards with an icon, or as a pill switch — and it still posts like the plain form it is.',
+    // SE Ranking US, 2026-09-26: radio button css 590/mo, difficulty 21; radio group 480/30;
+    // radio button design 390/28; segmented control 260/7 (volatile, 10–590 over the year);
+    // styled radio buttons 210/22. "segmented control css", the phrase the round-4 brief
+    // pre-assigned, has no measurable volume, so its parent is a variant here instead.
+    search: { query: 'radio button css', alsoRanks: ['radio group', 'radio button design', 'segmented control', 'styled radio buttons'] },
+    replaces: ['Gravity Forms / WPForms / Contact Form 7 radio fields with a theme’s styling', 'page-builder “radio image” and “card select” add-ons', 'JavaScript segmented controls that replace the inputs with divs'],
+    goodFor:
+      'Two to six choices people should see side by side: delivery or pickup, a plan, a billing period (segmented), a size, how to be contacted. Chunky cards when each option needs a line of explanation; segmented for two to four short words.',
+    notFor:
+      'Many options or long labels: over about six, use a native <select>. Several answers at once: that is checkboxes. An action that happens on click (a view switch that is not part of a form is fine, a Delete button is not). And a list of pages: those are links.',
+    props: [
+      { name: 'legend', type: 'string', note: 'The question, as the fieldset’s <legend>; the group’s accessible name. Required.' },
+      { name: 'name', type: 'string', note: 'The field name the form posts. Required.' },
+      { name: 'options', type: 'RadioOption[]', note: '`{ value, label, text?, icon?, disabled? }`. `text` is a line under the label and its description (not shown in segmented). `icon` (chunky) is a Font Awesome Free name: "truck", or "regular/clock" for another Free style.' },
+      { name: 'value', type: 'string', note: 'The value checked on render. Leave it out to make the visitor choose (with `required`).' },
+      { name: 'style', type: "'default' | 'chunky' | 'segmented'", default: "'default'", note: 'A styled list, a card per option, or a pill row.' },
+      { name: 'hideLegend', type: 'boolean', default: 'false', note: 'Hide the legend visually; it still names the group. Only when the question is already visible beside it.' },
+      { name: 'hint', type: 'string', note: 'A line under the legend, set as the group’s description.' },
+      { name: 'required', type: 'boolean', default: 'false', note: 'The browser’s own validation: the form will not submit until one is chosen.' },
+      { name: 'id', type: 'string', default: '“rg-<name>-<n>”', note: 'Base of the input ids (<id>-1, <id>-2 …).' },
+      { name: 'data-changed', type: 'event', note: 'Dispatched on the fieldset when the choice changes: bubbles, `detail: { name, value, label }`. The fieldset’s `data-value` follows it. The native change event fires too.' },
+      { name: 'class', type: 'string', note: 'Class on the fieldset, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--rg-accent', fallback: '#5933d8', note: 'Checked dot, checked card border, checked segment fill, icons.' },
+      { name: '--rg-accent-fg', fallback: '#fff', note: 'Text on a checked segment (7.27:1 on the fallback accent).' },
+      { name: '--rg-fg', fallback: 'inherit', note: 'Legend and labels.' },
+      { name: '--rg-muted', fallback: '#585c6e', note: 'Descriptions and the hint (6.6:1 on white).' },
+      { name: '--rg-border', fallback: '#8a8ea0', note: 'Radio ring and segmented outline (3.25:1 on white; the non-text minimum is 3:1); cards use it at 55%, full on hover.' },
+      { name: '--rg-bg', fallback: '#fff', note: 'Card, segment and radio fill.' },
+      { name: '--rg-bg-checked', fallback: '#f4f1fd', note: 'Checked card fill.' },
+      { name: '--rg-radius', fallback: '10px', note: 'Card and segment corners.' },
+      { name: '--rg-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+      { name: '--rg-size', fallback: '1.25rem', note: 'The radio circle.' },
+      { name: '--rg-card-min', fallback: '13rem', note: 'Narrowest a chunky card gets before the row wraps.' },
+    ],
+    a11y: [
+      'Real radios in a <fieldset> named by its <legend>: nothing is replaced, given a role or hidden from assistive technology, so screen readers announce “radio button, 2 of 3” and the group’s question.',
+      'The keyboard is the browser’s: Tab enters the group on the checked radio (or the first), the arrow keys move and select, Space selects, Tab leaves. No script is involved.',
+      'Each radio is named by its title only; a chunky card’s line of text is its description (aria-describedby), and the hint describes the group.',
+      'A visible 3px focus ring on the radio, or around the whole card or segment in those looks. Every option is at least 44px tall.',
+      'Colour is never the only signal: the checked radio has a dot, the checked card a heavier border and a fill, and in forced-colors mode checked cards and segments get a Highlight outline.',
+      'prefers-reduced-motion: no colour transition.',
+      'Without JavaScript nothing is missing: it is a form control, and it posts `name=value` in a plain form, with `required` validation by the browser. The script only adds the data-changed event for hosts.',
+    ],
+    usage: `<form method="post" action="/checkout/">
+  <RadioGroup legend="How would you like your order?" name="delivery" style="chunky" value="pickup" options={[
+    { value: 'delivery', label: 'Delivery', text: 'To your door in 2 to 3 working days.', icon: 'truck' },
+    { value: 'pickup', label: 'Pick up', text: 'From the shop, ready in an hour.', icon: 'store' },
+  ]} />
+  <RadioGroup legend="Billing period" name="billing" style="segmented" value="monthly" options={[
+    { value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly' },
+  ]} />
+  <button type="submit">Continue</button>
+</form>
+<!-- chunky icons are read at build: npm i -D @fortawesome/fontawesome-free (as for the icon element) -->
+<!-- .checkout { --rg-accent: var(--brand); --rg-focus: var(--brand); --rg-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/radio-group/ (demo)' }],
+    file: 'src/library/radio-group/RadioGroup.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'stepper',
+    name: 'Stepper',
+    aka: ['step indicator', 'progress steps', 'stepped progress indicator', 'checkout steps', 'wizard steps', 'multi-step form progress bar', 'Gravity Forms progress bar', 'WPForms page break progress'],
+    summary:
+      'An ordered list of steps, each done (with a check, optionally linked back), current (aria-current="step") or upcoming, joined by connector lines: horizontal when it has 40rem of its own width, vertical below. Static as rendered; window.__superheroStepper.go(id, n) advances it for a form that does not reload.',
+    pitch: 'Show people where they are in a checkout or a sign-up, how far they have come and what is left, on a laptop or a phone.',
+    // SE Ranking US, 2026-09-26: step indicator 210/mo, difficulty 12; wizard steps 170/12;
+    // progress indicator 260/42; steps ui 90/7. "progress steps html", the phrase the round-4
+    // brief pre-assigned, has no measurable volume; "stepper" alone is 14,800/78 and mostly
+    // exercise machines.
+    search: { query: 'step indicator', alsoRanks: ['wizard steps', 'progress indicator', 'steps ui'] },
+    replaces: ['Gravity Forms and WPForms multi-page progress bars (the “steps” style)', 'WooCommerce multi-step checkout plugins’ step bars', 'page-builder “process steps” widgets used as a progress bar'],
+    goodFor: 'A sequence of three to six steps someone goes through once: a checkout, a booking, an application or quote form split into pages, an onboarding checklist.',
+    notFor:
+      'A history or a process you describe rather than one the visitor is in: that is a timeline (info-list). Percent-done for a single task: that is a progress bar. More than about six steps: group them. And navigation between pages people can visit in any order: those are tabs or links.',
+    props: [
+      { name: 'steps', type: 'Step[]', note: '`{ label, href?, text? }`. A done step with an `href` links back to it; current and upcoming steps are never links. `text` is a short line under the label.' },
+      { name: 'current', type: 'number', default: '1', note: 'The 1-based current step. `steps.length + 1` marks every step done.' },
+      { name: 'label', type: 'string', default: '“Progress”', note: 'Accessible name: of the <nav> when any step has an href, otherwise of the list, so a purely visual stepper adds no landmark.' },
+      { name: 'orientation', type: "'auto' | 'vertical'", default: "'auto'", note: 'Auto is horizontal from 40rem of its own width and vertical below, so it turns vertical on a phone and in a sidebar. Vertical always stacks.' },
+      { name: 'id', type: 'string', default: '“stepper-<n>”', note: 'The id `window.__superheroStepper.go(id, n)` takes.' },
+      { name: 'go(id, n)', type: 'window.__superheroStepper', note: 'Makes step n current (clamped; steps.length + 1 = all done), earlier steps done and linked, later upcoming. Returns true, or false for an unknown id. Moves no focus: move it to your form section’s heading.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--st-accent', fallback: '#5933d8', note: 'Done and current markers, lines behind the current step.' },
+      { name: '--st-accent-fg', fallback: '#fff', note: 'Number or check on a filled marker (7.27:1 on the fallback accent).' },
+      { name: '--st-ring', fallback: 'accent at 22%', note: 'Halo around the current marker.' },
+      { name: '--st-upcoming', fallback: '#6b6f80', note: 'Upcoming marker ring and number (4.99:1 on white).' },
+      { name: '--st-bg', fallback: '#fff', note: 'Upcoming marker fill.' },
+      { name: '--st-line', fallback: '#d5d7e0', note: 'Connector ahead of the current step (decorative).' },
+      { name: '--st-fg', fallback: 'inherit', note: 'Labels.' },
+      { name: '--st-muted', fallback: '#585c6e', note: 'Upcoming labels and step text (6.62:1 on white).' },
+      { name: '--st-focus', fallback: '#5933d8', note: 'Focus ring on links to done steps.' },
+      { name: '--st-size', fallback: '2rem', note: 'Marker diameter.' },
+    ],
+    a11y: [
+      'An ordered list, so a screen reader announces the count and each step’s position. The current step’s item has aria-current="step"; exactly one does, or none once every step is done.',
+      'A done step is announced “Completed: <label>” (visually hidden text) and shows a check, so state is never colour alone: done has a check, current a halo and a bolder label, upcoming an outline.',
+      'Only done steps link. The whole stepper is a <nav> named by `label` when any step can link, and just a named list otherwise.',
+      'go() changes the states and links in place and moves no focus and announces nothing: the form should move focus to its next section’s heading, which is what a screen reader user needs to hear.',
+      'Links have a visible 3px focus ring. In forced-colors mode done and current markers use Highlight.',
+      'prefers-reduced-motion: no colour transition when it advances.',
+      'Without JavaScript it is exactly as rendered: the static state is right for a page per step, the common case.',
+    ],
+    usage: `<!-- A page per step: the build renders the right state. -->
+<Stepper label="Checkout progress" current={2} steps={[
+  { label: 'Basket', href: '/basket/' },
+  { label: 'Delivery', href: '/checkout/delivery/' },
+  { label: 'Payment' },
+  { label: 'Review' },
+]} />
+
+<!-- One page, a form that advances: -->
+<Stepper id="quote-steps" label="Quote progress" steps={steps} />
+<script>
+  window.__superheroStepper.go('quote-steps', 3);   // then focus the step's heading
+</script>
+<!-- .checkout { --st-accent: var(--brand); --st-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/stepper/ (demo)' }],
+    file: 'src/library/stepper/Stepper.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
