@@ -16,7 +16,7 @@
  * tabcordion        tablist / tab / tabpanel in the tabs layout and buttons with aria-expanded
  *                   in the accordion, the state carried across the breakpoint, the keys; no-JS:
  *                   the strip hidden, every panel open under a heading naming its tab; the
- *                   breakpoint lives only in the stylesheet (--tc-layout), and the runtime is
+ *                   breakpoint lives only in the stylesheet (--tcd-layout), and the runtime is
  *                   emitted once per page.
  * tooltip           shows on focus as well as hover, Escape hides it, the pointer can reach the
  *                   tip, taps toggle; placement flips and slides; no-JS: the trigger's
@@ -256,12 +256,12 @@ if (ids.has('tabcordion')) {
   const tabcordionRender = (page, css = tcComponent) => {
     const out = [];
     const f = (m) => out.push(m);
-    const sets = roots(page, 'div', 'data-tc');
+    const sets = roots(page, 'div', 'data-tcd');
     if (sets.length !== 2) f(`the demo should render 2 tabcordions (resizable and sidebar); found ${sets.length}.`);
     if (!sets.some((s) => has(s.open, 'data-multiple')) || sets.every((s) => has(s.open, 'data-multiple'))) f('the demo needs one tabcordion with multiple and one without.');
     for (const [n, s] of sets.entries()) {
       const where = `tabcordion ${n + 1}`;
-      if (!/\btc--(sm|md|lg)\b/.test(attr(s.open, 'class') ?? '')) f(`${where}: no breakpoint class (tc--sm, tc--md or tc--lg).`);
+      if (!/\btcd--(sm|md|lg)\b/.test(attr(s.open, 'class') ?? '')) f(`${where}: no breakpoint class (tcd--sm, tcd--md or tcd--lg).`);
       if (has(s.open, 'data-ready') || has(s.open, 'data-layout')) f(`${where}: rendered as if the script had run (data-ready / data-layout).`);
       const list = s.html.match(/<div\b[^>]*\srole="tablist"[^>]*>/)?.[0];
       if (!list) f(`${where}: no role="tablist" in the HTML.`);
@@ -270,7 +270,7 @@ if (ids.has('tabcordion')) {
         if (!attr(list, 'aria-label')) f(`${where}: the tablist has no aria-label.`);
       }
       const tabs = [...s.html.matchAll(/<button\b[^>]*\srole="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => ({ open: m[0].slice(0, m[0].indexOf('>') + 1), label: text(m[1]) }));
-      const panels = [...s.html.matchAll(/<section\b[^>]*\sdata-tc-panel[^>]*>/g)].map((m) => ({ open: m[0], html: block(s.html, m.index, 'section') }));
+      const panels = [...s.html.matchAll(/<section\b[^>]*\sdata-tcd-panel[^>]*>/g)].map((m) => ({ open: m[0], html: block(s.html, m.index, 'section') }));
       if (!tabs.length || tabs.length !== panels.length) f(`${where}: ${tabs.length} tabs for ${panels.length} panels; one each.`);
       tabs.forEach((t, i) => {
         const p = panels[i];
@@ -282,10 +282,10 @@ if (ids.has('tabcordion')) {
         if (attr(t.open, 'aria-selected') !== 'false' || attr(t.open, 'tabindex') !== '-1') f(`${where}: tab "${t.label}" must start aria-selected="false" tabindex="-1"; the script selects one.`);
         if (has(p.open, 'hidden')) f(`${where}: panel #${pid} is hidden in the static HTML; without JavaScript every panel is open.`);
         if (has(p.open, 'role')) f(`${where}: panel #${pid} has a role before the script runs; tabpanel is only true in the tabs layout.`);
-        const heading = p.html.match(/<(h[2-4])\b[^>]*class="tc__heading[^"]*"[^>]*>([\s\S]*?)<\/\1>/);
+        const heading = p.html.match(/<(h[2-4])\b[^>]*class="tcd__heading[^"]*"[^>]*>([\s\S]*?)<\/\1>/);
         if (!heading) f(`${where}: panel #${pid} has no h2–h4 heading.`);
         else if (text(heading[2]) !== t.label) f(`${where}: panel #${pid}'s heading "${text(heading[2])}" is not its tab's label "${t.label}".`);
-        const body = p.html.match(/<div\b[^>]*class="tc__body[^"]*"[^>]*>([\s\S]*)<\/div>\s*<\/section>$/);
+        const body = p.html.match(/<div\b[^>]*class="tcd__body[^"]*"[^>]*>([\s\S]*)<\/div>\s*<\/section>$/);
         if (!body || !text(body[1])) f(`${where}: panel #${pid} is empty in the static HTML.`);
         else if (has(body[0], 'hidden')) f(`${where}: panel #${pid}'s body is hidden in the static HTML.`);
       });
@@ -293,14 +293,14 @@ if (ids.has('tabcordion')) {
     }
     const runtimes = (page.match(/window\.__superheroTabcordion\s*=/g) || []).length;
     if (sets.length && runtimes !== 1) f(`the runtime is on the page ${runtimes} times; it must be emitted once.`);
-    // The breakpoint lives in the stylesheet only: each size sets --tc-layout: tabs in a
+    // The breakpoint lives in the stylesheet only: each size sets --tcd-layout: tabs in a
     // container query on the element's own width, and the script reads that property.
     for (const [size, rem] of [['sm', 30], ['md', 40], ['lg', 52]]) {
-      const re = new RegExp(`@container tabcordion \\(min-width: ${rem}rem\\) \\{\\s*\\.tc--${size} > \\.tc__frame \\{\\s*--tc-layout: tabs;`);
-      if (!re.test(css)) f(`the stylesheet has no \`@container tabcordion (min-width: ${rem}rem) { .tc--${size} > .tc__frame { --tc-layout: tabs; } }\`.`);
+      const re = new RegExp(`@container tabcordion \\(min-width: ${rem}rem\\) \\{\\s*\\.tcd--${size} > \\.tcd__frame \\{\\s*--tcd-layout: tabs;`);
+      if (!re.test(css)) f(`the stylesheet has no \`@container tabcordion (min-width: ${rem}rem) { .tcd--${size} > .tcd__frame { --tcd-layout: tabs; } }\`.`);
     }
-    if (!/\.tc \{\s*container: tabcordion \/ inline-size;/.test(css)) f('the root must be the `tabcordion` inline-size container, or the queries measure the wrong box.');
-    if (!/getPropertyValue\('--tc-layout'\)/.test(css)) f('the script must read --tc-layout rather than measure a width of its own.');
+    if (!/\.tcd \{\s*container: tabcordion \/ inline-size;/.test(css)) f('the root must be the `tabcordion` inline-size container, or the queries measure the wrong box.');
+    if (!/getPropertyValue\('--tcd-layout'\)/.test(css)) f('the script must read --tcd-layout rather than measure a width of its own.');
     if (/matchMedia\(|innerWidth|clientWidth\s*[<>]/.test(css)) {
       f('the script measures the width itself (matchMedia / innerWidth / clientWidth); the container query is the one breakpoint.');
     }
@@ -310,12 +310,12 @@ if (ids.has('tabcordion')) {
   finish('tabcordion render');
 
   // ---------------------------------------------------------- 3. mutations
-  const firstPanel = html.match(/<section\b[^>]*\sdata-tc-panel[^>]*>/)[0];
+  const firstPanel = html.match(/<section\b[^>]*\sdata-tcd-panel[^>]*>/)[0];
   const renderMutants = [
     ['tablist not hidden', html.replace(/(<div\b[^>]*role="tablist"[^>]*?)\shidden/, '$1')],
     ['a panel hidden', html.replace(firstPanel, firstPanel.replace('<section', '<section hidden'))],
     ['a panel with role before the script', html.replace(firstPanel, firstPanel.replace('<section', '<section role="tabpanel"'))],
-    ['a heading that does not match its tab', html.replace(/(<h[2-4]\b[^>]*class="tc__heading[^"]*"[^>]*>\s*<span[^>]*>)([^<]+)/, '$1Something else')],
+    ['a heading that does not match its tab', html.replace(/(<h[2-4]\b[^>]*class="tcd__heading[^"]*"[^>]*>\s*<span[^>]*>)([^<]+)/, '$1Something else')],
     ['a tab controlling the wrong panel', html.replace(/(role="tab"[^>]*?)aria-controls="[^"]+"/, '$1aria-controls="nowhere"')],
     ['a tab pre-selected', html.replace(/aria-selected="false"/, 'aria-selected="true"')],
     ['aria-expanded in the static HTML', html.replace(firstPanel, firstPanel.replace('<section', '<section aria-expanded="true"'))],
@@ -324,7 +324,7 @@ if (ids.has('tabcordion')) {
   const cssMutants = [
     ['the md container query removed', tcComponent.replace('@container tabcordion (min-width: 40rem)', '@media (min-width: 40rem)')],
     ['the root no longer a container', tcComponent.replace('container: tabcordion / inline-size;', '')],
-    ['the script measuring the window', tcComponent.replace("getPropertyValue('--tc-layout').trim() === 'tabs'", "getPropertyValue('--tc-layout').trim() === 'tabs' || matchMedia('(min-width: 40rem)').matches")],
+    ['the script measuring the window', tcComponent.replace("getPropertyValue('--tcd-layout').trim() === 'tabs'", "getPropertyValue('--tcd-layout').trim() === 'tabs' || matchMedia('(min-width: 40rem)').matches")],
   ];
   const logicMutants = [
     ['closing a panel leaves it selected', tcSrc.replace('selected: recent.length ? recent[recent.length - 1] : s.selected };', 'selected: s.selected };')],
@@ -339,7 +339,7 @@ if (ids.has('tabcordion')) {
   killed += await mutate(id, tcComponent, cssMutants, (c) => tabcordionRender(html, c));
   killed += await mutate(id, tcSrc, logicMutants, async (js) => tabcordionCases(await load(js, 'tabcordionState')));
   finish('tabcordion mutations');
-  summary.push(`tabcordion (golden cases, no-JS render of ${roots(html, 'div', 'data-tc').length}, ${killed} mutants caught)`);
+  summary.push(`tabcordion (golden cases, no-JS render of ${roots(html, 'div', 'data-tcd').length}, ${killed} mutants caught)`);
 }
 
 // ================================================================= tooltip

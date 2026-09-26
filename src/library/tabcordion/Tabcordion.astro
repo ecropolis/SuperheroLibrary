@@ -13,7 +13,7 @@
  *   - Accordion (narrower): each heading holds a button with aria-expanded and aria-controls.
  *     `multiple` (default true) lets several stay open; `multiple={false}` keeps one.
  *
- * CSS decides the layout. The container query sets `--tc-layout` to `tabs` or `accordion` on
+ * CSS decides the layout. The container query sets `--tcd-layout` to `tabs` or `accordion` on
  * the frame and draws that layout; the script reads the property whenever the element resizes
  * and makes the ARIA match. So there is one breakpoint, in the stylesheet, and no second copy
  * in JavaScript to drift from it.
@@ -34,13 +34,13 @@
  * no z-index.
  *
  * Theming, from the host's tokens (each has a fallback):
- *   --tc-accent               selected tab marker, chevron        (currentColor)
- *   --tc-fg / --tc-muted      text / unselected tab text          (inherit / inherit at 72%)
- *   --tc-bg                   panel and selected tab fill         (transparent)
- *   --tc-strip-bg             tab strip and closed heading fill   (rgb(0 0 0 / 0.04))
- *   --tc-border / --tc-radius frame and rules / frame corners     (rgb(0 0 0 / 0.14) / 0.5rem)
- *   --tc-pad                  panel padding                       (1.25rem)
- *   --tc-focus                keyboard focus ring                 (currentColor)
+ *   --tcd-accent               selected tab marker, chevron        (currentColor)
+ *   --tcd-fg / --tcd-muted      text / unselected tab text          (inherit / inherit at 72%)
+ *   --tcd-bg                   panel and selected tab fill         (transparent)
+ *   --tcd-strip-bg             tab strip and closed heading fill   (rgb(0 0 0 / 0.04))
+ *   --tcd-border / --tcd-radius frame and rules / frame corners     (rgb(0 0 0 / 0.14) / 0.5rem)
+ *   --tcd-pad                  panel padding                       (1.25rem)
+ *   --tcd-focus                keyboard focus ring                 (currentColor)
  */
 export interface TabcordionPanel {
   /** Anchor for the panel, unique on the page: `#delivery`. Letters, digits, - or _. */
@@ -88,16 +88,16 @@ locals.__tabcordionScript = true;
 ---
 
 <div
-  class:list={['tc', `tc--${breakpoint}`, className]}
-  data-tc
+  class:list={['tcd', `tcd--${breakpoint}`, className]}
+  data-tcd
   data-multiple={multiple ? '' : undefined}
   data-selected={selected}
 >
-  <div class="tc__frame">
-    <div class="tc__strip" role="tablist" aria-label={label} hidden data-tc-list>
+  <div class="tcd__frame">
+    <div class="tcd__strip" role="tablist" aria-label={label} hidden data-tcd-list>
       {
         panels.map((p) => (
-          <button class="tc__tab" type="button" role="tab" id={`${p.id}-tab`} aria-controls={p.id} aria-selected="false" tabindex="-1">
+          <button class="tcd__tab" type="button" role="tab" id={`${p.id}-tab`} aria-controls={p.id} aria-selected="false" tabindex="-1">
             {p.label}
           </button>
         ))
@@ -105,11 +105,11 @@ locals.__tabcordionScript = true;
     </div>
     {
       panels.map((p, i) => (
-        <section class="tc__panel" id={p.id} data-tc-panel>
-          <H class="tc__heading">
-            <span class="tc__label">{p.label}</span>
+        <section class="tcd__panel" id={p.id} data-tcd-panel>
+          <H class="tcd__heading">
+            <span class="tcd__label">{p.label}</span>
           </H>
-          <div class="tc__body" id={`${p.id}-body`} set:html={bodies[i]} />
+          <div class="tcd__body" id={`${p.id}-body`} set:html={bodies[i]} />
         </section>
       ))
     }
@@ -201,11 +201,11 @@ locals.__tabcordionScript = true;
 
         const mount = (root) => {
           if (root.dataset.ready) return;
-          const frame = root.querySelector('.tc__frame');
-          const list = root.querySelector('[data-tc-list]');
+          const frame = root.querySelector('.tcd__frame');
+          const list = root.querySelector('[data-tcd-list]');
           const tabs = [...list.querySelectorAll('[role="tab"]')];
-          const panels = [...frame.querySelectorAll(':scope > [data-tc-panel]')];
-          const bodies = panels.map((p) => p.querySelector(':scope > .tc__body'));
+          const panels = [...frame.querySelectorAll(':scope > [data-tcd-panel]')];
+          const bodies = panels.map((p) => p.querySelector(':scope > .tcd__body'));
           const ids = panels.map((p) => p.id);
           const focusable = bodies.map((b) => !!b.querySelector(FOCUSABLE));
 
@@ -213,16 +213,16 @@ locals.__tabcordionScript = true;
           const buttons = panels.map((p, i) => {
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'tc__toggle';
+            b.className = 'tcd__toggle';
             b.id = `${ids[i]}-acc`;
             b.setAttribute('aria-controls', bodies[i].id);
-            const span = p.querySelector('.tc__label');
+            const span = p.querySelector('.tcd__label');
             b.append(span);
-            p.querySelector('.tc__heading').append(b);
+            p.querySelector('.tcd__heading').append(b);
             return b;
           });
 
-          const layout = () => (getComputedStyle(frame).getPropertyValue('--tc-layout').trim() === 'tabs' ? 'tabs' : 'accordion');
+          const layout = () => (getComputedStyle(frame).getPropertyValue('--tcd-layout').trim() === 'tabs' ? 'tabs' : 'accordion');
           const fromHash = () => {
             try { return ids.indexOf(decodeURIComponent(location.hash.slice(1))); } catch { return -1; }
           };
@@ -241,9 +241,9 @@ locals.__tabcordionScript = true;
             root.dataset.layout = state.mode;
             if (prev && prev.mode === 'tabs' && state.mode === 'tabs' && prev.selected !== state.selected) {
               const p = panels[state.selected];
-              p.classList.remove('tc__panel--in');
+              p.classList.remove('tcd__panel--in');
               void p.offsetWidth; // restart the fade
-              p.classList.add('tc__panel--in');
+              p.classList.add('tcd__panel--in');
             }
           };
           const dispatch = (action) => {
@@ -283,7 +283,7 @@ locals.__tabcordionScript = true;
           render(null);
         };
 
-        const boot = () => document.querySelectorAll('[data-tc]').forEach(mount);
+        const boot = () => document.querySelectorAll('[data-tcd]').forEach(mount);
         window.__superheroTabcordion = { mount, state: tabcordionState };
         document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
       })();
@@ -292,156 +292,156 @@ locals.__tabcordionScript = true;
 }
 
 <style>
-  .tc {
+  .tcd {
     container: tabcordion / inline-size;
-    color: var(--tc-fg, inherit);
+    color: var(--tcd-fg, inherit);
   }
-  .tc [hidden] {
+  .tcd [hidden] {
     display: none !important;
   }
-  .tc__frame {
-    --tc-layout: accordion;
-    border: 1px solid var(--tc-border, rgb(0 0 0 / 0.14));
-    border-radius: var(--tc-radius, 0.5rem);
-    background: var(--tc-bg, transparent);
+  .tcd__frame {
+    --tcd-layout: accordion;
+    border: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
+    border-radius: var(--tcd-radius, 0.5rem);
+    background: var(--tcd-bg, transparent);
     overflow: clip;
   }
-  .tc :focus-visible {
-    outline: 3px solid var(--tc-focus, currentColor);
+  .tcd :focus-visible {
+    outline: 3px solid var(--tcd-focus, currentColor);
     outline-offset: -3px;
   }
-  .tc__body > :global(:first-child) {
+  .tcd__body > :global(:first-child) {
     margin-top: 0;
   }
-  .tc__body > :global(:last-child) {
+  .tcd__body > :global(:last-child) {
     margin-bottom: 0;
   }
 
   /* ---- no JavaScript, and the accordion: panels stacked, each under its heading. */
-  .tc__panel + .tc__panel {
-    border-top: 1px solid var(--tc-border, rgb(0 0 0 / 0.14));
+  .tcd__panel + .tcd__panel {
+    border-top: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
   }
-  .tc__heading {
+  .tcd__heading {
     margin: 0;
     font-size: 1.05rem;
     line-height: 1.35;
   }
-  .tc__label {
+  .tcd__label {
     display: block;
-    padding: 0.85rem var(--tc-pad, 1.25rem) 0;
+    padding: 0.85rem var(--tcd-pad, 1.25rem) 0;
   }
-  .tc__body {
-    padding: 0.5rem var(--tc-pad, 1.25rem) var(--tc-pad, 1.25rem);
+  .tcd__body {
+    padding: 0.5rem var(--tcd-pad, 1.25rem) var(--tcd-pad, 1.25rem);
   }
   /* The script moves the label into this button, so it carries no scope attribute: :global. */
-  .tc :global(.tc__toggle) {
+  .tcd :global(.tcd__toggle) {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     width: 100%;
     min-height: 2.75rem;
-    padding: 0.85rem var(--tc-pad, 1.25rem);
+    padding: 0.85rem var(--tcd-pad, 1.25rem);
     border: 0;
-    background: var(--tc-strip-bg, rgb(0 0 0 / 0.04));
+    background: var(--tcd-strip-bg, rgb(0 0 0 / 0.04));
     color: inherit;
     font: inherit;
     font-weight: 700;
     text-align: start;
     cursor: pointer;
   }
-  .tc :global(.tc__toggle[aria-expanded='true']) {
-    background: var(--tc-bg, transparent);
+  .tcd :global(.tcd__toggle[aria-expanded='true']) {
+    background: var(--tcd-bg, transparent);
   }
-  .tc :global(.tc__toggle .tc__label) {
+  .tcd :global(.tcd__toggle .tcd__label) {
     padding: 0;
   }
-  .tc :global(.tc__toggle)::after {
+  .tcd :global(.tcd__toggle)::after {
     content: '';
     flex: none;
     width: 0.5rem;
     height: 0.5rem;
     margin-inline-end: 0.3rem;
-    border-right: 2px solid var(--tc-accent, currentColor);
-    border-bottom: 2px solid var(--tc-accent, currentColor);
+    border-right: 2px solid var(--tcd-accent, currentColor);
+    border-bottom: 2px solid var(--tcd-accent, currentColor);
     rotate: 45deg;
     translate: 0 -0.15rem;
   }
-  .tc :global(.tc__toggle[aria-expanded='true'])::after {
+  .tcd :global(.tcd__toggle[aria-expanded='true'])::after {
     rotate: 225deg;
     translate: 0 0.15rem;
   }
 
   /* ---- tabs: only with the script (data-ready), and only when the element is wide enough. */
-  .tc__strip {
+  .tcd__strip {
     display: none;
   }
   @container tabcordion (min-width: 30rem) {
-    .tc--sm > .tc__frame {
-      --tc-layout: tabs;
+    .tcd--sm > .tcd__frame {
+      --tcd-layout: tabs;
     }
   }
   @container tabcordion (min-width: 40rem) {
-    .tc--md > .tc__frame {
-      --tc-layout: tabs;
+    .tcd--md > .tcd__frame {
+      --tcd-layout: tabs;
     }
   }
   @container tabcordion (min-width: 52rem) {
-    .tc--lg > .tc__frame {
-      --tc-layout: tabs;
+    .tcd--lg > .tcd__frame {
+      --tcd-layout: tabs;
     }
   }
-  .tc[data-layout='tabs'] .tc__strip {
+  .tcd[data-layout='tabs'] .tcd__strip {
     display: flex;
     overflow-x: auto;
     scrollbar-width: thin;
-    background: var(--tc-strip-bg, rgb(0 0 0 / 0.04));
-    border-bottom: 1px solid var(--tc-border, rgb(0 0 0 / 0.14));
+    background: var(--tcd-strip-bg, rgb(0 0 0 / 0.04));
+    border-bottom: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
   }
-  .tc[data-layout='tabs'] .tc__heading {
+  .tcd[data-layout='tabs'] .tcd__heading {
     display: none;
   }
-  .tc[data-layout='tabs'] .tc__panel {
+  .tcd[data-layout='tabs'] .tcd__panel {
     border-top: 0;
   }
-  .tc[data-layout='tabs'] .tc__body {
-    padding: var(--tc-pad, 1.25rem);
+  .tcd[data-layout='tabs'] .tcd__body {
+    padding: var(--tcd-pad, 1.25rem);
   }
-  .tc__tab {
+  .tcd__tab {
     flex: none;
     min-height: 2.75rem;
     padding: 0.7rem 1.15rem;
     border: 0;
-    border-inline-end: 1px solid var(--tc-border, rgb(0 0 0 / 0.14));
+    border-inline-end: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
     background: transparent;
-    color: var(--tc-muted, color-mix(in srgb, currentColor 72%, transparent));
+    color: var(--tcd-muted, color-mix(in srgb, currentColor 72%, transparent));
     font: inherit;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
   }
-  .tc__tab:hover {
-    color: var(--tc-fg, inherit);
+  .tcd__tab:hover {
+    color: var(--tcd-fg, inherit);
   }
-  .tc__tab[aria-selected='true'] {
-    background: var(--tc-bg, transparent);
-    color: var(--tc-fg, inherit);
+  .tcd__tab[aria-selected='true'] {
+    background: var(--tcd-bg, transparent);
+    color: var(--tcd-fg, inherit);
     box-shadow:
-      inset 0 3px 0 var(--tc-accent, currentColor),
-      0 1px 0 var(--tc-bg, transparent);
+      inset 0 3px 0 var(--tcd-accent, currentColor),
+      0 1px 0 var(--tcd-bg, transparent);
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .tc :global(.tc__toggle)::after {
+    .tcd :global(.tcd__toggle)::after {
       transition:
         rotate 200ms ease,
         translate 200ms ease;
     }
-    .tc[data-layout='tabs'] .tc__panel--in {
-      animation: tc-in 150ms ease-out;
+    .tcd[data-layout='tabs'] .tcd__panel--in {
+      animation: tcd-in 150ms ease-out;
     }
   }
-  @keyframes tc-in {
+  @keyframes tcd-in {
     from {
       opacity: 0;
     }

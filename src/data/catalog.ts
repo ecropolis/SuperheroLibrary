@@ -1454,15 +1454,15 @@ import { analytics } from '../data/site';
       { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
     ],
     theming: [
-      { name: '--tc-accent', fallback: 'currentColor', note: 'Selected tab marker and the accordion chevron.' },
-      { name: '--tc-fg', fallback: 'inherit', note: 'Text, and the selected tab.' },
-      { name: '--tc-muted', fallback: 'currentColor at 72%', note: 'Unselected tabs.' },
-      { name: '--tc-bg', fallback: 'transparent', note: 'Panel, selected tab and open heading fill.' },
-      { name: '--tc-strip-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Tab strip and closed accordion headings.' },
-      { name: '--tc-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Frame and rules.' },
-      { name: '--tc-radius', fallback: '0.5rem', note: 'Frame corners.' },
-      { name: '--tc-pad', fallback: '1.25rem', note: 'Panel and heading padding.' },
-      { name: '--tc-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+      { name: '--tcd-accent', fallback: 'currentColor', note: 'Selected tab marker and the accordion chevron.' },
+      { name: '--tcd-fg', fallback: 'inherit', note: 'Text, and the selected tab.' },
+      { name: '--tcd-muted', fallback: 'currentColor at 72%', note: 'Unselected tabs.' },
+      { name: '--tcd-bg', fallback: 'transparent', note: 'Panel, selected tab and open heading fill.' },
+      { name: '--tcd-strip-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Tab strip and closed accordion headings.' },
+      { name: '--tcd-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Frame and rules.' },
+      { name: '--tcd-radius', fallback: '0.5rem', note: 'Frame corners.' },
+      { name: '--tcd-pad', fallback: '1.25rem', note: 'Panel and heading padding.' },
+      { name: '--tcd-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
     ],
     a11y: [
       'Tabs: tablist named by `label`, tab and tabpanel with aria-selected, aria-controls and aria-labelledby, a roving tabindex so the strip is one Tab stop; ← → wrap, Home and End jump to the ends, and a tab is selected when it gets focus. A panel with nothing focusable inside is itself focusable.',
@@ -1485,7 +1485,7 @@ import { analytics } from '../data/site';
 <aside class="sidebar">
   <Tabcordion label="Visiting" panels={visit} multiple={false} breakpoint="sm" />
 </aside>
-<!-- .product { --tc-accent: var(--brand); --tc-border: var(--line); --tc-bg: var(--white); } -->`,
+<!-- .product { --tcd-accent: var(--brand); --tcd-border: var(--line); --tcd-bg: var(--white); } -->`,
     license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
     usedOn: [{ site: 'superherotech.ai', where: '/elements/tabcordion/ (demo)' }],
     file: 'src/library/tabcordion/Tabcordion.astro',

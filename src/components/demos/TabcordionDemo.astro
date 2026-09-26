@@ -40,41 +40,41 @@ const visit = [
   { id: 'visit-access', label: 'Access', body: '<p>Step-free entrance on the side street, and a ramp to the kiln room.</p>' },
 ];
 ---
-<div class="demo-tc">
+<div class="demo-tcd">
   <section>
-    <h2 class="demo-tc__h">Product details</h2>
-    <p class="demo-tc__note">Drag the corner of the box to make it narrower: below 40rem the tabs become an accordion, and the open panel stays open.</p>
-    <div class="demo-tc__resize">
-      <Tabcordion label="Product details" panels={mug} class="demo-tc__mug" />
+    <h2 class="demo-tcd__h">Product details</h2>
+    <p class="demo-tcd__note">Drag the corner of the box to make it narrower: below 40rem the tabs become an accordion, and the open panel stays open.</p>
+    <div class="demo-tcd__resize">
+      <Tabcordion label="Product details" panels={mug} class="demo-tcd__mug" />
     </div>
-    <p class="demo-tc__note">A link can open a panel: <a href="#mug-delivery">delivery times</a>.</p>
+    <p class="demo-tcd__note">A link can open a panel: <a href="#mug-delivery">delivery times</a>.</p>
   </section>
 
-  <section class="demo-tc__split">
-    <div class="demo-tc__main">
-      <h2 class="demo-tc__h">In a sidebar</h2>
-      <p class="demo-tc__note">The same element in a 17rem column stays an accordion on a wide screen, because its own width decides, not the window’s. This one keeps a single panel open.</p>
+  <section class="demo-tcd__split">
+    <div class="demo-tcd__main">
+      <h2 class="demo-tcd__h">In a sidebar</h2>
+      <p class="demo-tcd__note">The same element in a 17rem column stays an accordion on a wide screen, because its own width decides, not the window’s. This one keeps a single panel open.</p>
     </div>
-    <aside class="demo-tc__aside">
-      <Tabcordion label="Visiting the studio" panels={visit} multiple={false} headingLevel={3} class="demo-tc__visit" />
+    <aside class="demo-tcd__aside">
+      <Tabcordion label="Visiting the studio" panels={visit} multiple={false} headingLevel={3} class="demo-tcd__visit" />
     </aside>
   </section>
 </div>
 <style>
-  .demo-tc {
+  .demo-tcd {
     display: grid;
     gap: 2.5rem;
     color: var(--ink, #16192a);
   }
-  .demo-tc__h {
+  .demo-tcd__h {
     margin: 0 0 0.5rem;
     font-size: 1.35rem;
   }
-  .demo-tc__note {
+  .demo-tcd__note {
     margin: 0.5rem 0 0.75rem;
     font-size: 0.95rem;
   }
-  .demo-tc__resize {
+  .demo-tcd__resize {
     resize: horizontal;
     overflow: auto;
     min-width: 16rem;
@@ -83,23 +83,23 @@ const visit = [
     border: 1px dashed var(--line, #e6e6f0);
     border-width: 0 1px 1px 0;
   }
-  .demo-tc__split {
+  .demo-tcd__split {
     display: grid;
     gap: 1rem 1.5rem;
   }
   @media (min-width: 48rem) {
-    .demo-tc__split {
+    .demo-tcd__split {
       grid-template-columns: minmax(0, 1fr) 17rem;
       align-items: start;
     }
   }
-  .demo-tc :global(.demo-tc__mug),
-  .demo-tc :global(.demo-tc__visit) {
-    --tc-accent: var(--purple, #5933d8);
-    --tc-border: var(--line, #e6e6f0);
-    --tc-focus: var(--purple, #5933d8);
-    --tc-bg: var(--white, #fff);
-    --tc-strip-bg: var(--tint, #f8f8fc);
-    --tc-radius: var(--radius, 8px);
+  .demo-tcd :global(.demo-tcd__mug),
+  .demo-tcd :global(.demo-tcd__visit) {
+    --tcd-accent: var(--purple, #5933d8);
+    --tcd-border: var(--line, #e6e6f0);
+    --tcd-focus: var(--purple, #5933d8);
+    --tcd-bg: var(--white, #fff);
+    --tcd-strip-bg: var(--tint, #f8f8fc);
+    --tcd-radius: var(--radius, 8px);
   }
 </style>
