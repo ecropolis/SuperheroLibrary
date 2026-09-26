@@ -26,14 +26,14 @@
  * 3. The pin's hit area is 44px in the component's CSS; the fallback colours clear 4.5:1.
  *
  * info-circle
- * 4. Geometry: the `<ic-geometry>` block of InfoCircle.astro against golden positions (n = 2 to
+ * 4. Geometry: the `<inc-geometry>` block of InfoCircle.astro against golden positions (n = 2 to
  *    6, clockwise from the top, three decimals, never -0).
  * 5. The built page, per circle, against public/demo/info-circle-items.json:
  *    - no-JS: the circle is `hidden`; a numbered list (role="list") holds every item's title
  *      (a heading), text and link, none of it hidden;
  *    - the centre is aria-live="polite" and empty (the script copies the chosen entry in);
  *    - each item is a <button type="button"> named by its title, aria-controls → the centre,
- *      aria-pressed, exactly one "true" and it is `startAt`; --ic-x/--ic-y are the geometry's;
+ *      aria-pressed, exactly one "true" and it is `startAt`; --inc-x/--inc-y are the geometry's;
  *      its icon is the named Font Awesome Free icon, or its image with alt="";
  *    - a hidden, named pause button exactly when the circle autoplays; the script once a page.
  * 6. Items keep a 44px minimum; the fallback colours clear 4.5:1; every icon the demo pastes is
@@ -347,9 +347,9 @@ const icFile = 'src/library/info-circle/InfoCircle.astro';
 const icSrc = read(icFile);
 
 // 4. Geometry.
-const circlePositions = await block(icSrc, 'ic-geometry', 'circlePositions');
+const circlePositions = await block(icSrc, 'inc-geometry', 'circlePositions');
 if (!circlePositions) {
-  fail(`${icFile} has no \`// <ic-geometry>\` … \`// </ic-geometry>\` block.`);
+  fail(`${icFile} has no \`// <inc-geometry>\` … \`// </inc-geometry>\` block.`);
   finish('info-circle geometry');
 }
 const RING = {
@@ -411,13 +411,13 @@ for (const e of icExpected) {
   }
 }
 const icPos = (tag) => {
-  const m = (attr(tag, 'style') ?? '').match(/^--ic-x:(-?[\d.]+)%;--ic-y:(-?[\d.]+)%$/);
+  const m = (attr(tag, 'style') ?? '').match(/^--inc-x:(-?[\d.]+)%;--inc-y:(-?[\d.]+)%$/);
   return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
 };
 const validateInfoCircle = (html, expected, ring, where) => {
   const out = [];
   const bad = (m) => out.push(`${where}: ${m}`);
-  const roots = all(html, /<div\b[^>]*\sdata-ic=/);
+  const roots = all(html, /<div\b[^>]*\sdata-inc=/);
   if (roots.length !== expected.length) bad(`expected ${expected.length} info circles, found ${roots.length}.`);
   roots.forEach((el, r) => {
     const e = expected[r];
@@ -429,27 +429,27 @@ const validateInfoCircle = (html, expected, ring, where) => {
     if (attr(top, 'role') !== 'group' || attr(top, 'aria-label') !== e.label) bad(`${at}: the root should be role="group" named "${e.label}".`);
     let cfg = {};
     try {
-      cfg = JSON.parse(attr(top, 'data-ic'));
+      cfg = JSON.parse(attr(top, 'data-inc'));
     } catch {
-      bad(`${at}: data-ic is not JSON.`);
+      bad(`${at}: data-inc is not JSON.`);
     }
     if (cfg.autoplay !== e.autoplay) bad(`${at}: autoplay is ${cfg.autoplay}, the demo sets ${e.autoplay}.`);
 
-    const circle = all(el, /<div\b[^>]*\sdata-ic-circle/)[0];
+    const circle = all(el, /<div\b[^>]*\sdata-inc-circle/)[0];
     if (!circle) return bad(`${at}: no circle.`);
     if (attr(openTag(circle), 'hidden') === undefined) bad(`${at}: the circle must render hidden; without JavaScript the list is the element.`);
-    const centre = all(circle, /<div\b[^>]*\sdata-ic-centre/)[0];
+    const centre = all(circle, /<div\b[^>]*\sdata-inc-centre/)[0];
     const centreId = centre && attr(openTag(centre), 'id');
     if (!centre || attr(openTag(centre), 'aria-live') !== 'polite') bad(`${at}: the centre must be aria-live="polite".`);
     else if (text(centre)) bad(`${at}: the centre holds text in the static HTML; it would be a second copy of an entry.`);
-    const buttons = all(circle, /<button\b[^>]*\sdata-ic-item=/);
+    const buttons = all(circle, /<button\b[^>]*\sdata-inc-item=/);
     if (buttons.length !== n) bad(`${at}: ${buttons.length} item buttons for ${n} items.`);
     const want = ring(n);
     const pressed = buttons.map((b) => attr(openTag(b), 'aria-pressed'));
     if (pressed.filter((v) => v === 'true').length !== 1 || pressed[e.startAt] !== 'true') bad(`${at}: aria-pressed is [${pressed}]; exactly item ${e.startAt + 1} should be "true".`);
     if (pressed.some((v) => v !== 'true' && v !== 'false')) bad(`${at}: every item needs aria-pressed "true" or "false".`);
 
-    const list = all(el, /<ol\b[^>]*class="ic__list"/)[0];
+    const list = all(el, /<ol\b[^>]*class="inc__list"/)[0];
     if (!list) return bad(`${at}: no list.`);
     if (attr(openTag(list), 'role') !== 'list') bad(`${at}: the list needs role="list".`);
     const entries = all(list, /<li\b/);
@@ -475,9 +475,9 @@ const validateInfoCircle = (html, expected, ring, where) => {
       const li = entries[i];
       if (!li) return;
       if (attr(openTag(li), 'hidden') !== undefined) bad(`${pt}: its list entry is hidden.`);
-      const h = li.match(/<h([2-6])\b[^>]*class="ic__title"[^>]*>([\s\S]*?)<\/h\1>/);
+      const h = li.match(/<h([2-6])\b[^>]*class="inc__title"[^>]*>([\s\S]*?)<\/h\1>/);
       if (!h || text(h[2]) !== it.title) bad(`${pt}: the list entry's heading is not "${it.title}".`);
-      const t = li.match(/<p\b[^>]*class="ic__text"[^>]*>([\s\S]*?)<\/p>/);
+      const t = li.match(/<p\b[^>]*class="inc__text"[^>]*>([\s\S]*?)<\/p>/);
       if (!t || text(t[1]) !== it.text) bad(`${pt}: the list entry's text is not the fixture's.`);
       if (it.link) {
         const a = li.match(/<a\b([^>]*)>([\s\S]*?)<\/a>/);
@@ -485,7 +485,7 @@ const validateInfoCircle = (html, expected, ring, where) => {
       }
     });
 
-    const play = el.match(/<button\b[^>]*\sdata-ic-play[^>]*>([\s\S]*?)<\/button>/);
+    const play = el.match(/<button\b[^>]*\sdata-inc-play[^>]*>([\s\S]*?)<\/button>/);
     if (e.autoplay) {
       if (!play || attr(play[0], 'hidden') === undefined || attr(play[0], 'type') !== 'button' || !text(play[1])) bad(`${at}: autoplay needs a named, hidden pause button (WCAG 2.2.2).`);
     } else if (play) bad(`${at}: a pause button without autoplay.`);
@@ -506,13 +506,13 @@ for (const rel of icPages) {
 finish('info-circle page');
 
 // 6. Size and colours.
-const itemRule = icSrc.match(/\n {2}\.ic__item \{([\s\S]*?)\n {2}\}/)?.[1] ?? '';
-if (!/\n\s+min-width: 44px;/.test(itemRule) || !/\n\s+min-height: 44px;/.test(itemRule)) fail(`${icFile}: the .ic__item rule must keep min-width and min-height at 44px.`);
+const itemRule = icSrc.match(/\n {2}\.inc__item \{([\s\S]*?)\n {2}\}/)?.[1] ?? '';
+if (!/\n\s+min-width: 44px;/.test(itemRule) || !/\n\s+min-height: 44px;/.test(itemRule)) fail(`${icFile}: the .inc__item rule must keep min-width and min-height at 44px.`);
 const icRatios = [];
 for (const [label, fg, bg] of [
-  ['centre text', '--ic-fg', '--ic-centre-bg'],
-  ['chosen icon', '--ic-active-fg', '--ic-accent'],
-  ['link on the disc', '--ic-accent', '--ic-centre-bg'],
+  ['centre text', '--inc-fg', '--inc-centre-bg'],
+  ['chosen icon', '--inc-active-fg', '--inc-accent'],
+  ['link on the disc', '--inc-accent', '--inc-centre-bg'],
 ]) {
   const a = fallback(icSrc, fg);
   const b = fallback(icSrc, bg);
@@ -530,13 +530,13 @@ finish('info-circle size and colours');
 {
   const src = icHtml[icPages[0]];
   const v = (html) => validateInfoCircle(html, icExpected, circlePositions, 'mutant');
-  mustFail('info-circle', 'the ring starts at 3 o’clock, not the top', checkRing(await block(mutate('info-circle', 'start angle', icSrc, 'startDeg = -90', 'startDeg = 0'), 'ic-geometry', 'circlePositions')));
+  mustFail('info-circle', 'the ring starts at 3 o’clock, not the top', checkRing(await block(mutate('info-circle', 'start angle', icSrc, 'startDeg = -90', 'startDeg = 0'), 'inc-geometry', 'circlePositions')));
   mustFail('info-circle', 'two items pressed', v(mutate('info-circle', 'pressed', src, 'aria-pressed="false"', 'aria-pressed="true"')));
-  mustFail('info-circle', 'the circle shown without JavaScript', v(mutate('info-circle', 'circle hidden', src, /(class="ic__circle") hidden/, '$1')));
+  mustFail('info-circle', 'the circle shown without JavaScript', v(mutate('info-circle', 'circle hidden', src, /(class="inc__circle") hidden/, '$1')));
   mustFail('info-circle', 'the centre not a live region', v(mutate('info-circle', 'live', src, 'aria-live="polite"', '')));
-  mustFail('info-circle', 'an item moved off the ring', v(mutate('info-circle', 'moved', src, '--ic-x:50%;--ic-y:0%', '--ic-x:50%;--ic-y:3%')));
+  mustFail('info-circle', 'an item moved off the ring', v(mutate('info-circle', 'moved', src, '--inc-x:50%;--inc-y:0%', '--inc-x:50%;--inc-y:3%')));
   mustFail('info-circle', "a list entry's text dropped", v(mutate('info-circle', 'text', src, `>${icFixture.process.items[2].text}</p>`, '></p>')));
-  mustFail('info-circle', 'autoplay without its pause button', v(mutate('info-circle', 'pause', src, /<button type="button" class="ic__play"[\s\S]*?<\/button>/, '')));
+  mustFail('info-circle', 'autoplay without its pause button', v(mutate('info-circle', 'pause', src, /<button type="button" class="inc__play"[\s\S]*?<\/button>/, '')));
   mustFail('info-circle', 'a demo icon that is not Font Awesome Free', validateFa(mutate('info-circle', 'fa', icDemoSrc, /(<path fill="currentColor" d="M)(\d)/, '$19'), 'mutant'));
 }
 finish('info-circle mutations');
@@ -551,12 +551,12 @@ const WAITING = { up: 'translateY(100%)', down: 'translateY(-100%)', left: 'tran
 const checkSlides = (src) => {
   const out = [];
   for (const [dir, want] of Object.entries(WAITING)) {
-    const got = src.match(new RegExp(`\\.sb\\[data-direction='${dir}'\\] \\{\\s*--sb-waiting: ([^;]+);`))?.[1];
+    const got = src.match(new RegExp(`\\.slb\\[data-direction='${dir}'\\] \\{\\s*--slb-waiting: ([^;]+);`))?.[1];
     if (got !== want) out.push(`slide-box direction "${dir}": the back waits at ${got ?? 'nothing'}, expected ${want}.`);
   }
-  if (!/\.sb\[data-ready\] \.sb__back \{\s*transform: var\(--sb-waiting\);/.test(src)) out.push('slide-box: the back does not wait at --sb-waiting once the script runs.');
-  if (!/\.sb\[data-ready\]\[data-open\] \.sb__back \{\s*transform: none;/.test(src)) out.push('slide-box: an open card does not bring the back to transform: none.');
-  if (!/\.sb\[data-ready\] \.sb__card \{[^}]*overflow: hidden;/.test(src)) out.push('slide-box: the card must clip (overflow: hidden) so the waiting back is out of view.');
+  if (!/\.slb\[data-ready\] \.slb__back \{\s*transform: var\(--slb-waiting\);/.test(src)) out.push('slide-box: the back does not wait at --slb-waiting once the script runs.');
+  if (!/\.slb\[data-ready\]\[data-open\] \.slb__back \{\s*transform: none;/.test(src)) out.push('slide-box: an open card does not bring the back to transform: none.');
+  if (!/\.slb\[data-ready\] \.slb__card \{[^}]*overflow: hidden;/.test(src)) out.push('slide-box: the card must clip (overflow: hidden) so the waiting back is out of view.');
   return out;
 };
 checkSlides(sbSrc).forEach(fail);
@@ -576,7 +576,7 @@ for (const c of sbExpected) {
 const validateSlideBox = (html, expected, where) => {
   const out = [];
   const bad = (m) => out.push(`${where}: ${m}`);
-  const cards = all(html, /<div\b[^>]*\sdata-sb(?=[\s>])/);
+  const cards = all(html, /<div\b[^>]*\sdata-slb(?=[\s>])/);
   if (cards.length !== expected.length) bad(`expected ${expected.length} slide boxes, found ${cards.length}.`);
   cards.forEach((card, i) => {
     const e = expected[i];
@@ -587,16 +587,16 @@ const validateSlideBox = (html, expected, where) => {
     if (attr(top, 'data-direction') !== e.direction) bad(`${at}: data-direction is ${attr(top, 'data-direction')}, the fixture says ${e.direction}.`);
     if (attr(top, 'data-trigger') !== (e.trigger ?? 'both')) bad(`${at}: data-trigger is ${attr(top, 'data-trigger')}, the fixture says ${e.trigger ?? 'both'}.`);
 
-    const control = all(card, /<button\b[^>]*\sdata-sb-control/)[0];
-    if (!control) return bad(`${at}: no <button data-sb-control>.`);
+    const control = all(card, /<button\b[^>]*\sdata-slb-control/)[0];
+    if (!control) return bad(`${at}: no <button data-slb-control>.`);
     const ct = openTag(control);
     if (attr(ct, 'type') !== 'button') bad(`${at}: the control needs type="button".`);
     if (attr(ct, 'aria-expanded') !== 'false') bad(`${at}: the control needs aria-expanded="false" in the static HTML.`);
     if (attr(ct, 'hidden') === undefined) bad(`${at}: the control must render hidden, or a visitor without JavaScript meets a button that does nothing.`);
     if (text(control) !== e.title) bad(`${at}: the control is named "${text(control)}", expected "${e.title}".`);
 
-    const front = all(card, /<div\b[^>]*\sdata-sb-front(?=[\s>])/)[0];
-    const back = all(card, /<div\b[^>]*\sdata-sb-back(?=[\s>])/)[0];
+    const front = all(card, /<div\b[^>]*\sdata-slb-front(?=[\s>])/)[0];
+    const back = all(card, /<div\b[^>]*\sdata-slb-back(?=[\s>])/)[0];
     if (!front || !back) return bad(`${at}: missing a panel.`);
     if (card.indexOf(back) < card.indexOf(front)) bad(`${at}: the back comes before the front; without JavaScript they stack in source order.`);
     if (attr(ct, 'aria-controls') !== attr(openTag(back), 'id')) bad(`${at}: aria-controls does not name the back.`);
@@ -635,9 +635,9 @@ finish('slide-box page');
 // 9. Colours.
 const sbRatios = [];
 for (const [label, fg, bg] of [
-  ['front text', '--sb-front-fg', '--sb-front-bg'],
-  ['back text', '--sb-back-fg', '--sb-accent'],
-  ['back link', '--sb-accent', '--sb-cta-bg'],
+  ['front text', '--slb-front-fg', '--slb-front-bg'],
+  ['back text', '--slb-back-fg', '--slb-accent'],
+  ['back link', '--slb-accent', '--slb-cta-bg'],
 ]) {
   const a = fallback(sbSrc, fg);
   const b = fallback(sbSrc, bg);
@@ -655,12 +655,12 @@ finish('slide-box colours');
 {
   const src = sbHtml[sbPages[0]];
   const v = (html) => validateSlideBox(html, sbExpected, 'mutant');
-  mustFail('slide-box', '"up" parks the back above instead of below', checkSlides(mutate('slide-box', 'up', sbSrc, "--sb-waiting: translateY(100%);", '--sb-waiting: translateY(-100%);')));
-  mustFail('slide-box', 'the card no longer clips', checkSlides(mutate('slide-box', 'clip', sbSrc, /(\.sb\[data-ready\] \.sb__card \{[^}]*)overflow: hidden;/, '$1')));
+  mustFail('slide-box', '"up" parks the back above instead of below', checkSlides(mutate('slide-box', 'up', sbSrc, "--slb-waiting: translateY(100%);", '--slb-waiting: translateY(-100%);')));
+  mustFail('slide-box', 'the card no longer clips', checkSlides(mutate('slide-box', 'clip', sbSrc, /(\.slb\[data-ready\] \.slb__card \{[^}]*)overflow: hidden;/, '$1')));
   mustFail('slide-box', 'the control without aria-expanded', v(mutate('slide-box', 'expanded', src, ' aria-expanded="false"', '')));
-  mustFail('slide-box', 'the control shown without JavaScript', v(mutate('slide-box', 'hidden', src, /(<button type="button" class="sb__control"[^>]*?) hidden/, '$1')));
-  mustFail('slide-box', 'the back inert without JavaScript', v(mutate('slide-box', 'inert', src, /(<div class="sb__panel sb__back")/, '$1 inert')));
-  mustFail('slide-box', 'a link on the front', v(mutate('slide-box', 'front link', src, /(<p class="sb__text"[^>]*>)/, '$1<a href="/x/">x</a>')));
+  mustFail('slide-box', 'the control shown without JavaScript', v(mutate('slide-box', 'hidden', src, /(<button type="button" class="slb__control"[^>]*?) hidden/, '$1')));
+  mustFail('slide-box', 'the back inert without JavaScript', v(mutate('slide-box', 'inert', src, /(<div class="slb__panel slb__back")/, '$1 inert')));
+  mustFail('slide-box', 'a link on the front', v(mutate('slide-box', 'front link', src, /(<p class="slb__text"[^>]*>)/, '$1<a href="/x/">x</a>')));
   mustFail('slide-box', 'a card that slides from the wrong side', v(mutate('slide-box', 'direction', src, 'data-direction="left"', 'data-direction="right"')));
   mustFail('slide-box', 'a demo icon that is not Font Awesome Free', validateFa(mutate('slide-box', 'fa', sbDemoSrc, "'mug-hot'", "'mug-saucer'"), 'mutant'));
 }

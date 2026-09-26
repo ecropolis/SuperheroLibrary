@@ -15,7 +15,7 @@
  * visitor clicks an item, and never runs under prefers-reduced-motion (tracked live). While it
  * runs the centre is not a live region, so nothing is read out on its own.
  *
- * Geometry. Positions are computed at build (the `<ic-geometry>` block, which the check runs
+ * Geometry. Positions are computed at build (the `<inc-geometry>` block, which the check runs
  * against golden cases): item i of n sits at angle −90° + 360°·i/n, clockwise from the top,
  * on the circle's circumference, as percentages of the ring. Nothing measures at runtime.
  *
@@ -24,13 +24,13 @@
  * the element's only copy of the content, and the centre shows a copy of the chosen entry.
  *
  * Theming (each has a fallback):
- *   --ic-accent     #5933d8   chosen item, icons, ring, focus
- *   --ic-item-bg    #fff      an item not chosen          --ic-item-fg  var(--ic-accent)
- *   --ic-active-fg  #fff      the chosen item's icon (7.27:1 on the accent)
- *   --ic-centre-bg  #f4f1fe   the disc behind the text    --ic-fg       #1e283c (13.24:1 on it)
- *   --ic-ring       rgb(89 51 216 / 0.35)   the circumference line
- *   --ic-size       32rem     the circle's diameter (never wider than its container)
- *   --ic-item-size  4.5rem    each item's disc            --ic-focus    var(--ic-accent)
+ *   --inc-accent     #5933d8   chosen item, icons, ring, focus
+ *   --inc-item-bg    #fff      an item not chosen          --inc-item-fg  var(--inc-accent)
+ *   --inc-active-fg  #fff      the chosen item's icon (7.27:1 on the accent)
+ *   --inc-centre-bg  #f4f1fe   the disc behind the text    --inc-fg       #1e283c (13.24:1 on it)
+ *   --inc-ring       rgb(89 51 216 / 0.35)   the circumference line
+ *   --inc-size       32rem     the circle's diameter (never wider than its container)
+ *   --inc-item-size  4.5rem    each item's disc            --inc-focus    var(--inc-accent)
  */
 interface Item {
   title: string;
@@ -70,7 +70,7 @@ const {
   class: className,
 } = Astro.props;
 
-// <ic-geometry>
+// <inc-geometry>
 /** Item i of n on the circumference, clockwise from `startDeg` (the top), in percent of the ring. */
 function circlePositions(n: number, startDeg = -90): { x: number; y: number }[] {
   const round = (v: number) => Math.round(v * 1000) / 1000 + 0; // + 0 turns -0 into 0
@@ -79,7 +79,7 @@ function circlePositions(n: number, startDeg = -90): { x: number; y: number }[] 
     return { x: round(50 + 50 * Math.cos(a)), y: round(50 + 50 * Math.sin(a)) };
   });
 }
-// </ic-geometry>
+// </inc-geometry>
 
 const where = 'InfoCircle';
 if (!Array.isArray(items) || items.length < 2 || items.length > 10) {
@@ -99,7 +99,7 @@ if (interval !== 0 && !(Number.isFinite(interval) && interval >= 2000)) {
   throw new Error(`${where}: \`autoplay\` is the ms between items, at least 2000 (people need time to read); got ${String(autoplay)}.`);
 }
 
-const uid = 'ic-' + Math.random().toString(36).slice(2, 8);
+const uid = 'inc-' + Math.random().toString(36).slice(2, 8);
 const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 const positions = circlePositions(items.length);
 const cfg = JSON.stringify({ autoplay: interval, pause: pauseLabel, play: playLabel });
@@ -110,51 +110,51 @@ locals.__infoCircleScript = true;
 ---
 
 <div
-  class:list={['ic', className]}
-  data-ic={cfg}
+  class:list={['inc', className]}
+  data-inc={cfg}
   role={label ? 'group' : undefined}
   aria-label={label}
-  style={size ? `--ic-size:${size}` : undefined}
+  style={size ? `--inc-size:${size}` : undefined}
 >
-  <div class="ic__circle" hidden data-ic-circle>
-    <div class="ic__orbit">
-      <span class="ic__ring" aria-hidden="true"></span>
-      <div class="ic__centre" id={`${uid}-centre`} aria-live="polite" data-ic-centre></div>
+  <div class="inc__circle" hidden data-inc-circle>
+    <div class="inc__orbit">
+      <span class="inc__ring" aria-hidden="true"></span>
+      <div class="inc__centre" id={`${uid}-centre`} aria-live="polite" data-inc-centre></div>
       {
         items.map((it, i) => (
           <button
             type="button"
-            class="ic__item"
-            style={`--ic-x:${positions[i].x}%;--ic-y:${positions[i].y}%`}
+            class="inc__item"
+            style={`--inc-x:${positions[i].x}%;--inc-y:${positions[i].y}%`}
             aria-pressed={i === startAt ? 'true' : 'false'}
             aria-controls={`${uid}-centre`}
-            data-ic-item={i}
+            data-inc-item={i}
           >
             {it.image ? (
-              <img class="ic__img" src={it.image} alt="" loading="lazy" decoding="async" />
+              <img class="inc__img" src={it.image} alt="" loading="lazy" decoding="async" />
             ) : (
-              <span class="ic__glyph" aria-hidden="true" set:html={it.icon} />
+              <span class="inc__glyph" aria-hidden="true" set:html={it.icon} />
             )}
-            <span class="ic__sr">{it.title}</span>
+            <span class="inc__sr">{it.title}</span>
           </button>
         ))
       }
     </div>
   </div>
-  <ol class="ic__list" role="list">
+  <ol class="inc__list" role="list">
     {
       items.map((it) => (
-        <li class="ic__entry" data-ic-entry>
+        <li class="inc__entry" data-inc-entry>
           {it.image ? (
-            <img class="ic__img ic__img--list" src={it.image} alt="" loading="lazy" decoding="async" />
+            <img class="inc__img inc__img--list" src={it.image} alt="" loading="lazy" decoding="async" />
           ) : (
-            <span class="ic__glyph ic__glyph--list" aria-hidden="true" set:html={it.icon} />
+            <span class="inc__glyph inc__glyph--list" aria-hidden="true" set:html={it.icon} />
           )}
-          <div class="ic__body" data-ic-body>
-            <H class="ic__title">{it.title}</H>
-            <p class="ic__text">{it.text}</p>
+          <div class="inc__body" data-inc-body>
+            <H class="inc__title">{it.title}</H>
+            <p class="inc__text">{it.text}</p>
             {it.link && (
-              <a class="ic__link" href={it.link.href}>
+              <a class="inc__link" href={it.link.href}>
                 {it.link.text}
               </a>
             )}
@@ -165,9 +165,9 @@ locals.__infoCircleScript = true;
   </ol>
   {
     interval > 0 && (
-      <button type="button" class="ic__play" hidden data-ic-play>
-        <span class="ic__play-icon" aria-hidden="true" />
-        <span data-ic-play-text>{pauseLabel}</span>
+      <button type="button" class="inc__play" hidden data-inc-play>
+        <span class="inc__play-icon" aria-hidden="true" />
+        <span data-inc-play-text>{pauseLabel}</span>
       </button>
     )
   }
@@ -184,15 +184,15 @@ locals.__infoCircleScript = true;
             if (root.hasAttribute('data-ready')) return;
             let cfg = {};
             try {
-              cfg = JSON.parse(root.dataset.ic || '{}');
+              cfg = JSON.parse(root.dataset.inc || '{}');
             } catch {}
-            const circle = root.querySelector('[data-ic-circle]');
-            const centre = root.querySelector('[data-ic-centre]');
-            const buttons = [...root.querySelectorAll('[data-ic-item]')];
-            const bodies = [...root.querySelectorAll('[data-ic-body]')];
+            const circle = root.querySelector('[data-inc-circle]');
+            const centre = root.querySelector('[data-inc-centre]');
+            const buttons = [...root.querySelectorAll('[data-inc-item]')];
+            const bodies = [...root.querySelectorAll('[data-inc-body]')];
             if (!circle || !centre || !buttons.length || buttons.length !== bodies.length) return;
-            const play = root.querySelector('[data-ic-play]');
-            const playText = root.querySelector('[data-ic-play-text]');
+            const play = root.querySelector('[data-inc-play]');
+            const playText = root.querySelector('[data-inc-play-text]');
             const n = buttons.length;
             let active = Math.max(0, buttons.findIndex((b) => b.getAttribute('aria-pressed') === 'true'));
             let hovered = false;
@@ -206,7 +206,7 @@ locals.__infoCircleScript = true;
               active = i;
               buttons.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
               const copy = bodies[i].cloneNode(true);
-              copy.removeAttribute('data-ic-body');
+              copy.removeAttribute('data-inc-body');
               centre.replaceChildren(copy);
             };
             const render = () => {
@@ -273,7 +273,7 @@ locals.__infoCircleScript = true;
             root.setAttribute('data-ready', '');
             render();
           };
-          return () => document.querySelectorAll('[data-ic]:not([data-ready])').forEach(init);
+          return () => document.querySelectorAll('[data-inc]:not([data-ready])').forEach(init);
         })());
         boot();
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
@@ -285,152 +285,152 @@ locals.__infoCircleScript = true;
 }
 
 <style>
-  .ic {
+  .inc {
     container-type: inline-size;
-    color: var(--ic-fg, #1e283c);
+    color: var(--inc-fg, #1e283c);
   }
-  .ic__circle[hidden],
-  .ic__play[hidden] {
+  .inc__circle[hidden],
+  .inc__play[hidden] {
     display: none;
   }
 
   /* The list: without JavaScript, and in a container too narrow for the circle. */
-  .ic__list {
+  .inc__list {
     display: grid;
     gap: 1.25rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .ic__entry {
+  .inc__entry {
     display: grid;
     grid-template-columns: auto 1fr;
     align-items: start;
     gap: 1rem;
   }
-  .ic__glyph,
-  .ic__img {
+  .inc__glyph,
+  .inc__img {
     display: grid;
     place-items: center;
     width: 3rem;
     height: 3rem;
     border-radius: 50%;
   }
-  .ic__glyph--list {
-    background: var(--ic-centre-bg, #f4f1fe);
-    color: var(--ic-accent, #5933d8);
+  .inc__glyph--list {
+    background: var(--inc-centre-bg, #f4f1fe);
+    color: var(--inc-accent, #5933d8);
   }
-  .ic__glyph :global(svg) {
+  .inc__glyph :global(svg) {
     width: 45%;
     height: 45%;
   }
-  .ic__img {
+  .inc__img {
     object-fit: cover;
   }
-  .ic__title {
+  .inc__title {
     margin: 0 0 0.35rem;
     color: inherit;
     font-size: 1.15rem;
     line-height: 1.25;
   }
-  .ic__text {
+  .inc__text {
     margin: 0;
     line-height: 1.5;
   }
-  .ic__link {
+  .inc__link {
     display: inline-block;
     margin-top: 0.5rem;
-    color: var(--ic-accent, #5933d8);
+    color: var(--inc-accent, #5933d8);
     font-weight: 700;
   }
-  .ic__link:focus-visible {
-    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+  .inc__link:focus-visible {
+    outline: 3px solid var(--inc-focus, var(--inc-accent, #5933d8));
     outline-offset: 2px;
   }
 
   /* The circle. */
-  .ic__circle {
+  .inc__circle {
     position: relative;
-    width: min(var(--ic-size, 32rem), 100%);
+    width: min(var(--inc-size, 32rem), 100%);
     aspect-ratio: 1;
     margin-inline: auto;
   }
-  .ic__orbit {
+  .inc__orbit {
     position: absolute;
-    inset: calc(var(--ic-item-size, 4.5rem) / 2);
+    inset: calc(var(--inc-item-size, 4.5rem) / 2);
   }
-  .ic__ring {
+  .inc__ring {
     position: absolute;
     inset: 0;
-    border: 2px dashed var(--ic-ring, rgb(89 51 216 / 0.35));
+    border: 2px dashed var(--inc-ring, rgb(89 51 216 / 0.35));
     border-radius: 50%;
   }
-  .ic__ring::after {
+  .inc__ring::after {
     content: '';
     position: absolute;
-    inset: calc(var(--ic-item-size, 4.5rem) / 2 + 0.75rem);
+    inset: calc(var(--inc-item-size, 4.5rem) / 2 + 0.75rem);
     border-radius: 50%;
-    background: var(--ic-centre-bg, #f4f1fe);
+    background: var(--inc-centre-bg, #f4f1fe);
   }
   /* The text sits in the square inscribed in the free disc inside the items. */
-  .ic__centre {
+  .inc__centre {
     position: absolute;
-    inset: calc((100% - (100% - var(--ic-item-size, 4.5rem)) * 0.7071) / 2);
+    inset: calc((100% - (100% - var(--inc-item-size, 4.5rem)) * 0.7071) / 2);
     display: grid;
     place-content: center;
     overflow: auto;
     text-align: center;
     overflow-wrap: anywhere;
   }
-  .ic__centre .ic__body {
+  .inc__centre .inc__body {
     display: grid;
     justify-items: center;
     font-size: clamp(0.85rem, 3.2cqi, 1rem);
   }
-  .ic__centre .ic__title {
+  .inc__centre .inc__title {
     font-size: clamp(1rem, 3.6cqi, 1.15rem);
   }
-  .ic__item {
+  .inc__item {
     position: absolute;
-    left: var(--ic-x);
-    top: var(--ic-y);
+    left: var(--inc-x);
+    top: var(--inc-y);
     z-index: 1;
     display: grid;
     place-items: center;
-    width: var(--ic-item-size, 4.5rem);
-    height: var(--ic-item-size, 4.5rem);
+    width: var(--inc-item-size, 4.5rem);
+    height: var(--inc-item-size, 4.5rem);
     min-width: 44px;
     min-height: 44px;
     margin: 0;
     padding: 0;
     overflow: hidden;
-    border: 2px solid var(--ic-accent, #5933d8);
+    border: 2px solid var(--inc-accent, #5933d8);
     border-radius: 50%;
-    background: var(--ic-item-bg, #fff);
-    color: var(--ic-item-fg, var(--ic-accent, #5933d8));
+    background: var(--inc-item-bg, #fff);
+    color: var(--inc-item-fg, var(--inc-accent, #5933d8));
     font: inherit;
     cursor: pointer;
     translate: -50% -50%;
     transition: background-color 0.2s ease, color 0.2s ease, scale 0.2s ease;
   }
-  .ic__item .ic__glyph,
-  .ic__item .ic__img {
+  .inc__item .inc__glyph,
+  .inc__item .inc__img {
     width: 100%;
     height: 100%;
   }
-  .ic__item[aria-pressed='true'] {
-    background: var(--ic-accent, #5933d8);
-    color: var(--ic-active-fg, #fff);
+  .inc__item[aria-pressed='true'] {
+    background: var(--inc-accent, #5933d8);
+    color: var(--inc-active-fg, #fff);
     scale: 1.1;
   }
-  .ic__item:has(.ic__img)[aria-pressed='true'] {
-    box-shadow: 0 0 0 4px var(--ic-accent, #5933d8);
+  .inc__item:has(.inc__img)[aria-pressed='true'] {
+    box-shadow: 0 0 0 4px var(--inc-accent, #5933d8);
   }
-  .ic__item:focus-visible {
-    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+  .inc__item:focus-visible {
+    outline: 3px solid var(--inc-focus, var(--inc-accent, #5933d8));
     outline-offset: 4px;
   }
-  .ic__sr {
+  .inc__sr {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -438,7 +438,7 @@ locals.__infoCircleScript = true;
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .ic__play {
+  .inc__play {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -453,16 +453,16 @@ locals.__infoCircleScript = true;
     font-size: 0.9rem;
     cursor: pointer;
   }
-  .ic__play:focus-visible {
-    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+  .inc__play:focus-visible {
+    outline: 3px solid var(--inc-focus, var(--inc-accent, #5933d8));
     outline-offset: 2px;
   }
-  .ic__play-icon {
+  .inc__play-icon {
     width: 0.7rem;
     height: 0.8rem;
     border-inline: 0.22rem solid currentColor;
   }
-  .ic__play[data-paused] .ic__play-icon {
+  .inc__play[data-paused] .inc__play-icon {
     border: 0;
     background: currentColor;
     clip-path: polygon(0 0, 100% 50%, 0 100%);
@@ -470,39 +470,39 @@ locals.__infoCircleScript = true;
 
   /* With JavaScript and room for it: the circle, and the list stays only as its source. */
   @container (width >= 28rem) {
-    .ic[data-ready] .ic__list {
+    .inc[data-ready] .inc__list {
       display: none;
     }
   }
   @container (width < 28rem) {
-    .ic__circle,
-    .ic__play {
+    .inc__circle,
+    .inc__play {
       display: none !important;
     }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .ic[data-ready] .ic__centre > :global(*) {
-      animation: ic-in 0.25s ease-out;
+    .inc[data-ready] .inc__centre > :global(*) {
+      animation: inc-in 0.25s ease-out;
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ic__item {
+    .inc__item {
       transition: none;
     }
   }
-  @keyframes ic-in {
+  @keyframes inc-in {
     from {
       opacity: 0;
     }
   }
 
   @media print {
-    .ic__circle,
-    .ic__play {
+    .inc__circle,
+    .inc__play {
       display: none !important;
     }
-    .ic[data-ready] .ic__list {
+    .inc[data-ready] .inc__list {
       display: grid;
     }
   }

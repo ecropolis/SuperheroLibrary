@@ -26,14 +26,14 @@
  * neither is cut off; there is no fixed height. The host's grid sets the width.
  *
  * Theming (each has a fallback):
- *   --sb-accent     #5933d8   back, icon, focus ring
- *   --sb-front-bg   #fff      --sb-front-fg  #1e283c     --sb-border  rgb(0 0 0 / 0.08)
- *   --sb-back-bg    var(--sb-accent)        --sb-back-fg   #fff (7.27:1 on the accent)
- *   --sb-cta-bg     #fff      --sb-cta-fg    var(--sb-back-bg)
- *   --sb-icon-color var(--sb-accent)        --sb-icon-bg   #f4f1fe   --sb-icon-size 2.25rem
- *   --sb-radius 14px  --sb-padding 1.75rem 1.5rem  --sb-shadow (box-shadow)  --sb-min-height 14rem
- *   --sb-title-size 1.2rem  --sb-duration 450ms  --sb-easing cubic-bezier(0.2, 0.7, 0.2, 1)
- *   --sb-fade 200ms  --sb-focus var(--sb-accent)
+ *   --slb-accent     #5933d8   back, icon, focus ring
+ *   --slb-front-bg   #fff      --slb-front-fg  #1e283c     --slb-border  rgb(0 0 0 / 0.08)
+ *   --slb-back-bg    var(--slb-accent)        --slb-back-fg   #fff (7.27:1 on the accent)
+ *   --slb-cta-bg     #fff      --slb-cta-fg    var(--slb-back-bg)
+ *   --slb-icon-color var(--slb-accent)        --slb-icon-bg   #f4f1fe   --slb-icon-size 2.25rem
+ *   --slb-radius 14px  --slb-padding 1.75rem 1.5rem  --slb-shadow (box-shadow)  --slb-min-height 14rem
+ *   --slb-title-size 1.2rem  --slb-duration 450ms  --slb-easing cubic-bezier(0.2, 0.7, 0.2, 1)
+ *   --slb-fade 200ms  --slb-focus var(--slb-accent)
  */
 interface Props {
   title?: string;
@@ -52,7 +52,7 @@ interface Props {
   direction?: 'up' | 'down' | 'left' | 'right';
   /** Whether hover ALSO slides it in. Click, tap and keyboard always do. */
   trigger?: 'both' | 'click';
-  /** ms. Overrides --sb-duration. */
+  /** ms. Overrides --slb-duration. */
   duration?: number;
   headingLevel?: 2 | 3 | 4 | 5 | 6;
   /** Accessible name of the card's button. Default: `title`, else the front's first heading. */
@@ -82,7 +82,7 @@ if (image && typeof imageAlt !== 'string') {
 }
 if (!['up', 'down', 'left', 'right'].includes(direction)) throw new Error(`${who}: \`direction\` is up, down, left or right; got "${direction}".`);
 
-const uid = 'sb-' + Math.random().toString(36).slice(2, 8);
+const uid = 'slb-' + Math.random().toString(36).slice(2, 8);
 const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 const hasFront = Astro.slots.has('front');
 const hasBack = Astro.slots.has('back');
@@ -93,44 +93,44 @@ locals.__slideBoxScript = true;
 ---
 
 <div
-  class:list={['sb', className]}
-  data-sb
+  class:list={['slb', className]}
+  data-slb
   data-direction={direction}
   data-trigger={trigger}
-  style={duration !== undefined ? `--sb-duration:${duration}ms` : undefined}
+  style={duration !== undefined ? `--slb-duration:${duration}ms` : undefined}
 >
-  <button type="button" class="sb__control" aria-expanded="false" aria-controls={`${uid}-back`} hidden data-sb-control>
-    <span class="sb__sr" data-sb-label>{label ?? title}</span>
+  <button type="button" class="slb__control" aria-expanded="false" aria-controls={`${uid}-back`} hidden data-slb-control>
+    <span class="slb__sr" data-slb-label>{label ?? title}</span>
   </button>
-  <div class="sb__card">
-    <div class="sb__panel sb__front" id={`${uid}-front`} data-sb-front>
-      {image && <img class="sb__image" src={image} alt={imageAlt} loading="lazy" decoding="async" />}
-      <div class="sb__body">
+  <div class="slb__card">
+    <div class="slb__panel slb__front" id={`${uid}-front`} data-slb-front>
+      {image && <img class="slb__image" src={image} alt={imageAlt} loading="lazy" decoding="async" />}
+      <div class="slb__body">
         {
           hasFront ? (
             <slot name="front" />
           ) : (
             <>
-              {icon && !image && <span class="sb__icon" aria-hidden="true" set:html={icon} />}
-              {title && <H class="sb__title">{title}</H>}
-              {text && <p class="sb__text">{text}</p>}
+              {icon && !image && <span class="slb__icon" aria-hidden="true" set:html={icon} />}
+              {title && <H class="slb__title">{title}</H>}
+              {text && <p class="slb__text">{text}</p>}
             </>
           )
         }
       </div>
-      <span class="sb__hint" aria-hidden="true"></span>
+      <span class="slb__hint" aria-hidden="true"></span>
     </div>
-    <div class="sb__panel sb__back" id={`${uid}-back`} data-sb-back>
-      <div class="sb__body">
+    <div class="slb__panel slb__back" id={`${uid}-back`} data-slb-back>
+      <div class="slb__body">
         {
           hasBack ? (
             <slot name="back" />
           ) : (
             <>
-              {back && <H class="sb__title">{back}</H>}
-              {backText && <p class="sb__text">{backText}</p>}
+              {back && <H class="slb__title">{back}</H>}
+              {backText && <p class="slb__text">{backText}</p>}
               {cta && (
-                <a class="sb__cta" href={cta.href}>
+                <a class="slb__cta" href={cta.href}>
                   {cta.text}
                 </a>
               )}
@@ -138,7 +138,7 @@ locals.__slideBoxScript = true;
           )
         }
       </div>
-      <span class="sb__hint sb__hint--close" aria-hidden="true"></span>
+      <span class="slb__hint slb__hint--close" aria-hidden="true"></span>
     </div>
   </div>
 </div>
@@ -152,11 +152,11 @@ locals.__slideBoxScript = true;
           const canHover = matchMedia('(hover: hover) and (pointer: fine)');
           const init = (el) => {
             if (el.hasAttribute('data-ready')) return;
-            const control = el.querySelector('[data-sb-control]');
-            const front = el.querySelector('[data-sb-front]');
-            const back = el.querySelector('[data-sb-back]');
+            const control = el.querySelector('[data-slb-control]');
+            const front = el.querySelector('[data-slb-front]');
+            const back = el.querySelector('[data-slb-back]');
             if (!control || !front || !back) return;
-            const label = control.querySelector('[data-sb-label]');
+            const label = control.querySelector('[data-slb-label]');
             if (label && !label.textContent.trim()) {
               const h = front.querySelector('h1,h2,h3,h4,h5,h6') || front;
               label.textContent = h.textContent.replace(/\s+/g, ' ').trim().slice(0, 80) || 'Show more';
@@ -244,7 +244,7 @@ locals.__slideBoxScript = true;
             // Transitions start only after the first frame, so nothing slides on load.
             requestAnimationFrame(() => requestAnimationFrame(() => el.setAttribute('data-armed', '')));
           };
-          return () => document.querySelectorAll('[data-sb]:not([data-ready])').forEach(init);
+          return () => document.querySelectorAll('[data-slb]:not([data-ready])').forEach(init);
         })());
         boot();
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
@@ -256,27 +256,27 @@ locals.__slideBoxScript = true;
 }
 
 <style>
-  .sb {
+  .slb {
     position: relative;
     display: grid;
-    border-radius: var(--sb-radius, 14px);
+    border-radius: var(--slb-radius, 14px);
   }
   /* Where the back waits, out of view, before it slides in. */
-  .sb[data-direction='up'] {
-    --sb-waiting: translateY(100%);
+  .slb[data-direction='up'] {
+    --slb-waiting: translateY(100%);
   }
-  .sb[data-direction='down'] {
-    --sb-waiting: translateY(-100%);
+  .slb[data-direction='down'] {
+    --slb-waiting: translateY(-100%);
   }
-  .sb[data-direction='left'] {
-    --sb-waiting: translateX(100%);
+  .slb[data-direction='left'] {
+    --slb-waiting: translateX(100%);
   }
-  .sb[data-direction='right'] {
-    --sb-waiting: translateX(-100%);
+  .slb[data-direction='right'] {
+    --slb-waiting: translateX(-100%);
   }
 
   /* The card's button covers the card; it is the pointer target for the front. */
-  .sb__control {
+  .slb__control {
     position: absolute;
     inset: 0;
     z-index: 2;
@@ -290,17 +290,17 @@ locals.__slideBoxScript = true;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  .sb__control[hidden] {
+  .slb__control[hidden] {
     display: none;
   }
-  .sb__control:focus-visible {
-    outline: 3px solid var(--sb-focus, var(--sb-accent, #5933d8));
+  .slb__control:focus-visible {
+    outline: 3px solid var(--slb-focus, var(--slb-accent, #5933d8));
     outline-offset: 3px;
   }
-  .sb[data-open] .sb__control {
+  .slb[data-open] .slb__control {
     pointer-events: none;
   }
-  .sb__sr {
+  .slb__sr {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -310,56 +310,56 @@ locals.__slideBoxScript = true;
   }
 
   /* Without JavaScript: two rows, front then back. With it: one clipped cell. */
-  .sb__card {
+  .slb__card {
     position: relative;
     display: grid;
     gap: 0.5rem;
-    border-radius: var(--sb-radius, 14px);
+    border-radius: var(--slb-radius, 14px);
   }
-  .sb[data-ready] .sb__card {
+  .slb[data-ready] .slb__card {
     overflow: hidden;
-    box-shadow: var(--sb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
+    box-shadow: var(--slb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
   }
-  .sb__panel {
+  .slb__panel {
     position: relative;
     display: grid;
     align-content: start;
-    min-height: var(--sb-min-height, 14rem);
+    min-height: var(--slb-min-height, 14rem);
     overflow: hidden;
-    border-radius: var(--sb-radius, 14px);
+    border-radius: var(--slb-radius, 14px);
     overflow-wrap: anywhere;
   }
-  .sb[data-ready] .sb__panel {
+  .slb[data-ready] .slb__panel {
     grid-area: 1 / 1;
     border-radius: 0;
   }
-  .sb__front {
-    border: 1px solid var(--sb-border, rgb(0 0 0 / 0.08));
-    background: var(--sb-front-bg, #fff);
-    color: var(--sb-front-fg, #1e283c);
-    box-shadow: var(--sb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
+  .slb__front {
+    border: 1px solid var(--slb-border, rgb(0 0 0 / 0.08));
+    background: var(--slb-front-bg, #fff);
+    color: var(--slb-front-fg, #1e283c);
+    box-shadow: var(--slb-shadow, 0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1));
   }
-  .sb[data-ready] .sb__front {
+  .slb[data-ready] .slb__front {
     box-shadow: none;
     border-radius: inherit;
   }
-  .sb__back {
+  .slb__back {
     z-index: 1;
     align-content: center;
-    background: var(--sb-back-bg, var(--sb-accent, #5933d8));
-    color: var(--sb-back-fg, #fff);
+    background: var(--slb-back-bg, var(--slb-accent, #5933d8));
+    color: var(--slb-back-fg, #fff);
   }
-  .sb[data-ready] .sb__back {
-    transform: var(--sb-waiting);
+  .slb[data-ready] .slb__back {
+    transform: var(--slb-waiting);
   }
-  .sb[data-ready][data-open] .sb__back {
+  .slb[data-ready][data-open] .slb__back {
     transform: none;
   }
-  .sb[data-armed] .sb__back {
-    transition: transform var(--sb-duration, 450ms) var(--sb-easing, cubic-bezier(0.2, 0.7, 0.2, 1));
+  .slb[data-armed] .slb__back {
+    transition: transform var(--slb-duration, 450ms) var(--slb-easing, cubic-bezier(0.2, 0.7, 0.2, 1));
   }
 
-  .sb__image {
+  .slb__image {
     display: block;
     width: 100%;
     max-width: none;
@@ -367,71 +367,71 @@ locals.__slideBoxScript = true;
     aspect-ratio: 16 / 9;
     object-fit: cover;
   }
-  .sb__body {
+  .slb__body {
     display: grid;
     justify-items: start;
-    padding: var(--sb-padding, 1.75rem 1.5rem);
+    padding: var(--slb-padding, 1.75rem 1.5rem);
   }
   /* Room for the corner hint, which only the script shows. */
-  .sb[data-ready] .sb__front .sb__body {
+  .slb[data-ready] .slb__front .slb__body {
     padding-bottom: 3.5rem;
   }
-  .sb[data-ready] .sb__back .sb__body {
+  .slb[data-ready] .slb__back .slb__body {
     padding-top: 3.25rem;
   }
-  .sb__body > :global(*) {
+  .slb__body > :global(*) {
     max-width: 100%;
   }
-  .sb__icon {
+  .slb__icon {
     display: grid;
     place-items: center;
-    width: calc(var(--sb-icon-size, 2.25rem) * 2);
-    height: calc(var(--sb-icon-size, 2.25rem) * 2);
+    width: calc(var(--slb-icon-size, 2.25rem) * 2);
+    height: calc(var(--slb-icon-size, 2.25rem) * 2);
     margin-bottom: 1rem;
     border-radius: 50%;
-    background: var(--sb-icon-bg, #f4f1fe);
-    color: var(--sb-icon-color, var(--sb-accent, #5933d8));
+    background: var(--slb-icon-bg, #f4f1fe);
+    color: var(--slb-icon-color, var(--slb-accent, #5933d8));
     line-height: 0;
   }
-  .sb__icon :global(svg) {
-    width: var(--sb-icon-size, 2.25rem);
-    height: var(--sb-icon-size, 2.25rem);
+  .slb__icon :global(svg) {
+    width: var(--slb-icon-size, 2.25rem);
+    height: var(--slb-icon-size, 2.25rem);
   }
-  .sb__title {
+  .slb__title {
     margin: 0 0 0.5rem;
     color: inherit;
-    font-size: var(--sb-title-size, 1.2rem);
+    font-size: var(--slb-title-size, 1.2rem);
     line-height: 1.25;
   }
-  .sb__text {
+  .slb__text {
     margin: 0;
     line-height: 1.5;
   }
-  .sb__cta {
+  .slb__cta {
     display: inline-flex;
     align-items: center;
     min-height: 2.75rem;
     margin-top: 1.25rem;
     padding: 0.5rem 1.25rem;
     border-radius: 999px;
-    background: var(--sb-cta-bg, #fff);
-    color: var(--sb-cta-fg, var(--sb-back-bg, var(--sb-accent, #5933d8)));
+    background: var(--slb-cta-bg, #fff);
+    color: var(--slb-cta-fg, var(--slb-back-bg, var(--slb-accent, #5933d8)));
     font-weight: 700;
     text-decoration: none;
   }
-  .sb__cta:hover {
+  .slb__cta:hover {
     text-decoration: underline;
   }
-  .sb__cta:focus-visible {
-    outline: 3px solid var(--sb-back-fg, #fff);
+  .slb__cta:focus-visible {
+    outline: 3px solid var(--slb-back-fg, #fff);
     outline-offset: 3px;
   }
 
   /* The corner hint: a plus on the front, turned into a cross on the back. Script only. */
-  .sb__hint {
+  .slb__hint {
     display: none;
   }
-  .sb[data-ready] .sb__hint {
+  .slb[data-ready] .slb__hint {
     position: absolute;
     right: 1rem;
     bottom: 1rem;
@@ -443,9 +443,9 @@ locals.__slideBoxScript = true;
       linear-gradient(currentColor, currentColor) center / 0.85rem 2px no-repeat,
       linear-gradient(currentColor, currentColor) center / 2px 0.85rem no-repeat;
     box-shadow: inset 0 0 0 1.5px currentColor;
-    color: var(--sb-icon-color, var(--sb-accent, #5933d8));
+    color: var(--slb-icon-color, var(--slb-accent, #5933d8));
   }
-  .sb[data-ready] .sb__hint--close {
+  .slb[data-ready] .slb__hint--close {
     top: 1rem;
     bottom: auto;
     color: inherit;
@@ -454,34 +454,34 @@ locals.__slideBoxScript = true;
 
   /* No sliding: the panels crossfade. */
   @media (prefers-reduced-motion: reduce) {
-    .sb[data-ready] .sb__back,
-    .sb[data-ready][data-open] .sb__back {
+    .slb[data-ready] .slb__back,
+    .slb[data-ready][data-open] .slb__back {
       transform: none;
     }
-    .sb[data-ready] .sb__back {
+    .slb[data-ready] .slb__back {
       opacity: 0;
       visibility: hidden;
     }
-    .sb[data-ready][data-open] .sb__back {
+    .slb[data-ready][data-open] .slb__back {
       opacity: 1;
       visibility: visible;
     }
-    .sb[data-armed] .sb__back {
+    .slb[data-armed] .slb__back {
       transition:
-        opacity var(--sb-fade, 200ms) ease,
-        visibility 0s linear var(--sb-fade, 200ms);
+        opacity var(--slb-fade, 200ms) ease,
+        visibility 0s linear var(--slb-fade, 200ms);
     }
-    .sb[data-armed][data-open] .sb__back {
+    .slb[data-armed][data-open] .slb__back {
       transition-delay: 0s;
     }
   }
 
   @media print {
-    .sb__control,
-    .sb__hint {
+    .slb__control,
+    .slb__hint {
       display: none !important;
     }
-    .sb[data-ready] .sb__panel {
+    .slb[data-ready] .slb__panel {
       grid-area: auto;
       transform: none;
       opacity: 1;

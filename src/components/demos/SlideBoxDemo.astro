@@ -44,13 +44,13 @@ const cards = (fixture.cards as Card[]).map(({ icon, image, ...c }) => ({
   image: image ? asset(image) : undefined,
 }));
 ---
-<div class="demo-sb" id="slide-box-demo">
+<div class="demo-slb" id="slide-box-demo">
   {cards.map((c) => <SlideBox {...c} />)}
 </div>
 <style>
-  .demo-sb {
-    --sb-accent: var(--purple, #5933d8);
-    --sb-radius: var(--radius, 14px);
+  .demo-slb {
+    --slb-accent: var(--purple, #5933d8);
+    --slb-radius: var(--radius, 14px);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
     gap: 1rem;

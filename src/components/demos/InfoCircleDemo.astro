@@ -33,18 +33,18 @@ const fa: Record<string, string> = {
 const process = fixture.process.items.map(({ icon, ...it }) => ({ ...it, icon: fa[icon] }));
 const cafes = fixture.cafes.items.map(({ image, ...it }) => ({ ...it, image: asset(image) }));
 ---
-<div class="demo-ic" id="info-circle-demo">
+<div class="demo-inc" id="info-circle-demo">
   <InfoCircle items={process} label={fixture.process.label} autoplay={5000} />
-  <InfoCircle class="demo-ic__warm" items={cafes} label={fixture.cafes.label} startAt={fixture.cafes.startAt} size="28rem" />
+  <InfoCircle class="demo-inc__warm" items={cafes} label={fixture.cafes.label} startAt={fixture.cafes.startAt} size="28rem" />
 </div>
 <style>
-  .demo-ic {
-    --ic-accent: var(--purple, #5933d8);
+  .demo-inc {
+    --inc-accent: var(--purple, #5933d8);
     display: grid;
     gap: 3rem;
   }
-  .demo-ic :global(.demo-ic__warm) {
-    --ic-centre-bg: var(--tint, #f4f1fe);
-    --ic-item-size: 5.5rem;
+  .demo-inc :global(.demo-inc__warm) {
+    --inc-centre-bg: var(--tint, #f4f1fe);
+    --inc-item-size: 5.5rem;
   }
 </style>
