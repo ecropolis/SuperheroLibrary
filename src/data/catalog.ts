@@ -1639,6 +1639,213 @@ import { analytics } from '../data/site';
     file: 'src/library/slide-box/SlideBox.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'countdown',
+    name: 'Countdown',
+    aka: ['UABB Countdown', 'Elementor Countdown', 'countdown timer', 'evergreen countdown timer', 'sale timer', 'deadline timer', 'order cut-off timer'],
+    summary:
+      'Days, hours, minutes and seconds to a wall-clock moment in the business’s time zone, or an evergreen run that starts per visitor and is remembered in localStorage. Square, circle or plain. At zero it shows a message, hides, or counts to the next day’s or week’s occurrence. A role="timer" named by its end (“Ends Oct 3, 5:00 PM CDT”) with no aria-live, so nothing is announced as it ticks; the digits stay readable on demand.',
+    pitch: 'Show exactly how long is left — to the end of a sale, the start of an event or today’s order cut-off — in your time zone, not the visitor’s guess.',
+    // SE Ranking US, 2026-09-26: countdown timer widget 320/mo, difficulty 36; countdown timer
+    // html 320/53; sales countdown timer 40/44; evergreen countdown timer 10/13. "countdown
+    // widget" 4,400/64 is out of reach and "email countdown timer" 480/37 is a different
+    // product (an image in an email), so neither is claimed.
+    search: { query: 'countdown timer widget', alsoRanks: ['countdown timer html', 'sales countdown timer', 'evergreen countdown timer'] },
+    replaces: ['UABB “Countdown” module (Beaver Builder)', 'Elementor Pro Countdown widget', 'evergreen timer plugins (Deadline Funnel style)', 'embedded third-party countdown widgets'],
+    goodFor:
+      'A real deadline: a sale that ends, an event that starts, a daily order cut-off (onEnd="repeat" every day), a webinar. Evergreen suits an offer that is genuinely held for each visitor for a set time, such as a welcome discount.',
+    notFor:
+      'A deadline that is not real. An evergreen timer that restarts on every visit, or a sale that never ends, is a false urgency claim, and the FTC and UK CMA treat fake countdowns as a deceptive practice; this element keeps a visitor’s evergreen start on return precisely so the deadline stays true. Also not a clock or a stopwatch, and not for the page’s one line of news (announcement-bar has its own “Ends in 2 days” countdown).',
+    props: [
+      { name: 'to', type: "'YYYY-MM-DD' | 'YYYY-MM-DDTHH:MM'", note: 'The end, as the business’s wall clock reads it. A date alone is that day’s midnight. Give `to` or `evergreen`.' },
+      { name: 'timeZone', type: 'string (IANA)', note: 'Required with `to`: “America/Chicago”, not the visitor’s zone. A time inside a spring-forward gap resolves to the jump.' },
+      { name: 'evergreen', type: 'number (minutes)', note: 'Starts on the visitor’s first view; the start instant is stored in localStorage under `key` (never a cookie), so a return shows the same deadline.' },
+      { name: 'key', type: 'string', default: '“countdown-evergreen”', note: 'localStorage key of the evergreen start. Countdowns sharing a key share a deadline; give each offer its own.' },
+      { name: 'units', type: "('days' | 'hours' | 'minutes' | 'seconds')[]", default: 'all four', note: 'The largest shown takes the rest (no days: 51 hours). The smallest rounds up, so it reaches zero exactly at the end.' },
+      { name: 'labels', type: '{ days?, hours?, minutes?, seconds? }', default: 'English', note: 'Each a word, or [singular, plural]: `{ days: [\'día\', \'días\'] }`. For other languages, with `ends`, `endsIn`, `endedText` and `locale`.' },
+      { name: 'style', type: "'square' | 'circle' | 'plain'", default: "'square'", note: 'Boxes, rings whose arc is the unit’s share of its range, or bare digits.' },
+      { name: 'onEnd', type: "'message' | 'hide' | 'repeat'", default: "'message'", note: 'At zero: show `endedText`; remove it; or count again (with `to`, to the next occurrence per `every`; evergreen, a fresh run).' },
+      { name: 'every', type: "'day' | 'week'", note: 'With `to` and onEnd="repeat": the same wall-clock time the next day or week, in `timeZone`, across DST.' },
+      { name: 'endedText', type: 'string', default: '“This offer has ended.”', note: 'Shown at zero with onEnd="message", and the accessible name then.' },
+      { name: 'ends', type: 'string', default: '“Ends”', note: 'Word before the end date: the accessible name and the no-JavaScript line.' },
+      { name: 'endsIn', type: 'string', default: '“Ends in”', note: 'Before an evergreen duration in the no-JavaScript line (“Ends in 30 minutes”).' },
+      { name: 'showEnd', type: 'boolean', default: 'false', note: 'Keep the “Ends Oct 3, 5:00 PM CDT” line visible under the running digits.' },
+      { name: 'locale', type: 'string', default: '“en-US”', note: 'Locale of the end date.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and place it.' },
+    ],
+    theming: [
+      { name: '--cd-bg', fallback: '#1e283c', note: 'style="square" box (14.75:1 with its digits).' },
+      { name: '--cd-fg', fallback: '#fff', note: 'style="square" digits and labels.' },
+      { name: '--cd-text', fallback: 'inherit', note: 'Digits of circle and plain; the end line and the ended message.' },
+      { name: '--cd-label', fallback: 'currentColor at 80–85%', note: 'Unit labels. Keep 4.5:1 if you set it.' },
+      { name: '--cd-ring', fallback: '#5933d8', note: 'style="circle" arc.' },
+      { name: '--cd-track', fallback: 'rgb(127 127 127 / 0.25)', note: 'style="circle" track under the arc.' },
+      { name: '--cd-size', fallback: 'clamp(1.75rem, 6vw, 2.75rem)', note: 'Digit size; circle units scale with it.' },
+      { name: '--cd-radius', fallback: '10px', note: 'Square box corners.' },
+      { name: '--cd-gap', fallback: '0.75rem', note: 'Space between units.' },
+      { name: '--cd-align', fallback: 'center', note: 'justify-content of the units: flex-start to sit left.' },
+      { name: '--cd-font', fallback: 'inherit', note: 'Digit font family; the digits are tabular so they do not jitter.' },
+    ],
+    a11y: [
+      'role="timer", whose implicit aria-live is “off”, with no aria-live attribute: nothing is announced as the digits tick, so a screen reader is never read seconds. The wrapper’s aria-label gives the absolute end, “Ends Oct 3, 5:00 PM CDT”, or `endedText` once ended.',
+      'The digits stay readable when someone navigates into them: each unit is its number and its word, and screen readers get the number unpadded, so it reads “3 days 4 hours”, not “zero three 4”.',
+      'The name changes only when the end does: a daily repeat rolling over, or an evergreen run starting.',
+      'Without JavaScript: the static line “Ends Oct 3, 5:00 PM CDT” in a <time datetime> (an evergreen one reads “Ends in 30 minutes”). The digits from the build’s clock are not shown, because they would be stale and never tick.',
+      'No layout shift: the script placed right after the element shows and corrects the digits before the first paint.',
+      'prefers-reduced-motion: no tick animation on a changing digit and no ring transition; the numbers simply change.',
+      'The square style’s fallback colours clear 4.5:1 (14.75:1); `npm run check` computes it.',
+    ],
+    usage: `<!-- A sale that ends at 5 PM Chicago time, whatever zone the visitor is in. -->
+<h2>The autumn sale ends in</h2>
+<Countdown to="2026-10-03T17:00" timeZone="America/Chicago" endedText="The autumn sale has ended." />
+
+<!-- Today's order cut-off, then tomorrow's, for ever. -->
+<Countdown to="2026-09-28T15:00" timeZone="America/New_York" onEnd="repeat" every="day"
+  style="plain" units={['hours', 'minutes', 'seconds']} />
+
+<!-- 30 minutes per visitor, the same deadline when they come back. -->
+<Countdown evergreen={30} key="welcome-offer" style="circle" units={['minutes', 'seconds']} />
+<!-- .cd { --cd-bg: var(--navy); --cd-fg: var(--white); --cd-ring: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/countdown/ (demo)' }],
+    file: 'src/library/countdown/Countdown.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'content-toggle',
+    name: 'Content toggle',
+    aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch'],
+    summary:
+      'Two labelled versions of one thing, a switch (role="switch") or two pressed buttons between them, and two panels in slots a and b. Optional badge on one label, a choice remembered for the session, and ?<param>= to preselect. Without JavaScript both panels show under their labels as headings.',
+    pitch: 'Let visitors flip between two versions of the same thing — monthly or annual prices, homes or businesses — without leaving the page.',
+    // SE Ranking US, 2026-09-26: toggle content 110/mo, difficulty 27; content switcher 90/18;
+    // css toggle switch 170/16; html toggle switch 90/9. "content toggle" and "pricing toggle"
+    // have no US volume; "toggle switch" 22,400/64 is out of reach and mostly hardware.
+    search: { query: 'toggle content', alsoRanks: ['content switcher', 'css toggle switch', 'html toggle switch'] },
+    replaces: ['UABB “Content Toggle” module (Beaver Builder)', 'PowerPack Content Toggle', 'the monthly/annual toggle of pricing-table plugins'],
+    goodFor:
+      'The pricing page’s monthly or annual switch, and any two versions of the same content a visitor picks between: homes or businesses, metric or imperial, before or during a project. One line of label each side.',
+    notFor:
+      'Tabs. A toggle is two versions of ONE thing switched in place, so the panels share a shape (the same plans, two prices). Three or more views, or two different topics (Features and Reviews), are tabs, which name each panel as a tab and scale past two. Also not for hiding content people need; both panels are one click apart, and without JavaScript both show.',
+    props: [
+      { name: 'labels', type: '[string, string]', note: 'Required. The two states, [a, b]: “Monthly”, “Annual”. They label the switch and head the panels.' },
+      { name: 'slot a / slot b', type: 'slots', note: 'Required. The two panels: `<div slot="a">…</div>` and `<div slot="b">…</div>`.' },
+      { name: 'style', type: "'switch' | 'buttons'", default: "'switch'", note: 'A switch between the two labels, or two pressed buttons for labels too long to sit either side of one.' },
+      { name: 'default', type: "'a' | 'b'", default: "'a'", note: 'Which panel shows first when the URL and the session say nothing.' },
+      { name: 'badge', type: 'string', note: 'A short note on one label: “Save 20%”. The switch is described by it, so it is heard too.' },
+      { name: 'badgeOn', type: "'a' | 'b'", default: "'b'", note: 'Which label carries the badge.' },
+      { name: 'remember', type: 'boolean', default: 'false', note: 'Keep the visitor’s choice for this browser session (sessionStorage).' },
+      { name: 'key', type: 'string', default: '“content-toggle:<param or hash>”', note: 'The sessionStorage key. Toggles sharing a key share the remembered choice.' },
+      { name: 'param', type: 'string', note: 'A URL parameter that preselects: `param="billing"` and a link to `?billing=b` or `?billing=annual` opens on annual. Beats the remembered choice.' },
+      { name: 'label', type: 'string', default: '“<a> or <b>”', note: 'Accessible name of the button group (style="buttons").' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5', default: '3', note: 'Level of each panel’s heading: visible without JavaScript, for screen readers with it.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and place it.' },
+    ],
+    theming: [
+      { name: '--ct-track', fallback: '#5933d8', note: 'Switch track, the same in both states (neither is “off”). 7.27:1 against white.' },
+      { name: '--ct-knob', fallback: '#fff', note: 'Switch knob.' },
+      { name: '--ct-label', fallback: 'currentColor at 75%', note: 'The label not shown. Keep 4.5:1 if you set it.' },
+      { name: '--ct-active', fallback: 'inherit', note: 'The label that is shown (also bold).' },
+      { name: '--ct-pressed-bg', fallback: '#5933d8', note: 'style="buttons": the pressed button (7.27:1 with its text).' },
+      { name: '--ct-pressed-fg', fallback: '#fff', note: 'style="buttons": the pressed button’s text.' },
+      { name: '--ct-border', fallback: '#5933d8', note: 'style="buttons": the outline round both.' },
+      { name: '--ct-badge-bg', fallback: '#dff5e8', note: 'Badge ground (8.19:1 with its text).' },
+      { name: '--ct-badge-fg', fallback: '#0f5132', note: 'Badge text.' },
+      { name: '--ct-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+      { name: '--ct-gap', fallback: '1.25rem', note: 'Space between the switch and the panel.' },
+      { name: '--ct-align', fallback: 'center', note: 'Where the switch sits: flex-start for the left.' },
+    ],
+    a11y: [
+      'style="switch": a native <button role="switch"> named by label b, with aria-checked saying whether b is shown (“Annual, switch, on”) and aria-controls naming both panels. Space and Enter toggle it; clicking either visible label sets it too.',
+      'style="buttons": two <button aria-pressed> in a group named by `label`; exactly one is pressed.',
+      'The badge describes the switch (aria-describedby), so “Save 20%” is heard as well as seen.',
+      'The shown panel keeps its label as a heading for screen readers only, so it is clear which version is on the page; the other panel is hidden, not just covered.',
+      'Without JavaScript both panels render, each under its label as a heading, and the switch (which could not work) is not shown.',
+      'No layout shift: the script right after the element settles it before the first paint. prefers-reduced-motion: the knob jumps instead of sliding and the panel does not fade. In forced-colours mode the track and knob are drawn with system colours.',
+    ],
+    usage: `<ContentToggle labels={['Monthly', 'Annual']} badge="Save 20%" param="billing" remember>
+  <PricingTable slot="a" period="month" />
+  <PricingTable slot="b" period="year" />
+</ContentToggle>
+<!-- A link to /pricing/?billing=annual opens on annual prices. -->
+
+<ContentToggle labels={['For homeowners', 'For businesses and landlords']} style="buttons" label="Who it is for">
+  <div slot="a">…</div>
+  <div slot="b">…</div>
+</ContentToggle>
+<!-- .ct { --ct-track: var(--brand); --ct-pressed-bg: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/content-toggle/ (demo)' }],
+    file: 'src/library/content-toggle/ContentToggle.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'off-canvas',
+    name: 'Off-canvas panel',
+    aka: ['UABB Off-Canvas', 'Elementor Off-Canvas', 'slide-out panel', 'side drawer', 'push menu', 'offcanvas', 'flyout panel', 'slide-in cart'],
+    summary:
+      'A native <dialog> that slides in from the left, right, top or bottom when any data-offcanvas-open trigger asks. Modal by default (backdrop, focus kept in, Escape, scroll lock keeping the scrollbar width), or push: non-modal, publishing --ofc-push for the host to move its page over. Focus returns to the opener. Without JavaScript the panel renders inline where it sits, and its #<id> link jumps to it.',
+    pitch: 'Keep the cart, the filters or the account menu one tap away, sliding in from the edge instead of crowding the page.',
+    // SE Ranking US, 2026-09-26: off canvas 140/mo, difficulty 35; push menu 110/13; off canvas
+    // menu 70/24; slide out panel 70/6. "side drawer" 480/7 and "slide out drawer" 590/19 are
+    // furniture and hardware; "flyout menu" 210/14 is main navigation, mega-menu's ground.
+    search: { query: 'off canvas', alsoRanks: ['off canvas menu', 'slide out panel', 'push menu'] },
+    replaces: ['UABB “Off-Canvas” module (Beaver Builder)', 'Elementor Pro Off-Canvas widget', 'slide-out cart and side-cart plugins', 'push-menu and slide-panel jQuery plugins'],
+    goodFor:
+      'Things that belong beside the page and are wanted now and then: a cart, product filters, an account or secondary menu, a short form (a callback request), a notice, a table of contents on a long page. Push mode suits a panel people keep open while they read, such as notes or a contents list.',
+    notFor:
+      'The site’s main navigation. mega-menu already folds its own links behind a Menu button below its breakpoint, in the header, keeping the nav landmark, aria-current on the page you are on, arrow-key movement and a no-JavaScript fallback; use that for the main menu on every screen size. Use off-canvas for what sits beside that menu (the cart, filters, an account menu), or for a secondary nav on a site whose main menu is plain header links. Also not for a message that must interrupt (that is modal) or content everyone needs (that belongs on the page).',
+    props: [
+      { name: 'id', type: 'string', note: 'Required. Any element with data-offcanvas-open="<id>" opens it; a link to #<id> reaches it without JavaScript.' },
+      { name: 'title', type: 'string', note: 'Required. The panel’s heading and accessible name (aria-labelledby).' },
+      { name: 'hideTitle', type: 'boolean', default: 'false', note: 'Hide the heading visually; it still names the panel.' },
+      { name: 'side', type: "'left' | 'right' | 'top' | 'bottom'", default: "'left'", note: 'The edge it slides from. Left and right take the full height; top and bottom the full width.' },
+      { name: 'mode', type: "'modal' | 'push'", default: "'modal'", note: 'modal: backdrop, page inert, scroll locked. push: non-modal, no backdrop; publishes --ofc-push (its size) and data-ofc-push (its side) on <html> while open.' },
+      { name: 'closeLabel', type: 'string', default: '“Close”', note: 'Name of the 44px close button.' },
+      { name: 'closeOnBackdrop', type: 'boolean', default: 'true', note: 'Close on a click on the backdrop (modal). A text selection dragged out of the panel never closes it.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '2', note: 'Level of the title’s heading.' },
+      { name: 'slot (default)', type: 'slot', note: 'The content: a <nav>, a form, a cart, a promo. A <form method="dialog"> inside closes it on submit.' },
+      { name: 'class', type: 'string', note: 'Class on the <dialog>, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--ofc-size', fallback: 'min(22rem, 88vw) · auto', note: 'Width of a left or right panel; height of a top or bottom one (at most 85dvh).' },
+      { name: '--ofc-bg', fallback: '#fff', note: 'The panel (14.75:1 with its text).' },
+      { name: '--ofc-fg', fallback: '#1e283c', note: 'Text in the panel.' },
+      { name: '--ofc-backdrop', fallback: 'rgb(15 20 35 / 0.55)', note: 'Behind a modal panel.' },
+      { name: '--ofc-shadow', fallback: '0 0 3rem rgb(0 0 0 / 0.25)', note: 'The panel’s shadow.' },
+      { name: '--ofc-padding', fallback: 'clamp(1rem, 4vw, 1.5rem)', note: 'Inside the panel.' },
+      { name: '--ofc-close-bg', fallback: 'transparent', note: 'Close button fill (a faint grey on hover).' },
+      { name: '--ofc-close-fg', fallback: 'currentColor', note: 'Close icon.' },
+      { name: '--ofc-focus', fallback: 'currentColor', note: 'Focus ring inside the panel.' },
+      { name: '--ofc-z', fallback: '110', note: 'Stacking of a push panel, below the cookie-consent bar (120). A modal panel is in the browser’s top layer, like every modal dialog.' },
+      { name: '--ofc-duration', fallback: '0.28s', note: 'Slide time; none under reduced motion.' },
+      { name: '--ofc-border', fallback: '#dfe3ea', note: 'Border of the inline panel without JavaScript.' },
+      { name: '--ofc-push', fallback: '(published)', note: 'Set BY the element on <html> in push mode: the panel’s width (or height), 0px when closed. The host moves its page: html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }' },
+    ],
+    a11y: [
+      'A native <dialog> named by its title (aria-labelledby). Modal mode uses showModal(): the page is inert, Tab stays in the panel, Escape closes it, and the page does not scroll underneath, with the scrollbar’s width kept so nothing shifts.',
+      'Push mode is non-modal (show()): the page stays usable beside it, and Escape closes it while focus is in the panel or on its trigger.',
+      'Triggers get aria-controls and aria-expanded (and aria-haspopup="dialog" in modal mode). A trigger that is not a link or button gets role="button" and tabindex="0" and opens on Enter or Space.',
+      'Focus moves into the panel on open and returns to the opener on close. The close button is a real 44px <button> named by closeLabel. A backdrop click closes a modal panel; a text selection dragged out of it does not.',
+      'Without JavaScript the panel renders inline, visible, under its heading, at its place in the page; a link trigger to #<id> jumps to it; the close button, which could not work, is not shown.',
+      'prefers-reduced-motion: the panel appears and goes at once, with no slide and no backdrop fade.',
+    ],
+    usage: `<!-- A link keeps working without JavaScript: it jumps to the panel, which then reads inline. -->
+<a href="#cart" data-offcanvas-open="cart">Cart (2)</a>
+<OffCanvas id="cart" title="Your cart" side="right">
+  <CartSummary />
+</OffCanvas>
+
+<!-- Push: the page moves over by the panel's width. -->
+<button type="button" data-offcanvas-open="contents">Contents</button>
+<OffCanvas id="contents" title="On this page" mode="push">…</OffCanvas>
+<!-- global.css:
+  .ofc { --ofc-bg: var(--white); --ofc-fg: var(--ink); }
+  .site { transition: translate 0.28s; }
+  html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }
+  @media (prefers-reduced-motion: reduce) { .site { transition: none; } } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/off-canvas/ (demo)' }],
+    file: 'src/library/off-canvas/OffCanvas.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

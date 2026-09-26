@@ -1,0 +1,104 @@
+---
+/**
+ * Demo for `content-toggle`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Two toggles:
+ *   - the pricing case: Monthly / Annual on a switch, a "Save 20%" badge on Annual, remembered
+ *     for the session and preselected by ?billing=annual (or =b) in the address;
+ *   - long labels on two pressed buttons: the same service for homes and for businesses.
+ * The prices are invented and link nowhere.
+ */
+import ContentToggle from '../../library/content-toggle/ContentToggle.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+const plans = [
+  { name: 'Starter', month: 12, note: 'One site, email support' },
+  { name: 'Studio', month: 29, note: 'Five sites, a shared library' },
+  { name: 'Agency', month: 79, note: 'Unlimited sites, priority help' },
+];
+---
+<div class="demo-ct">
+  <ContentToggle labels={['Monthly', 'Annual']} badge="Save 20%" param="billing" remember key="demo-ct-billing">
+    <ul slot="a" class="demo-ct__plans">
+      {
+        plans.map((p) => (
+          <li class="demo-ct__plan">
+            <strong>{p.name}</strong>
+            <span class="demo-ct__price">${p.month}<small>/month</small></span>
+            <span>{p.note}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <ul slot="b" class="demo-ct__plans">
+      {
+        plans.map((p) => (
+          <li class="demo-ct__plan">
+            <strong>{p.name}</strong>
+            <span class="demo-ct__price">${Math.round(p.month * 12 * 0.8)}<small>/year</small></span>
+            <span>{p.note}; two months free</span>
+          </li>
+        ))
+      }
+    </ul>
+  </ContentToggle>
+
+  <div class="demo-ct__box">
+    <ContentToggle labels={['For homeowners', 'For businesses and landlords']} style="buttons" label="Who it is for" headingLevel={4}>
+      <div slot="a">
+        <p>A survey of your home within the week, a written quote, and one person to call from start to finish.</p>
+      </div>
+      <div slot="b">
+        <p>Planned maintenance across every property you manage, one invoice a month, and a report your insurer accepts.</p>
+      </div>
+    </ContentToggle>
+  </div>
+</div>
+
+<style>
+  .demo-ct {
+    display: grid;
+    gap: 2rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-ct__plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .demo-ct__plan {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1.1rem 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+    text-align: center;
+  }
+  .demo-ct__price {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--purple-dark, #3f1fb0);
+  }
+  .demo-ct__price small {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink, #1e283c);
+  }
+  .demo-ct__box {
+    padding: 1.25rem 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-ct__box p {
+    margin: 0;
+    text-align: center;
+  }
+</style>

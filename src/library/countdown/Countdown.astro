@@ -1,0 +1,615 @@
+---
+/**
+ * Countdown — days, hours, minutes and seconds to a moment: the end of a sale, the start of an
+ * event, today's order cut-off. UABB's Countdown module, Elementor Pro's Countdown and the
+ * "evergreen" timers of the funnel plugins.
+ *
+ * Two kinds of end:
+ *   - `to`: a wall-clock time in the business's `timeZone` (IANA, required): "YYYY-MM-DD" (that
+ *     day's midnight there) or "YYYY-MM-DDTHH:MM". Same rules as announcement-bar, whose
+ *     `<anb-time>` parser this file copies (elements never import each other).
+ *   - `evergreen`: a number of minutes that starts per visitor, on their first view. The start
+ *     instant is stored in localStorage under `key` (never a cookie), so a returning visitor
+ *     sees the same deadline, not a fresh one. Every countdown sharing a `key` shares a start.
+ *
+ * When it reaches zero, `onEnd`: 'message' (default) swaps the digits for `endedText`; 'hide'
+ * removes it; 'repeat' counts to the next occurrence: with `to`, the same wall-clock time the
+ * next day or week (`every`) in the business's zone, across DST; with `evergreen`, a fresh run
+ * from that moment.
+ *
+ * role="timer", whose implicit aria-live is "off", and no aria-live attribute: nothing is
+ * announced as the digits tick, so a screen reader is never read seconds. The wrapper's
+ * aria-label gives the absolute end ("Ends Oct 3, 5:00 PM CDT"), or `endedText` once ended, and
+ * changes only when the end itself does (a repeat, an evergreen start). The digits stay
+ * readable for someone who navigates into them: each unit is its number and its word, with the
+ * zero-padded number hidden from screen readers and an unpadded copy read instead, so it reads
+ * "3 days 4 hours", not "zero three 4".
+ *
+ * No layout shift: the digits are rendered from the build's clock, hidden, and the inline script
+ * placed right after the element shows and corrects them while the parser is still there,
+ * before the first paint. Without JavaScript the visitor gets the static line "Ends Oct 3,
+ * 5:00 PM CDT" in a <time datetime>, not digits from the build's clock that would be stale and
+ * never tick. (An evergreen countdown has no date before it starts; its line reads "Ends in 30
+ * minutes".)
+ *
+ * prefers-reduced-motion: no tick animation on a changing digit, no ring transition.
+ * Ticks once a second when seconds are shown, on the minute otherwise; stops in hidden tabs.
+ *
+ * ONE copy of the time logic: `countdownTime()` is used by the build and, serialised with
+ * toString(), by the browser; scripts/check-time-and-toggles.mjs runs the source between the
+ * `<cd-time>` markers in Node against golden cases. It must reference nothing but language
+ * globals.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --cd-bg / --cd-fg     style="square" box and its digits          (#1e283c / #fff, 14.75:1)
+ *   --cd-text             digits of circle and plain; ended message  (inherit)
+ *   --cd-label            unit labels                                (inherit, at 80%)
+ *   --cd-ring / --cd-track  style="circle" arc and its track         (#5933d8 / rgb(127 127 127 / 0.25))
+ *   --cd-size             digit size                                 (clamp(1.75rem, 6vw, 2.75rem))
+ *   --cd-radius           square box corners                         (10px)
+ *   --cd-gap              space between units                        (0.75rem)
+ *   --cd-align            flex alignment of the units                (center)
+ *   --cd-font             digit font family                          (inherit)
+ */
+
+// <cd-time>
+export function countdownTime() {
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+  const UNITS = ['days', 'hours', 'minutes', 'seconds'];
+  const SIZE: Record<string, number> = { days: 864e5, hours: 36e5, minutes: 6e4, seconds: 1e3 };
+  const fmts = new Map();
+  const parts = (ms: number, tz: string) => {
+    let f = fmts.get(tz);
+    if (!f) {
+      f = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+      fmts.set(tz, f);
+    }
+    const p: Record<string, number> = {};
+    for (const x of f.formatToParts(ms)) if (x.type !== 'literal') p[x.type] = +x.value;
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute);
+  };
+  /** "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM", and a real date and time. */
+  const valid = (s: string) => {
+    if (typeof s !== 'string' || !(DATE.test(s) || DATETIME.test(s))) return false;
+    const [d, t = '00:00'] = s.split('T');
+    const [y, mo, da] = d.split('-').map(Number);
+    const [h, mi] = t.split(':').map(Number);
+    const back = new Date(Date.UTC(y, mo - 1, da)).toISOString().slice(0, 10);
+    return back === d && h < 24 && mi < 60;
+  };
+  /** The instant at which `tz`'s wall clock reads `s` ("YYYY-MM-DD" = its midnight). A time in a
+   * spring-forward gap resolves to the jump (02:30 that does not exist is 03:30). */
+  const instant = (s: string, tz: string) => {
+    const [d, t = '00:00'] = s.split('T');
+    const [y, mo, da] = d.split('-').map(Number);
+    const [h, mi] = t.split(':').map(Number);
+    const target = Date.UTC(y, mo - 1, da, h, mi);
+    let ms = target;
+    // Walk the guess by how far tz's wall clock is from the target; twice covers a DST edge.
+    for (let i = 0; i < 3; i++) {
+      const off = parts(ms, tz) - target;
+      if (!off) break;
+      ms -= off;
+    }
+    return ms;
+  };
+  const addDays = (d: string, n: number) => {
+    const [y, m, day] = d.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, day + n)).toISOString().slice(0, 10);
+  };
+  /** The end to count to at `ms`: `to` itself until it passes; with `every`, then the next
+   * occurrence of the same wall-clock time, a day or a week on, in `tz`. */
+  const next = (ms: number, to: string, tz: string, every?: string | null) => {
+    const first = instant(to, tz);
+    if (!every || ms < first) return first;
+    const step = every === 'week' ? 7 : 1;
+    const [d, t = '00:00'] = to.split('T');
+    // Days differ in length by an hour at most, so this lands on or just before the answer.
+    let k = Math.max(0, Math.floor((ms - first) / (step * 864e5)) - 1);
+    for (;;) {
+      const at = instant(`${addDays(d, k * step)}T${t}`, tz);
+      if (at > ms) return at;
+      k++;
+    }
+  };
+  /** Time left, split over the units shown. The largest shown unit takes everything above it
+   * (no days: 51 hours), and the smallest is rounded UP, so it never reads zero while time is
+   * left and reaches zero exactly at the end. */
+  const split = (left: number, units: string[]) => {
+    const shown = UNITS.filter((u) => units.includes(u));
+    const unit = SIZE[shown[shown.length - 1]];
+    let rest = Math.max(0, Math.ceil(left / unit)) * unit;
+    const out: Record<string, number> = {};
+    for (const u of shown) {
+      out[u] = Math.floor(rest / SIZE[u]);
+      rest -= out[u] * SIZE[u];
+    }
+    return out;
+  };
+  /** An evergreen run: a stored start that is a past instant is kept, anything else starts now.
+   * `store` says the caller must write `start`. */
+  const evergreen = (stored: string | null, now: number, minutes: number) => {
+    const n = stored === null || stored === '' ? NaN : Number(stored);
+    const keep = Number.isFinite(n) && n > 0 && n <= now;
+    const start = keep ? n : now;
+    return { start, end: start + minutes * 6e4, store: !keep };
+  };
+  /** "2 days 4 hours", "3 hours 12 minutes", "30 minutes": for the evergreen line without JS. */
+  const duration = (ms: number, labels: Record<string, string[]>) => {
+    const m = Math.ceil(ms / 6e4);
+    const u = (n: number, k: string) => `${n} ${labels[k][n === 1 ? 0 : 1]}`;
+    const d = Math.floor(m / 1440);
+    const h = Math.floor((m % 1440) / 60);
+    const mm = m % 60;
+    if (d) return h ? `${u(d, 'days')} ${u(h, 'hours')}` : u(d, 'days');
+    if (h) return mm ? `${u(h, 'hours')} ${u(mm, 'minutes')}` : u(h, 'hours');
+    return u(mm, 'minutes');
+  };
+  /** "Oct 3, 5:00 PM CDT": the end as the business's clock reads it (the visitor's without a zone). */
+  const endText = (ms: number, tz: string | null, locale: string) =>
+    new Intl.DateTimeFormat(locale, { timeZone: tz || undefined, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(ms);
+  return { UNITS, valid, instant, next, split, evergreen, duration, endText };
+}
+// </cd-time>
+
+/**
+ * The browser side. Mounts one countdown right after it has been parsed (before first paint)
+ * and ticks every mounted one from a single timer. Serialised into the inline script together
+ * with countdownTime().
+ */
+function countdownClient(time: ReturnType<typeof countdownTime>) {
+  interface Cfg {
+    to: string | null;
+    tz: string | null;
+    every: string | null;
+    evergreen: number | null;
+    key: string;
+    units: string[];
+    onEnd: 'message' | 'hide' | 'repeat';
+    locale: string;
+    ends: string;
+    ended: string;
+  }
+  interface El extends HTMLElement {
+    cdCfg?: Cfg;
+    cdEnd?: number;
+    cdStart?: number;
+    cdTop?: number;
+    cdDone?: boolean;
+  }
+  const els = new Set<El>();
+  const mem: Record<string, string> = {};
+  let timer = 0;
+  const RANGE: Record<string, number> = { hours: 24, minutes: 60, seconds: 60 };
+  const get = (k: string) => {
+    try {
+      return localStorage.getItem(k) ?? mem[k] ?? null;
+    } catch {
+      return mem[k] ?? null;
+    }
+  };
+  const set = (k: string, v: string | null) => {
+    if (v === null) delete mem[k];
+    else mem[k] = v;
+    try {
+      if (v === null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+    } catch {}
+  };
+  const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+
+  const endFor = (el: El, now: number) => {
+    const c = el.cdCfg!;
+    if (c.evergreen !== null) {
+      if (el.cdStart === undefined) {
+        const run = time.evergreen(get(c.key), now, c.evergreen);
+        el.cdStart = run.start;
+        if (run.store) set(c.key, String(run.start));
+      }
+      let end = el.cdStart + c.evergreen * 6e4;
+      if (now >= end && c.onEnd === 'repeat') {
+        el.cdStart = now;
+        set(c.key, String(now));
+        end = now + c.evergreen * 6e4;
+      }
+      return end;
+    }
+    return time.next(now, c.to!, c.tz!, c.onEnd === 'repeat' ? c.every : null);
+  };
+
+  const update = (el: El) => {
+    const c = el.cdCfg!;
+    const now = Date.now();
+    const end = endFor(el, now);
+    const units = el.querySelector<HTMLElement>('[data-cd-units]')!;
+    const endsLine = el.querySelector<HTMLElement>('[data-cd-ends]');
+    const endedLine = el.querySelector<HTMLElement>('[data-cd-ended]');
+    if (now >= end) {
+      el.cdDone = true;
+      els.delete(el);
+      if (c.onEnd === 'hide') {
+        el.hidden = true;
+        return;
+      }
+      units.hidden = true;
+      if (endsLine) endsLine.hidden = true;
+      if (endedLine) endedLine.hidden = false;
+      el.setAttribute('aria-label', c.ended);
+      return;
+    }
+    if (end !== el.cdEnd) {
+      el.cdEnd = end;
+      const text = time.endText(end, c.evergreen !== null ? null : c.tz, c.locale);
+      el.setAttribute('aria-label', `${c.ends} ${text}`);
+      const t = endsLine?.querySelector('time');
+      if (t) {
+        t.dateTime = new Date(end).toISOString();
+        t.textContent = text;
+      }
+      const lead = endsLine?.querySelector('[data-cd-lead]');
+      if (lead) lead.textContent = c.ends;
+      el.cdTop = undefined;
+    }
+    units.hidden = false;
+    if (endedLine) endedLine.hidden = true;
+    const values = time.split(end - now, c.units);
+    const top = c.units[0];
+    if (el.cdTop === undefined) el.cdTop = Math.max(1, values[top]);
+    for (const u of c.units) {
+      const box = units.querySelector<HTMLElement>(`[data-cd-unit="${u}"]`);
+      if (!box) continue;
+      const v = values[u];
+      const num = box.querySelector<HTMLElement>('[data-cd-num]')!;
+      const sr = box.querySelector<HTMLElement>('[data-cd-sr]');
+      if (sr && sr.textContent !== String(v)) sr.textContent = String(v);
+      const s = pad(v);
+      if (num.textContent !== s) {
+        num.textContent = s;
+        num.classList.remove('cd__num--tick');
+        void num.offsetWidth; // restart the tick
+        num.classList.add('cd__num--tick');
+      }
+      const label = box.querySelector<HTMLElement>('[data-cd-label]');
+      if (label) {
+        const pair = (label.dataset.cdLabel || '').split('|');
+        label.textContent = pair[v === 1 ? 0 : 1] ?? pair[0];
+      }
+      const arc = box.querySelector<SVGCircleElement>('[data-cd-arc]');
+      if (arc) {
+        const range = u === top ? el.cdTop : RANGE[u];
+        arc.style.strokeDasharray = `${Math.min(100, (v / range) * 100).toFixed(2)} 100`;
+      }
+    }
+  };
+
+  const seconds = () => [...els].some((el) => el.cdCfg!.units.includes('seconds'));
+  const schedule = () => {
+    clearTimeout(timer);
+    if (document.hidden || !els.size) return;
+    const step = seconds() ? 1000 : 60000;
+    timer = window.setTimeout(
+      () => {
+        els.forEach(update);
+        schedule();
+      },
+      step - (Date.now() % step) + 15,
+    );
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return clearTimeout(timer);
+    els.forEach(update);
+    schedule();
+  });
+
+  const mount = (el: El | null) => {
+    if (!el || el.cdCfg) return;
+    try {
+      el.cdCfg = JSON.parse(el.dataset.cd || '{}');
+    } catch {
+      return;
+    }
+    el.classList.add('cd--live');
+    els.add(el);
+    update(el);
+    schedule();
+  };
+
+  return {
+    mount,
+    /** Forget evergreen starts (all, or one key) and start those countdowns again. For reviewers and tests. */
+    reset: (key?: string) => {
+      document.querySelectorAll<El>('[data-cd]').forEach((el) => {
+        const c = el.cdCfg;
+        if (!c || c.evergreen === null || (key && c.key !== key)) return;
+        set(c.key, null);
+        el.cdStart = undefined;
+        el.cdEnd = undefined;
+        el.cdDone = false;
+        el.hidden = false;
+        els.add(el);
+        update(el);
+      });
+      schedule();
+    },
+  };
+}
+
+type Unit = 'days' | 'hours' | 'minutes' | 'seconds';
+interface Props {
+  /** The end, as the business's wall clock reads it: "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM". */
+  to?: string;
+  /** IANA zone of that wall clock, e.g. "America/Chicago". Required with `to`. */
+  timeZone?: string;
+  /** Minutes from the visitor's first view instead of `to`. Stored per visitor in localStorage. */
+  evergreen?: number;
+  /** localStorage key of the evergreen start. Default "countdown-evergreen". */
+  key?: string;
+  /** Which units to show, largest first. Default all four. */
+  units?: Unit[];
+  /** Unit labels, singular and plural (or one word for both), for other languages. */
+  labels?: Partial<Record<Unit, string | [string, string]>>;
+  /** Default square. */
+  style?: 'square' | 'circle' | 'plain';
+  /** At zero: show `endedText` (default), hide, or count to the next occurrence. */
+  onEnd?: 'message' | 'hide' | 'repeat';
+  /** With `to` and onEnd="repeat": the same wall-clock time every day or every week. */
+  every?: 'day' | 'week';
+  /** Shown, and the accessible name, once it has ended. Default "This offer has ended." */
+  endedText?: string;
+  /** The word before the end date: "Ends Oct 3, 5:00 PM CDT". Default "Ends". */
+  ends?: string;
+  /** The words before an evergreen duration without JavaScript. Default "Ends in". */
+  endsIn?: string;
+  /** Keep the "Ends <date>" line visible under the digits too. Default false. */
+  showEnd?: boolean;
+  /** Locale of the end date. Default "en-US". */
+  locale?: string;
+  class?: string;
+}
+
+const {
+  to,
+  timeZone,
+  evergreen,
+  key = 'countdown-evergreen',
+  units: unitsProp = ['days', 'hours', 'minutes', 'seconds'],
+  labels = {},
+  style = 'square',
+  onEnd = 'message',
+  every,
+  endedText = 'This offer has ended.',
+  ends = 'Ends',
+  endsIn = 'Ends in',
+  showEnd = false,
+  locale = 'en-US',
+  class: className,
+} = Astro.props;
+
+const time = countdownTime();
+if ((to === undefined) === (evergreen === undefined)) throw new Error('Countdown: give it `to` (a date in `timeZone`) or `evergreen` (minutes per visitor), one of the two.');
+if (to !== undefined) {
+  if (!time.valid(to)) throw new Error(`Countdown: to "${to}" is not "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" (a real date and time).`);
+  if (!timeZone) throw new Error('Countdown: `to` is a wall-clock time; say whose with `timeZone` (e.g. "America/Chicago").');
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+  } catch {
+    throw new Error(`Countdown: timeZone "${timeZone}" is not an IANA zone.`);
+  }
+}
+if (evergreen !== undefined && !(Number.isFinite(evergreen) && evergreen > 0)) throw new Error('Countdown: evergreen is a number of minutes above 0.');
+if (!['square', 'circle', 'plain'].includes(style)) throw new Error(`Countdown: style "${style}" is not square, circle or plain.`);
+if (!['message', 'hide', 'repeat'].includes(onEnd)) throw new Error(`Countdown: onEnd "${onEnd}" is not message, hide or repeat.`);
+if (every !== undefined && !['day', 'week'].includes(every)) throw new Error(`Countdown: every "${every}" is not day or week.`);
+if (to !== undefined && onEnd === 'repeat' && !every) throw new Error('Countdown: onEnd="repeat" with `to` needs `every` ("day" or "week").');
+if (every && (onEnd !== 'repeat' || evergreen !== undefined)) throw new Error('Countdown: `every` goes with `to` and onEnd="repeat" only (an evergreen repeat simply starts again).');
+const units = time.UNITS.filter((u) => (unitsProp as string[]).includes(u)) as Unit[];
+if (!units.length || units.length !== unitsProp.length) throw new Error(`Countdown: units must be some of days, hours, minutes, seconds, each once; got ${JSON.stringify(unitsProp)}.`);
+
+const DEFAULT_LABELS: Record<Unit, [string, string]> = { days: ['day', 'days'], hours: ['hour', 'hours'], minutes: ['minute', 'minutes'], seconds: ['second', 'seconds'] };
+const pairs = Object.fromEntries(
+  time.UNITS.map((u) => {
+    const l = labels[u as Unit];
+    return [u, l === undefined ? DEFAULT_LABELS[u as Unit] : typeof l === 'string' ? [l, l] : l];
+  }),
+) as Record<Unit, [string, string]>;
+
+// The build's clock decides the no-JavaScript render and the first frame; the script re-decides.
+const now = Date.now();
+const tz = timeZone ?? null;
+const endAtBuild = to !== undefined ? time.next(now, to, tz!, onEnd === 'repeat' ? every : null) : now + evergreen! * 6e4;
+const endedAtBuild = to !== undefined && now >= endAtBuild;
+const endLine = to !== undefined ? time.endText(endAtBuild, tz, locale) : '';
+const label = endedAtBuild ? endedText : to !== undefined ? `${ends} ${endLine}` : `${endsIn} ${time.duration(evergreen! * 6e4, pairs)}`;
+const values = time.split(Math.max(0, endAtBuild - now), units);
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__cdCount as number) || 0) + 1;
+locals.__cdCount = n;
+const config = JSON.stringify({
+  to: to ?? null,
+  tz,
+  every: every ?? null,
+  evergreen: evergreen ?? null,
+  key,
+  units,
+  onEnd,
+  locale,
+  ends,
+  ended: endedText,
+});
+// Defined once per page; each countdown calls mount on itself from the script right after it.
+const define = `window.__superheroCountdown=window.__superheroCountdown||(${countdownClient.toString()})((${countdownTime.toString()})());`;
+const mountScript = `${n === 1 ? define : ''}window.__superheroCountdown.mount(document.currentScript.previousElementSibling);`;
+---
+
+<div
+  class:list={['cd', `cd--${style}`, { 'cd--show-end': showEnd }, className]}
+  role="timer"
+  aria-label={label}
+  data-cd={config}
+  hidden={endedAtBuild && onEnd === 'hide'}
+>
+  <div class="cd__units" data-cd-units hidden>
+    {
+      units.map((u) => (
+        <div class="cd__unit" data-cd-unit={u}>
+          {style === 'circle' && (
+            <svg class="cd__ring" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+              <circle class="cd__track" cx="50" cy="50" r="46" pathLength="100" />
+              <circle class="cd__arc" cx="50" cy="50" r="46" pathLength="100" data-cd-arc />
+            </svg>
+          )}
+          <span class="cd__num" aria-hidden="true" data-cd-num>{String(values[u]).padStart(2, '0')}</span>
+          <span class="cd__sr" data-cd-sr>{values[u]}</span>{' '}
+          <span class="cd__label" data-cd-label={pairs[u].join('|')}>{pairs[u][values[u] === 1 ? 0 : 1]}</span>
+        </div>
+      ))
+    }
+  </div>
+  {
+    to !== undefined ? (
+      <p class="cd__ends" data-cd-ends hidden={endedAtBuild}>
+        <span data-cd-lead>{ends}</span> <time datetime={new Date(endAtBuild).toISOString()}>{endLine}</time>
+      </p>
+    ) : (
+      <p class="cd__ends" data-cd-ends>
+        <span data-cd-lead>{endsIn}</span> <time datetime={`PT${evergreen}M`}>{time.duration(evergreen! * 6e4, pairs)}</time>
+      </p>
+    )
+  }
+  <p class="cd__ended" data-cd-ended hidden={!endedAtBuild}>{endedText}</p>
+</div>
+<script is:inline set:html={mountScript} />
+
+<style>
+  .cd {
+    color: var(--cd-text, inherit);
+    text-align: center;
+  }
+  .cd[hidden],
+  .cd [hidden] {
+    display: none !important;
+  }
+  .cd__units {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: var(--cd-align, center);
+    gap: var(--cd-gap, 0.75rem);
+  }
+  .cd__unit {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    min-width: 4.5rem;
+  }
+  /* The unpadded number, for screen readers only; the padded one is what is seen. */
+  .cd__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .cd__num {
+    display: block;
+    font-family: var(--cd-font, inherit);
+    font-size: var(--cd-size, clamp(1.75rem, 6vw, 2.75rem));
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .cd__label {
+    letter-spacing: 0.04em;
+    /* Small capitals, not text-transform: uppercase, which Chrome passes to screen readers as "DAYS". */
+    font-variant-caps: all-small-caps;
+    font-size: 0.95rem;
+    color: var(--cd-label, color-mix(in srgb, currentColor 80%, transparent));
+  }
+  .cd__ends,
+  .cd__ended {
+    margin: 0;
+  }
+  .cd__ends time {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .cd__ended {
+    font-weight: 700;
+  }
+  /* With the digits running, the end line is for the no-JavaScript render unless asked for. */
+  .cd--live:not(.cd--show-end) .cd__ends {
+    display: none;
+  }
+  .cd--show-end .cd__ends {
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  /* ---- square */
+  .cd--square .cd__unit {
+    box-sizing: border-box;
+    padding: 0.7rem 0.6rem 0.6rem;
+    border-radius: var(--cd-radius, 10px);
+    background: var(--cd-bg, #1e283c);
+    color: var(--cd-fg, #fff);
+  }
+  .cd--square .cd__label {
+    color: var(--cd-label, color-mix(in srgb, var(--cd-fg, #fff) 85%, transparent));
+  }
+
+  /* ---- circle: the number inside a ring whose arc is the unit's share of its range */
+  .cd--circle .cd__unit {
+    width: calc(var(--cd-size, clamp(1.75rem, 6vw, 2.75rem)) * 2.6);
+    aspect-ratio: 1;
+    min-width: 0;
+  }
+  .cd__ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    rotate: -90deg;
+  }
+  .cd__ring circle {
+    fill: none;
+    stroke-width: 5;
+  }
+  .cd__track {
+    stroke: var(--cd-track, rgb(127 127 127 / 0.25));
+  }
+  .cd__arc {
+    stroke: var(--cd-ring, #5933d8);
+    stroke-linecap: round;
+    stroke-dasharray: 100 100;
+  }
+  .cd--circle .cd__num,
+  .cd--circle .cd__label {
+    position: relative;
+  }
+
+  /* ---- plain: digits and labels, nothing around them */
+  .cd--plain .cd__unit {
+    min-width: 3.5rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cd__num--tick {
+      animation: cd-tick 0.3s ease-out;
+    }
+    .cd__arc {
+      transition: stroke-dasharray 0.4s ease;
+    }
+  }
+  @keyframes cd-tick {
+    from {
+      opacity: 0.2;
+      transform: translateY(-0.25em);
+    }
+  }
+</style>

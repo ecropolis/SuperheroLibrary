@@ -1,0 +1,176 @@
+---
+/**
+ * Demo for `off-canvas`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Four panels: a secondary menu from the left, filters from the right (a form whose button
+ * closes the panel), a notice from the bottom, and a push panel from the left. The push panel
+ * moves only this demo's mock page over by --ofc-push, as a host would move its own page
+ * wrapper; it does not move the gallery or the website around it.
+ *
+ * Every trigger is a link to #<id>, so without JavaScript each panel below is reached by its
+ * link and reads inline. Nothing here is sent anywhere.
+ */
+import OffCanvas from '../../library/off-canvas/OffCanvas.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+---
+<div class="demo-ofc">
+  <div class="demo-ofc__stage">
+    <p class="demo-ofc__lead">Open a panel from each edge. Escape, the × or a click outside closes it, and focus comes back here.</p>
+    <div class="demo-ofc__row">
+      <a class="demo-ofc__btn" href="#demo-ofc-menu" data-offcanvas-open="demo-ofc-menu">Menu, from the left</a>
+      <a class="demo-ofc__btn" href="#demo-ofc-filters" data-offcanvas-open="demo-ofc-filters">Filters, from the right</a>
+      <a class="demo-ofc__btn" href="#demo-ofc-notice" data-offcanvas-open="demo-ofc-notice">Notice, from the bottom</a>
+      <a class="demo-ofc__btn demo-ofc__btn--quiet" href="#demo-ofc-notes" data-offcanvas-open="demo-ofc-notes">Notes that push the page</a>
+    </div>
+    <div class="demo-ofc__lines" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>
+</div>
+
+<OffCanvas id="demo-ofc-menu" title="Browse" side="left">
+  <nav aria-label="Browse">
+    <ul class="demo-ofc__links">
+      <li><a href="#demo-ofc-menu">New this week</a></li>
+      <li><a href="#demo-ofc-menu">Gift cards</a></li>
+      <li><a href="#demo-ofc-menu">Your orders</a></li>
+      <li><a href="#demo-ofc-menu">Help and returns</a></li>
+    </ul>
+  </nav>
+</OffCanvas>
+
+<OffCanvas id="demo-ofc-filters" title="Filter the results" side="right" closeLabel="Close the filters">
+  <form method="dialog" class="demo-ofc__form">
+    <fieldset>
+      <legend>Size</legend>
+      <label><input type="checkbox" name="size" value="s" /> Small</label>
+      <label><input type="checkbox" name="size" value="m" checked /> Medium</label>
+      <label><input type="checkbox" name="size" value="l" /> Large</label>
+    </fieldset>
+    <fieldset>
+      <legend>In stock</legend>
+      <label><input type="radio" name="stock" value="any" checked /> Show everything</label>
+      <label><input type="radio" name="stock" value="now" /> Ships today</label>
+    </fieldset>
+    <button class="demo-ofc__btn" type="submit">Show 24 results</button>
+  </form>
+</OffCanvas>
+
+<OffCanvas id="demo-ofc-notice" title="Opening hours this week" side="bottom">
+  <p>We close at 3 PM on Friday for the staff party, and open as usual on Saturday.</p>
+</OffCanvas>
+
+<OffCanvas id="demo-ofc-notes" title="Notes" side="left" mode="push" closeLabel="Close the notes">
+  <p>A push panel is not modal: the page beside it still works, and it publishes its width as <code>--ofc-push</code> for the page to move over by.</p>
+  <p>Escape closes it while focus is in here or on its button.</p>
+</OffCanvas>
+
+<style>
+  .demo-ofc {
+    overflow: hidden;
+    color: var(--ink, #1e283c);
+  }
+  .demo-ofc__stage {
+    padding: 1.25rem 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  /* What a host does with push mode, on this demo's mock page only. */
+  :global(html[data-ofc-push='left']) .demo-ofc__stage {
+    translate: min(var(--ofc-push, 0px), 40%) 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .demo-ofc__stage {
+      transition: translate 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+  }
+  .demo-ofc__lead {
+    margin: 0 0 1rem;
+  }
+  .demo-ofc__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .demo-ofc__btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .demo-ofc__btn--quiet {
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+  }
+  .demo-ofc__btn:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 3px;
+  }
+  .demo-ofc__lines {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+  }
+  .demo-ofc__lines i {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--tint, #f3f1fc);
+  }
+  .demo-ofc__lines i:nth-child(2n) {
+    width: 70%;
+  }
+  .demo-ofc__links {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .demo-ofc__links a {
+    display: block;
+    padding: 0.7rem 0.25rem;
+    border-bottom: 1px solid var(--line, #dfe3ea);
+    color: inherit;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .demo-ofc__links a:hover {
+    color: var(--purple-dark, #3f1fb0);
+  }
+  .demo-ofc__form {
+    display: grid;
+    gap: 1rem;
+  }
+  .demo-ofc__form fieldset {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.75rem 1rem 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: 10px;
+  }
+  .demo-ofc__form legend {
+    padding: 0 0.25rem;
+    font-weight: 700;
+  }
+  .demo-ofc__form label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+  }
+  .demo-ofc__form button {
+    justify-self: start;
+  }
+</style>

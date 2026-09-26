@@ -1,0 +1,406 @@
+---
+/**
+ * ContentToggle — one switch between two versions of the same content: monthly or annual
+ * prices, homes or businesses, metric or imperial. UABB's Content Toggle, PowerPack's Content
+ * Toggle and the "pricing toggle" of every pricing-table plugin.
+ *
+ * Two labelled states, `labels: [a, b]`, and two panels, the slots `a` and `b`.
+ *   - style="switch" (default): the labels sit either side of a <button role="switch">. The
+ *     switch is named by label b and `aria-checked` says whether b is shown ("Annual, switch,
+ *     on"); clicking either label also sets it. Space and Enter toggle it.
+ *   - style="buttons": two <button aria-pressed> in a named group, for labels too long to sit
+ *     either side of a switch. Pressing the pressed one leaves it pressed.
+ * `badge` puts a short note on one label ("Save 20%", `badgeOn` 'b' by default); the switch is
+ * described by it, so it is heard as well as seen.
+ *
+ * Which state first: `?<param>=b` (or =a, or a label's text) in the URL when `param` is set, so a
+ * link can open on annual prices; else the visitor's last choice this session when `remember`
+ * is set (sessionStorage, under `key`); else `default`.
+ *
+ * Without JavaScript both panels render, one after the other, each under its label as a heading:
+ * nothing is hidden that a visitor cannot reach, and the switch (which could not work) is not
+ * shown. With JavaScript the inline script placed right after the element hides the other panel
+ * and shows the switch before the first paint, so the page does not jump. The shown panel keeps
+ * its heading for screen readers only; it says which version is showing.
+ *
+ * Not tabs: a toggle is two versions of ONE thing, switched in place, with a line of copy on
+ * each side. Three or more views, or two different topics, are tabs.
+ *
+ * prefers-reduced-motion: the knob jumps instead of sliding and the new panel does not fade.
+ *
+ * Changing state dispatches `content-toggle` (bubbles; `detail.state` is 'a' or 'b') on the
+ * element, and sets `data-ct-state` on it, for a host that wants to react.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --ct-track / --ct-knob          switch track (both states) / knob       (#5933d8 / #fff; track 7.27:1 on white)
+ *   --ct-label / --ct-active        other label / the label that is shown   (inherit at 75% / inherit)
+ *   --ct-pressed-bg / --ct-pressed-fg   style="buttons" pressed button      (#5933d8 / #fff, 7.27:1)
+ *   --ct-border                     style="buttons" outline                 (#5933d8)
+ *   --ct-badge-bg / --ct-badge-fg   the badge                               (#dff5e8 / #0f5132)
+ *   --ct-focus                      keyboard focus ring                     (currentColor)
+ *   --ct-gap                        space between the bar and the panel     (1.25rem)
+ *   --ct-align                      where the bar sits                      (center)
+ */
+interface Props {
+  /** The two states' names: [a, b]. Short: "Monthly", "Annual". */
+  labels: [string, string];
+  /** Default switch. `buttons` for labels too long to sit either side of a switch. */
+  style?: 'switch' | 'buttons';
+  /** Which panel shows first. Default 'a'. */
+  default?: 'a' | 'b';
+  /** A short note on one label: "Save 20%". */
+  badge?: string;
+  /** Which label carries the badge. Default 'b'. */
+  badgeOn?: 'a' | 'b';
+  /** Remember the visitor's choice for this browser session (sessionStorage). */
+  remember?: boolean;
+  /** sessionStorage key. Default "content-toggle:<param or a hash of the labels>". */
+  key?: string;
+  /** URL parameter that preselects: `param="billing"` and `?billing=b` (or `=annual`). */
+  param?: string;
+  /** Name of the button group (style="buttons"). Default "<a> or <b>". */
+  label?: string;
+  /** Level of each panel's heading (shown without JavaScript). Default 3. */
+  headingLevel?: 2 | 3 | 4 | 5;
+  class?: string;
+}
+
+const {
+  labels,
+  style = 'switch',
+  default: initial = 'a',
+  badge,
+  badgeOn = 'b',
+  remember = false,
+  key,
+  param,
+  label,
+  headingLevel = 3,
+  class: className,
+} = Astro.props;
+
+if (!Array.isArray(labels) || labels.length !== 2 || !labels.every((l) => typeof l === 'string' && l.trim())) throw new Error('ContentToggle: `labels` must be two non-empty strings, [a, b].');
+if (labels[0].trim().toLowerCase() === labels[1].trim().toLowerCase()) throw new Error('ContentToggle: the two labels must differ.');
+if (!['switch', 'buttons'].includes(style)) throw new Error(`ContentToggle: style "${style}" is not switch or buttons.`);
+if (!['a', 'b'].includes(initial)) throw new Error(`ContentToggle: default "${initial}" is not a or b.`);
+if (!['a', 'b'].includes(badgeOn)) throw new Error(`ContentToggle: badgeOn "${badgeOn}" is not a or b.`);
+if (param !== undefined && !/^[A-Za-z][\w-]*$/.test(param)) throw new Error(`ContentToggle: param "${param}" must be a plain URL parameter name.`);
+if (!Astro.slots.has('a') || !Astro.slots.has('b')) throw new Error('ContentToggle: give it both panels, `<div slot="a">…</div>` and `<div slot="b">…</div>`.');
+
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5';
+const [a, b] = labels;
+const hash = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(36);
+};
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__ctCount as number) || 0) + 1;
+locals.__ctCount = n;
+const uid = `ct-${n}`;
+const config = JSON.stringify({
+  initial,
+  remember,
+  key: key || `content-toggle:${param || hash(labels.join('|'))}`,
+  param: param ?? null,
+  labels,
+});
+const describedBy = badge ? (badgeOn === 'a' ? `${uid}-a ${uid}-badge` : `${uid}-badge`) : undefined;
+
+/** The browser side, serialised into the inline script once per page. */
+function contentToggleClient() {
+  interface Cfg {
+    initial: 'a' | 'b';
+    remember: boolean;
+    key: string;
+    param: string | null;
+    labels: [string, string];
+  }
+  const mem: Record<string, string> = {};
+  const get = (k: string) => {
+    try {
+      return sessionStorage.getItem(k) ?? mem[k] ?? null;
+    } catch {
+      return mem[k] ?? null;
+    }
+  };
+  const set = (k: string, v: string) => {
+    mem[k] = v;
+    try {
+      sessionStorage.setItem(k, v);
+    } catch {}
+  };
+  /** 'a', 'b', or a label's text (any case) in the URL; anything else is ignored. */
+  const fromUrl = (c: Cfg) => {
+    if (!c.param) return null;
+    let v: string | null = null;
+    try {
+      v = new URLSearchParams(location.search).get(c.param);
+    } catch {}
+    if (!v) return null;
+    const s = v.trim().toLowerCase();
+    if (s === 'a' || s === c.labels[0].toLowerCase()) return 'a';
+    if (s === 'b' || s === c.labels[1].toLowerCase()) return 'b';
+    return null;
+  };
+
+  const mount = (root: HTMLElement | null) => {
+    if (!root || root.dataset.ctState) return;
+    let c: Cfg;
+    try {
+      c = JSON.parse(root.dataset.ct || '{}');
+    } catch {
+      return;
+    }
+    const bar = root.querySelector<HTMLElement>('[data-ct-bar]')!;
+    const sw = bar.querySelector<HTMLButtonElement>('[role="switch"]');
+    const buttons = [...bar.querySelectorAll<HTMLButtonElement>('button[data-ct-pick]')];
+    const picks = [...bar.querySelectorAll<HTMLElement>('[data-ct-pick]')];
+    const panels = [...root.querySelectorAll<HTMLElement>(':scope > [data-ct-panel]')];
+    const stored = c.remember ? get(c.key) : null;
+    let state: 'a' | 'b' = fromUrl(c) || (stored === 'a' || stored === 'b' ? stored : c.initial);
+
+    const render = (animate: boolean) => {
+      root.dataset.ctState = state;
+      if (sw) sw.setAttribute('aria-checked', String(state === 'b'));
+      buttons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.ctPick === state)));
+      picks.forEach((p) => p.classList.toggle('ct__opt--on', p.dataset.ctPick === state));
+      panels.forEach((p) => {
+        const on = p.dataset.ctPanel === state;
+        p.hidden = !on;
+        p.classList.toggle('ct__panel--in', on && animate);
+      });
+    };
+    const choose = (next: 'a' | 'b') => {
+      if (next === state) return;
+      state = next;
+      render(true);
+      if (c.remember) set(c.key, state);
+      root.dispatchEvent(new CustomEvent('content-toggle', { bubbles: true, detail: { state } }));
+    };
+
+    if (sw) sw.addEventListener('click', () => choose(state === 'a' ? 'b' : 'a'));
+    picks.forEach((p) => p.addEventListener('click', () => choose(p.dataset.ctPick as 'a' | 'b')));
+    root.classList.add('ct--live');
+    bar.hidden = false;
+    render(false);
+  };
+  return { mount };
+}
+const define = `window.__superheroContentToggle=window.__superheroContentToggle||(${contentToggleClient.toString()})();`;
+const mountScript = `${n === 1 ? define : ''}window.__superheroContentToggle.mount(document.currentScript.previousElementSibling);`;
+---
+
+<div class:list={['ct', `ct--${style}`, className]} data-ct={config}>
+  <div class="ct__bar" data-ct-bar hidden>
+    {
+      style === 'switch' ? (
+        <div class="ct__switchrow">
+          <span class="ct__opt" id={`${uid}-a`} data-ct-pick="a">
+            {a}
+            {badge && badgeOn === 'a' && <span class="ct__badge" id={`${uid}-badge`}>{badge}</span>}
+          </span>
+          <button
+            class="ct__switch"
+            type="button"
+            role="switch"
+            aria-checked={initial === 'b' ? 'true' : 'false'}
+            aria-labelledby={`${uid}-b-name`}
+            aria-describedby={describedBy}
+            aria-controls={`${uid}-pa ${uid}-pb`}
+          >
+            <span class="ct__knob" />
+          </button>
+          <span class="ct__opt" id={`${uid}-b`} data-ct-pick="b">
+            <span id={`${uid}-b-name`}>{b}</span>
+            {badge && badgeOn === 'b' && <span class="ct__badge" id={`${uid}-badge`}>{badge}</span>}
+          </span>
+        </div>
+      ) : (
+        <div class="ct__group" role="group" aria-label={label || `${a} or ${b}`}>
+          <button class="ct__btn" type="button" aria-pressed={initial === 'a' ? 'true' : 'false'} aria-controls={`${uid}-pa`} data-ct-pick="a">
+            {a}
+            {badge && badgeOn === 'a' && <span class="ct__badge" id={`${uid}-badge`}>{badge}</span>}
+          </button>
+          <button class="ct__btn" type="button" aria-pressed={initial === 'b' ? 'true' : 'false'} aria-controls={`${uid}-pb`} data-ct-pick="b">
+            {b}
+            {badge && badgeOn === 'b' && <span class="ct__badge" id={`${uid}-badge`}>{badge}</span>}
+          </button>
+        </div>
+      )
+    }
+  </div>
+  <div class="ct__panel" id={`${uid}-pa`} data-ct-panel="a">
+    <H class="ct__heading">{a}</H>
+    <div class="ct__body"><slot name="a" /></div>
+  </div>
+  <div class="ct__panel" id={`${uid}-pb`} data-ct-panel="b">
+    <H class="ct__heading">{b}</H>
+    <div class="ct__body"><slot name="b" /></div>
+  </div>
+</div>
+<script is:inline set:html={mountScript} />
+
+<style>
+  .ct [hidden] {
+    display: none !important;
+  }
+  .ct__bar {
+    display: flex;
+    justify-content: var(--ct-align, center);
+    margin-bottom: var(--ct-gap, 1.25rem);
+  }
+  .ct__heading {
+    margin: 1.25rem 0 0.75rem;
+  }
+  [data-ct-panel='a'] .ct__heading {
+    margin-top: 0;
+  }
+  /* With the switch working, the shown panel's heading is for screen readers only. */
+  .ct--live .ct__heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .ct__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .ct__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+  .ct :focus-visible {
+    outline: 3px solid var(--ct-focus, currentColor);
+    outline-offset: 3px;
+  }
+
+  /* ---- switch */
+  .ct__switchrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 0.5rem;
+  }
+  .ct__opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ct-label, color-mix(in srgb, currentColor 75%, transparent));
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ct__opt--on {
+    color: var(--ct-active, inherit);
+    font-weight: 700;
+  }
+  .ct__switch {
+    position: relative;
+    flex: none;
+    width: 3.5rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .ct__switch::before {
+    content: '';
+    position: absolute;
+    inset: 0.55rem 0.25rem;
+    border-radius: 999px;
+    background: var(--ct-track, #5933d8);
+  }
+  .ct__knob {
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: -0.55rem;
+    border-radius: 50%;
+    background: var(--ct-knob, #fff);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  }
+  .ct__switch[aria-checked='true'] .ct__knob {
+    translate: 1.4rem 0;
+  }
+  .ct__switch:focus-visible {
+    outline-offset: 0;
+    border-radius: 999px;
+  }
+  /* Windows High Contrast: the track and knob are backgrounds, so draw them with borders too. */
+  @media (forced-colors: active) {
+    .ct__switch::before {
+      border: 2px solid CanvasText;
+    }
+    .ct__knob {
+      background: CanvasText;
+    }
+  }
+
+  /* ---- buttons */
+  .ct__group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0.25rem;
+    border: 2px solid var(--ct-border, #5933d8);
+    border-radius: 999px;
+    gap: 0.25rem;
+  }
+  .ct__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .ct__btn[aria-pressed='true'] {
+    background: var(--ct-pressed-bg, #5933d8);
+    color: var(--ct-pressed-fg, #fff);
+  }
+  @media (forced-colors: active) {
+    .ct__btn[aria-pressed='true'] {
+      outline: 2px solid Highlight;
+    }
+  }
+
+  .ct__badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--ct-badge-bg, #dff5e8);
+    color: var(--ct-badge-fg, #0f5132);
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ct__knob {
+      transition: translate 0.18s ease;
+    }
+    .ct__panel--in {
+      animation: ct-in 0.18s ease-out;
+    }
+  }
+  @keyframes ct-in {
+    from {
+      opacity: 0;
+    }
+  }
+</style>
