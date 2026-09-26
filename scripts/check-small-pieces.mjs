@@ -15,6 +15,16 @@
  *   before the first paint); the runtime is defined once per page.
  * - Chip colours from the component's CSS clear 4.5:1.
  *
+ * scrollbox
+ * - The scroller is role="region" with a non-empty aria-label and tabindex="0"; buttons, when
+ *   present, are type="button", hidden, named, and aria-controls the scroller; nothing ships
+ *   with the script's state (no data-ready, no room variables), so there are no fades.
+ * - The fade logic: `scrollboxEdges`, cut from the EMITTED script between its markers and run
+ *   against cases (fits, sub-pixel, start, middle, end, overscroll, right-to-left).
+ * - The CSS: the mask only under [data-ready]; the mask reads the room variables; the
+ *   scrollbar is never hidden; the scroller is position: relative (it must contain positioned
+ *   descendants, or they widen the page); a button press is instant under reduced motion.
+ *
  * Mutation tests: each element's checks are run again on deliberately broken copies (see
  * `mutants`). Every mutant must be caught, or the check itself is broken.
  *
@@ -191,18 +201,117 @@ function checkTagsCss(src) {
   return { out, ratios };
 }
 
+// ============================================================== scrollbox
+const SB_SRC = 'src/library/scrollbox/Scrollbox.astro';
+function checkScrollbox(html, where, { demo = false } = {}) {
+  const out = [];
+  const boxes = roots(html, 'div', 'data-sb');
+  if (demo && boxes.length !== 3) out.push(`${where}: expected the demo's 3 scrollboxes, found ${boxes.length}.`);
+  let withArrows = 0;
+  boxes.forEach((b, i) => {
+    const w = `${where}, scrollbox ${i + 1}`;
+    if (attr(b.open, 'data-ready') !== undefined || attr(b.open, 'data-overflow') !== undefined) out.push(`${w}: ships with the script's state (data-ready / data-overflow); without JavaScript there are no fades.`);
+    const vp = b.html.match(/<div\b[^>]*\sdata-sb-viewport[^>]*>/)?.[0];
+    if (!vp) return out.push(`${w}: no scroller.`);
+    if (attr(vp, 'role') !== 'region') out.push(`${w}: the scroller is not role="region".`);
+    if (!decode(attr(vp, 'aria-label') ?? '').trim()) out.push(`${w}: the scroller's region has no name (aria-label).`);
+    if (attr(vp, 'tabindex') !== '0') out.push(`${w}: the scroller needs tabindex="0" so a keyboard can scroll it.`);
+    if (/--sb-room/.test(attr(vp, 'style') ?? '')) out.push(`${w}: the scroller ships with room variables; the fades are the script's.`);
+    const id = attr(vp, 'id');
+    const btns = [...b.html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]);
+    if (btns.length) {
+      withArrows++;
+      if (btns.length !== 2) out.push(`${w}: ${btns.length} buttons; arrows are two.`);
+      for (const btn of btns) {
+        const name = decode(attr(btn, 'aria-label') ?? '');
+        if (attr(btn, 'type') !== 'button') out.push(`${w}: the "${name}" button needs type="button".`);
+        if (attr(btn, 'hidden') === undefined) out.push(`${w}: the "${name}" button must ship hidden; the script shows it when there is somewhere to go.`);
+        if (!name.trim()) out.push(`${w}: a button has no name.`);
+        if (!id || attr(btn, 'aria-controls') !== id) out.push(`${w}: the "${name}" button must aria-controls the scroller.`);
+      }
+      if (demo && !btns.some((x) => attr(x, 'aria-label') === 'Scroll left')) out.push(`${w}: no "Scroll left" button.`);
+      if (demo && !btns.some((x) => attr(x, 'aria-label') === 'Scroll right')) out.push(`${w}: no "Scroll right" button.`);
+    }
+    const s = scriptAfter(html, b);
+    if (!s || !s.includes('window.__superheroScrollbox.mount(document.currentScript.previousElementSibling)')) out.push(`${w}: its mount script must come straight after it.`);
+  });
+  if (demo && !withArrows) out.push(`${where}: the demo has no scrollbox with arrows.`);
+  if (demo && withArrows === boxes.length) out.push(`${where}: the demo has no scrollbox without arrows.`);
+  const defs = (html.match(/window\.__superheroScrollbox=window\.__superheroScrollbox\|\|/g) || []).length;
+  if (boxes.length && defs !== 1) out.push(`${where}: the scrollbox runtime is defined ${defs} times; it must be once per page.`);
+  if (boxes.length && !/behavior:\s*still\.matches\s*\?\s*["']auto["']\s*:\s*["']smooth["']/.test(html)) out.push(`${where}: the emitted script does not jump at once under prefers-reduced-motion.`);
+  if (boxes.length && !/matchMedia\(\s*["']\(prefers-reduced-motion: reduce\)["']\s*\)/.test(html)) out.push(`${where}: the emitted script does not read prefers-reduced-motion.`);
+  return out;
+}
+const EDGE_CASES = [
+  // [label, scrollLeft, scrollWidth, clientWidth, rtl, expected { left, right }]
+  ['everything fits', 0, 300, 300, false, { left: 0, right: 0 }],
+  ['half a pixel of overflow is none', 0, 300.5, 300, false, { left: 0, right: 0 }],
+  ['at the start: fade on the right only', 0, 1000, 300, false, { left: 0, right: 700 }],
+  ['in the middle: both', 250, 1000, 300, false, { left: 250, right: 450 }],
+  ['sub-pixel scroll rounds', 250.4, 1000, 300, false, { left: 250, right: 450 }],
+  ['half a pixel from the end: no right fade', 699.5, 1000, 300, false, { left: 700, right: 0 }],
+  ['at the end: fade on the left only', 700, 1000, 300, false, { left: 700, right: 0 }],
+  ['elastic overscroll before the start', -20, 1000, 300, false, { left: 0, right: 700 }],
+  ['right-to-left, at the start (the right edge)', 0, 1000, 300, true, { left: 700, right: 0 }],
+  ['right-to-left, in the middle', -250, 1000, 300, true, { left: 450, right: 250 }],
+  ['right-to-left, at the end (the left edge)', -700, 1000, 300, true, { left: 0, right: 700 }],
+];
+function checkEdges(html, where) {
+  const out = [];
+  const m = html.match(/\/\*<sb-edges>\*\/([\s\S]*?)\/\*<\/sb-edges>\*\//);
+  if (!m) return [`${where}: the emitted script has no /*<sb-edges>*/ … /*</sb-edges>*/ block.`];
+  let edges;
+  try {
+    edges = new Function(`return (${m[1]});`)();
+  } catch (e) {
+    return [`${where}: the emitted scrollboxEdges does not parse: ${e.message}`];
+  }
+  for (const [label, sl, sw, cw, rtl, want] of EDGE_CASES) {
+    const got = edges(sl, sw, cw, rtl);
+    if (got?.left !== want.left || got?.right !== want.right) out.push(`scrollboxEdges: ${label}: got ${JSON.stringify(got)}, expected ${JSON.stringify(want)}.`);
+  }
+  return out;
+}
+function checkScrollboxCss(src) {
+  const out = [];
+  const css = styleOf(src);
+  for (const [sel, body] of rules(css)) {
+    if (/mask-image/.test(body) && !/\[data-ready\]/.test(sel)) out.push(`${SB_SRC}: "${sel}" sets a mask without [data-ready]; without JavaScript there must be no fades.`);
+    if (/scrollbar-width:\s*none/.test(body) || (/::-webkit-scrollbar/.test(sel) && /display:\s*none/.test(body))) out.push(`${SB_SRC}: "${sel}" hides the scrollbar; the buttons must never be the only way to scroll.`);
+    if (/scroll-behavior:\s*smooth/.test(body)) out.push(`${SB_SRC}: "${sel}" sets scroll-behavior: smooth, which would make the reduced-motion jump glide.`);
+  }
+  const masked = rules(css).find(([sel, body]) => /\[data-ready\]/.test(sel) && /mask-image/.test(body));
+  if (!masked || !/--sb-room-left/.test(masked[1]) || !/--sb-room-right/.test(masked[1]) || !/min\(var\(--sb-fade-size/.test(masked[1])) {
+    out.push(`${SB_SRC}: the mask must be sized by min(--sb-fade-size, the measured room) on each side.`);
+  }
+  const vp = rules(css).find(([sel]) => sel === '.sb__viewport');
+  if (!vp || !/position:\s*relative/.test(vp[1])) out.push(`${SB_SRC}: .sb__viewport must be position: relative, or a positioned box in a far-off item escapes the scroller and widens the page.`);
+  return out;
+}
+
 // ================================================================== run
 const pages = {
   tags: read('dist/tags/index.html'),
+  scrollbox: read('dist/scrollbox/index.html'),
   index: read('dist/index.html'),
 };
-const src = { tags: read(TAGS_SRC) };
+const src = { tags: read(TAGS_SRC), scrollbox: read(SB_SRC) };
 finish('files');
 
 failures.push(...checkTags(pages.tags, 'dist/tags/index.html', { demo: true }), ...checkTags(pages.index, 'dist/index.html'));
 const tagsCss = checkTagsCss(src.tags);
 failures.push(...tagsCss.out);
 finish('tags');
+
+failures.push(
+  ...checkScrollbox(pages.scrollbox, 'dist/scrollbox/index.html', { demo: true }),
+  ...checkScrollbox(pages.index, 'dist/index.html'),
+  ...checkEdges(pages.scrollbox, 'dist/scrollbox/index.html'),
+  ...checkEdges(pages.index, 'dist/index.html'),
+  ...checkScrollboxCss(src.scrollbox),
+);
+finish('scrollbox');
 
 // ---------------------------------------------------------- mutation tests
 const swap = (s, from, to) => {
@@ -216,6 +325,16 @@ const mutants = [
   ['tags: "+N more" miscounted', () => checkTags(pages.tags.replace(/(data-tg-more[^>]*>)\s*\+(\d+) more/, (_, a, n) => `${a}+${Number(n) + 1} more`), 't', { demo: true })],
   ['tags: mount script moved away', () => checkTags(pages.tags.replace(/(<div class="tg tg--removable[\s\S]*?<\/div>)(<script>)/, '$1<p></p>$2'), 't', { demo: true })],
   ['tags: chip text on a pale background', () => checkTagsCss(swap(src.tags, 'var(--tg-bg, #eef0f4)', 'var(--tg-bg, #6b7280)')).out],
+  ['scrollbox: region with no name', () => checkScrollbox(pages.scrollbox.replace(/(data-sb-viewport|role="region") aria-label="[^"]*"/, '$1'), 's', { demo: true })],
+  ['scrollbox: region not focusable', () => checkScrollbox(swap(pages.scrollbox, 'tabindex="0"', 'tabindex="-1"'), 's', { demo: true })],
+  ['scrollbox: a button shipped visible', () => checkScrollbox(pages.scrollbox.replace(/(<button class="sb__btn[^>]*?) hidden/, '$1'), 's', { demo: true })],
+  ['scrollbox: edges ignore right-to-left', () => checkEdges(swap(pages.scrollbox, 'rtl ? max + scrollLeft : scrollLeft', 'scrollLeft'), 's')],
+  ['scrollbox: edges fade for half a pixel', () => checkEdges(swap(pages.scrollbox, 'toRight < 1 ? 0', 'toRight <= 0 ? 0'), 's')],
+  ['scrollbox: edges swap the sides', () => checkEdges(swap(pages.scrollbox, 'left: fromLeft < 1 ? 0 : Math.round(fromLeft)', 'left: toRight < 1 ? 0 : Math.round(toRight)'), 's')],
+  ['scrollbox: smooth even under reduced motion', () => checkScrollbox(pages.scrollbox.replace(/still\.matches \? "auto" : "smooth"/, '"smooth"'), 's', { demo: true })],
+  ['scrollbox: fades without JavaScript', () => checkScrollboxCss(swap(src.scrollbox, '.sb[data-ready] .sb__viewport {\n    --sb-l', '.sb .sb__viewport {\n    --sb-l'))],
+  ['scrollbox: scrollbar hidden', () => checkScrollboxCss(swap(src.scrollbox, 'scrollbar-width: thin', 'scrollbar-width: none'))],
+  ['scrollbox: scroller no longer contains positioned items', () => checkScrollboxCss(swap(src.scrollbox, '    position: relative;\n    display: flex;', '    display: flex;'))],
 ];
 const survived = [];
 for (const [name, run] of mutants) {
@@ -232,5 +351,5 @@ for (const s of survived) fail(`mutation "${s}" survived: the check no longer no
 finish('mutation tests');
 
 console.log(
-  `check-small-pieces ok: tags (chips, remove names, "+N more"; ${tagsCss.ratios.join(', ')}), ${mutants.length} mutants caught.`,
+  `check-small-pieces ok: tags (chips, remove names, "+N more"; ${tagsCss.ratios.join(', ')}), scrollbox (regions, buttons, ${EDGE_CASES.length} fade cases on the emitted script), ${mutants.length} mutants caught.`,
 );

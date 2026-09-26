@@ -1,0 +1,133 @@
+---
+/**
+ * Demo for `scrollbox`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * Three rows: project cards with arrows and snap; a row of category chips with no arrows
+ * (swipe, trackpad, wheel, keys or the scrollbar); and a short row that fits, which shows
+ * neither fades nor buttons, because there is nothing more to see.
+ */
+import Scrollbox from '../../library/scrollbox/Scrollbox.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const projects = [
+  { title: 'Riverside bakery', text: 'Menu, hours and pre-orders on one page.', image: 'hills.svg' },
+  { title: 'Hill country tours', text: 'Seven tours, one booking form.', image: 'promo.svg' },
+  { title: 'Northside dental', text: 'New-patient forms before the visit.', image: 'hills.svg' },
+  { title: 'Oak and iron', text: 'A furniture maker’s portfolio.', image: 'promo.svg' },
+  { title: 'Harbor yoga', text: 'Class times that update themselves.', image: 'hills.svg' },
+  { title: 'Greenline gardens', text: 'Seasonal lists and a plant finder.', image: 'promo.svg' },
+];
+const categories = ['All', 'Kitchens', 'Bathrooms', 'Gardens', 'Lighting', 'Flooring', 'Windows', 'Outdoor living', 'Storage', 'Paint'];
+---
+<div class="demo-sb" id="scrollbox-demo">
+  <Scrollbox label="Recent projects" arrows snap itemWidth="min(78%, 15rem)">
+    {
+      projects.map((p) => (
+        <article class="demo-sb__card">
+          <img src={asset(p.image)} alt="" width="480" height="270" loading="lazy" decoding="async" />
+          <h3>{p.title}</h3>
+          <p>{p.text}</p>
+          <a href="#scrollbox-demo">
+            See the site<span class="demo-sb__sr">: {p.title}</span>
+          </a>
+        </article>
+      ))
+    }
+  </Scrollbox>
+
+  <Scrollbox label="Categories" gap="0.5rem">
+    {
+      categories.map((c, i) => (
+        <a class="demo-sb__chip" href="#scrollbox-demo" aria-current={i === 0 ? 'true' : undefined}>
+          {c}
+        </a>
+      ))
+    }
+  </Scrollbox>
+
+  <Scrollbox label="Opening days" arrows gap="0.5rem">
+    <span class="demo-sb__chip">Mon to Fri</span>
+    <span class="demo-sb__chip">Sat mornings</span>
+  </Scrollbox>
+</div>
+<style>
+  .demo-sb {
+    --sb-focus: var(--purple, #5933d8);
+    --sb-btn-bg: var(--navy, #1e283c);
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+  .demo-sb__card {
+    display: grid;
+    align-content: start;
+    gap: 0.4rem;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 0 0 1rem;
+    overflow: hidden;
+    border: 1px solid var(--line, #d5d9e2);
+    border-radius: var(--radius, 12px);
+    background: var(--white, #fff);
+    color: var(--ink, #1d2433);
+  }
+  .demo-sb__card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+  .demo-sb__card h3 {
+    margin: 0.4rem 1rem 0;
+    font-size: 1rem;
+  }
+  .demo-sb__card p {
+    margin: 0 1rem;
+    font-size: 0.9rem;
+  }
+  .demo-sb__card a {
+    margin: 0.25rem 1rem 0;
+    color: var(--purple, #5933d8);
+    font-weight: 600;
+  }
+  .demo-sb__card a:focus-visible,
+  .demo-sb__chip:focus-visible {
+    outline: 3px solid var(--purple, #5933d8);
+    outline-offset: 2px;
+  }
+  .demo-sb__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    box-sizing: border-box;
+    padding: 0.25rem 1rem;
+    border: 1px solid var(--line, #d5d9e2);
+    border-radius: 999px;
+    background: var(--white, #fff);
+    color: var(--ink, #1d2433);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .demo-sb__chip[aria-current='true'] {
+    border-color: var(--purple, #5933d8);
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+  }
+  .demo-sb__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>

@@ -1490,6 +1490,62 @@ import { analytics } from '../data/site';
     file: 'src/library/tags/Tags.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'scrollbox',
+    name: 'Scrollbox',
+    aka: ['horizontal scroller', 'scroll row', 'overflow row', 'scroll shadows', 'edge fade', 'horizontal scroll section', 'chip row'],
+    summary:
+      'A row of cards or chips that scrolls sideways inside its container: a named, focusable region the keyboard can scroll, with edge fades that appear only on a side with more to see (measured on scroll and resize) and optional left/right buttons that are never the only way to scroll. Optional scroll-snap. Without JavaScript it is a plain horizontal scroll.',
+    pitch: 'Fit a long row of projects, products or categories into one line, and let the edges show there is more to scroll.',
+    // SE Ranking US, 2026-09-26: horizontal scroll cards 170/mo, difficulty 13 (and rising:
+    // 70 a year ago); horizontal scroll css 170/24; horizontal scrolling website 90/21.
+    // "horizontal scroll" 720/27 is mostly people asking how to scroll sideways, left unclaimed.
+    search: { query: 'horizontal scroll cards', alsoRanks: ['horizontal scroll css', 'horizontal scrolling website'] },
+    replaces: ['page-builder “horizontal scroll” sections and scroll-shadow snippets', 'a carousel used only to fit a row that is too wide', 'overflow rows that hide their scrollbar and give no hint there is more'],
+    goodFor:
+      'A row that is useful at a glance and fine to explore: related products, recent projects, category chips, a filter bar on a phone. The visitor moves it, at their pace, however they like to scroll.',
+    notFor:
+      'A carousel: when the row should page one screen at a time with dots and a count, or move by itself, or show one card at a time, that is card-slider. Also not for content every visitor must read (a row hides most of what it holds: use a grid), and not for a data table (that scrolls in its own element, with its headers).',
+    props: [
+      { name: 'label', type: 'string', note: 'Accessible name of the scrolling region: “Recent projects”. Required.' },
+      { name: 'default slot', type: 'items', note: 'Each direct child is one item (card, chip, link). They keep their own width; the row is as tall as the tallest.' },
+      { name: 'arrows', type: 'boolean', default: 'false', note: '“Scroll left” / “Scroll right” buttons over the edges. Each shows only while there is more that way. A press scrolls about four fifths of the width.' },
+      { name: 'snap', type: 'boolean', default: 'false', note: 'scroll-snap (proximity): items come to rest at their start.' },
+      { name: 'gap', type: 'string', note: 'Space between items, any CSS length. Overrides `--sb-gap` (1rem).' },
+      { name: 'itemWidth', type: 'string', note: 'Width of each item: “16rem”, “min(80%, 18rem)”. Overrides `--sb-item` (auto).' },
+      { name: 'leftLabel / rightLabel', type: 'string', default: '“Scroll left” / “Scroll right”', note: 'Button names; translate on a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--sb-gap', fallback: '1rem', note: 'Space between items; the `gap` prop overrides it.' },
+      { name: '--sb-item', fallback: 'auto', note: 'Item width; the `itemWidth` prop overrides it.' },
+      { name: '--sb-fade-size', fallback: '2.5rem', note: 'The furthest a fade reaches. It is also the scroll padding, so a focused item stops clear of the fade.' },
+      { name: '--sb-btn-bg', fallback: '#1b1c22', note: 'Button background.' },
+      { name: '--sb-btn-fg', fallback: '#fff', note: 'Button chevron (16.99:1 on the fallback).' },
+      { name: '--sb-btn-size', fallback: '2.75rem', note: 'Button size: 44 px.' },
+      { name: '--sb-focus', fallback: '#5933d8', note: 'Focus ring on the region and the buttons.' },
+      { name: '--sb-scrollbar', fallback: 'rgb(0 0 0 / 0.35)', note: 'Scrollbar thumb, where scrollbar-color is supported. The scrollbar is never hidden.' },
+    ],
+    a11y: [
+      'The scroller is role="region" named by `label`, with tabindex="0": a keyboard focuses it and scrolls it with ← →. The items’ own links are ordinary tab stops, and a focused one is scrolled into view clear of the fade.',
+      'The fades are a visual hint only, drawn with a mask so they suit any background. Each shows only while that side has more to scroll; `npm run check` runs the measuring function the page actually ships.',
+      'The buttons are real buttons named “Scroll left” and “Scroll right”, 44 px, aria-controls naming the region. Each shows only while there is more that way; one that reaches its end while focused stays, dimmed and aria-disabled, until focus leaves it, so focus is never dropped. They are never the only way to scroll: the scrollbar always shows, and touch, trackpad, wheel and keys work as the browser’s own.',
+      'prefers-reduced-motion: a button press jumps at once instead of gliding. Nothing moves by itself.',
+      'Without JavaScript: a plain horizontal scroll with its scrollbar, no fades and no buttons.',
+    ],
+    usage: `<Scrollbox label="Recent projects" arrows snap itemWidth="min(80%, 16rem)">
+  {projects.map((p) => <article class="card">…<a href={p.url}>{p.title}</a></article>)}
+</Scrollbox>
+
+<Scrollbox label="Categories" gap="0.5rem">
+  {categories.map((c) => <a class="chip" href={c.url}>{c.name}</a>)}
+</Scrollbox>
+<!-- global.css: .sb { --sb-btn-bg: var(--brand); --sb-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/scrollbox/ (demo)' }],
+    file: 'src/library/scrollbox/Scrollbox.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
