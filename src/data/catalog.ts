@@ -1428,6 +1428,84 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'video-gallery',
+    name: 'Video gallery',
+    aka: ['UABB Video Gallery', 'PowerPack Video Gallery', 'Elementor Video Playlist', 'YouTube gallery', 'Vimeo gallery', 'video grid', 'filterable video gallery'],
+    summary:
+      'A grid of YouTube, Vimeo or self-hosted videos, each behind your own poster and a play button, with optional category filter chips. A click plays the video in one lightbox dialog or in the tile itself. Nothing is requested from YouTube or Vimeo until a tile is pressed.',
+    pitch: 'All your videos on one page, sorted by topic, with your own thumbnails, and nothing loads from YouTube until someone picks one.',
+    // SE Ranking US, 2026-09-26: video gallery 590/mo, difficulty 20; youtube gallery 210/8;
+    // video gallery wordpress 50/28; video gallery website 40/13 (the round-3 note's first
+    // guess, which "video gallery" beats on volume at a similar difficulty). video grid 390/34
+    // is a stock-footage and editing query, left unclaimed.
+    search: { query: 'video gallery', alsoRanks: ['youtube gallery', 'video gallery website', 'video gallery wordpress'] },
+    replaces: ['UABB / PowerPack “Video Gallery” modules (Beaver Builder)', 'Elementor Pro Video Playlist', 'YouTube gallery plugins', 'a page of pasted YouTube iframes'],
+    goodFor: 'A page of several videos: testimonials, a how-to library, event recordings, a portfolio of films. Categories when there are enough to be worth sorting.',
+    notFor:
+      'One video on its own (that is video-player), an ambient loop behind a hero (video-background), and a whole channel kept in sync by itself: the list is written into the page, so a new upload means an edit. Galleries of photos are not this either.',
+    props: [
+      { name: 'videos', type: '{ url, title, caption?, poster?, category?, tracks? }[]', note: 'Required. `url` takes what video-player’s `src` takes: a YouTube URL or id (watch, youtu.be, shorts, embed), a Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }]. Anything else fails the build. `title` is required. `category` is one string or several.' },
+      { name: 'mode', type: "'lightbox' | 'inline'", default: "'lightbox'", note: 'Lightbox plays in one <dialog> over the page. Inline replaces the tile’s poster with the player; pressing another tile puts it back.' },
+      { name: 'columns', type: 'number (1–6)', default: '3', note: 'The most tiles per row. Fewer when a tile would be narrower than --vg-min; one on a phone. Set --vg-template instead for the host’s own grid.' },
+      { name: 'filter', type: 'boolean', default: 'two or more categories', note: 'Category chips above the grid, “All” first.' },
+      { name: 'counts', type: 'boolean', default: 'false', note: 'Show how many videos each chip holds.' },
+      { name: 'allLabel / filterLabel', type: 'string', default: '“All” / “Filter videos”', note: 'The first chip, and the accessible name of the chip group.' },
+      { name: 'aspect', type: 'number | string', default: '16/9', note: 'Frame ratio of every tile and of the lightbox: 1.7778, "16/9", "4 / 3".' },
+      { name: 'autoplay', type: 'boolean', default: 'true', note: 'Start playing on the click. False shows the player and waits for a second press.' },
+      { name: 'titleTag', type: "'h2' | 'h3' | 'h4' | 'p'", default: "'h3'", note: 'Element for each tile’s title, to fit the page’s heading outline.' },
+      { name: 'playLabel / closeLabel', type: 'string', default: '“Play” / “Close video”', note: 'Words, for a non-English site. playLabel prefixes each title in the button’s name.' },
+      { name: 'playIcon', type: 'string', note: 'Inline SVG markup for the play icon. Use currentColor and 1em.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--vg-min', fallback: '14rem', note: 'No tile narrower than this; below it the row drops a column.' },
+      { name: '--vg-gap', fallback: '1.25rem', note: 'Gap between tiles.' },
+      { name: '--vg-template', fallback: '(unset)', note: 'The whole grid-template-columns, when the host wants its own grid: `repeat(4, 1fr)`.' },
+      { name: '--vg-radius', fallback: '0.5rem', note: 'Corner radius of each frame.' },
+      { name: '--vg-bg', fallback: '#000', note: 'Frame colour behind the poster and the player.' },
+      { name: '--vg-panel', fallback: 'linear-gradient(135deg, #2c3656, #1e283c)', note: 'A tile without a poster.' },
+      { name: '--vg-overlay', fallback: 'rgb(0 0 0 / 0.12)', note: 'Tint over the poster.' },
+      { name: '--vg-play-bg', fallback: 'rgb(0 0 0 / 0.7)', note: 'Play button circle. Keep 3:1 against the posters.' },
+      { name: '--vg-play-fg', fallback: '#fff', note: 'Play icon.' },
+      { name: '--vg-play-size', fallback: '3.5rem', note: 'Diameter of the circle.' },
+      { name: '--vg-focus', fallback: '#5933d8', note: 'Focus ring on tiles and chips.' },
+      { name: '--vg-title', fallback: 'inherit', note: 'Tile title colour.' },
+      { name: '--vg-caption', fallback: 'inherit', note: 'Caption colour.' },
+      { name: '--vg-chip-bg', fallback: '#fff', note: 'Chip fill.' },
+      { name: '--vg-chip-fg', fallback: '#1e283c', note: 'Chip text (14.75:1 on the fallback fill).' },
+      { name: '--vg-chip-border', fallback: '#c9cedb', note: 'Chip outline.' },
+      { name: '--vg-chip-on-bg', fallback: '#1e283c', note: 'The pressed chip’s fill.' },
+      { name: '--vg-chip-on-fg', fallback: '#fff', note: 'The pressed chip’s text.' },
+      { name: '--vg-backdrop', fallback: 'rgb(0 0 0 / 0.88)', note: 'Lightbox backdrop.' },
+      { name: '--vg-close-bg', fallback: 'rgb(255 255 255 / 0.15)', note: 'Lightbox close button fill.' },
+      { name: '--vg-close-fg', fallback: '#fff', note: 'Lightbox close icon and title.' },
+    ],
+    a11y: [
+      'Each tile’s play control is a real <button> named “Play: <title>”, over the whole poster, with a visible focus ring. The title is also printed under the tile as a heading (titleTag).',
+      'Filter chips are a labelled group of <button aria-pressed>, “All” first and pressed. Choosing one hides the other tiles and a polite live region says how many are shown (“Open films: 3 videos.”).',
+      'Lightbox: one native modal <dialog>, named by the video’s title: focus trapped, Escape and a backdrop click close it, the close button is labelled. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing empties the dialog so the sound stops, returns focus to the tile and releases the scroll lock.',
+      'Inline: focus moves into the player (the titled iframe, or the <video>). One tile plays at a time.',
+      'Self-hosted files keep the browser’s native controls with a captions menu. A captions track is expected (WCAG 1.2.2); the build warns without one.',
+      'prefers-reduced-motion: tiles shown by a filter appear at once instead of fading in, and the play button does not grow on hover. Nothing plays until asked.',
+      'Without JavaScript every tile is a link to the video’s own page (“Watch “<title>” on YouTube”), or to the file, and every video is listed: the chips are not shown.',
+    ],
+    usage: `<VideoGallery
+  videos={[
+    { url: 'https://www.youtube.com/watch?v=VIDEO_ID', title: 'Planting garlic', poster: '/images/garlic.webp', category: 'How-to' },
+    { url: 'https://vimeo.com/123456789', title: 'Spring open day', poster: '/images/open-day.webp', category: 'Events' },
+    { url: '/video/tour.mp4', title: 'A tour of the farm', poster: '/video/tour.webp',
+      tracks: [{ src: '/video/tour.en.vtt', srclang: 'en', label: 'English' }], category: 'Events' },
+  ]}
+  counts
+/>
+<!-- .videos { --vg-play-bg: var(--brand); --vg-radius: var(--radius); --vg-chip-on-bg: var(--brand); } -->`,
+    license:
+      'The videos stay yours, or their owners’: the gallery plays them from YouTube, Vimeo or your own site, under those services’ terms, and adds nothing of its own. The films in our demo are the Blender Foundation’s open films Big Buck Bunny and Sintel, CC BY 3.0, credited under each one as that licence asks.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/video-gallery/ (demo)' }],
+    file: 'src/library/video-gallery/VideoGallery.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
