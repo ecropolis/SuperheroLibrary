@@ -1,0 +1,449 @@
+---
+/**
+ * Tabcordion — one set of panels that is a row of tabs when the element itself is wide and an
+ * accordion when it is narrow. The width that decides is the element's OWN width (a CSS
+ * container query), not the window's: the same tabcordion is tabs in a wide column and an
+ * accordion in a sidebar on the same desktop page.
+ *
+ * One DOM. Each panel is rendered once as a <section> with its label as a heading; the tab
+ * strip is a row of buttons naming the same sections. What a visitor gets:
+ *   - Without JavaScript: no tab strip; every panel is open under its heading, a plain page.
+ *   - Tabs (the element is at least `breakpoint` wide): tablist / tab / tabpanel, aria-selected,
+ *     roving tabindex, ← → Home End (automatic activation). One panel shows.
+ *   - Accordion (narrower): each heading holds a button with aria-expanded and aria-controls.
+ *     `multiple` (default true) lets several stay open; `multiple={false}` keeps one.
+ *
+ * CSS decides the layout. The container query sets `--tcd-layout` to `tabs` or `accordion` on
+ * the frame and draws that layout; the script reads the property whenever the element resizes
+ * and makes the ARIA match. So there is one breakpoint, in the stylesheet, and no second copy
+ * in JavaScript to drift from it.
+ *
+ * State is carried across the switch. Going to the accordion opens the selected tab's panel
+ * (and keeps any the visitor had open before). Going to tabs selects the panel opened most
+ * recently that is still open; if the visitor closed them all, the last selected tab stays.
+ * The rules are the `tabcordion-state` block below, which `npm run check` runs as golden cases.
+ *
+ * `#<id>` in the URL (on load and on hashchange) selects that panel, or opens it in the
+ * accordion. The element never rewrites the address.
+ *
+ * Motion: the chevron turns and a newly shown tab panel fades in over 150 ms; neither under
+ * prefers-reduced-motion.
+ *
+ * Sizing: a block that fills its container. It is a size container, so inside a flex row give
+ * it `flex: 1` (or a width): a size container does not grow to fit its content. No positioning,
+ * no z-index.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --tcd-accent               selected tab marker, chevron        (currentColor)
+ *   --tcd-fg / --tcd-muted      text / unselected tab text          (inherit / inherit at 72%)
+ *   --tcd-bg                   panel and selected tab fill         (transparent)
+ *   --tcd-strip-bg             tab strip and closed heading fill   (rgb(0 0 0 / 0.04))
+ *   --tcd-border / --tcd-radius frame and rules / frame corners     (rgb(0 0 0 / 0.14) / 0.5rem)
+ *   --tcd-pad                  panel padding                       (1.25rem)
+ *   --tcd-focus                keyboard focus ring                 (currentColor)
+ */
+export interface TabcordionPanel {
+  /** Anchor for the panel, unique on the page: `#delivery`. Letters, digits, - or _. */
+  id: string;
+  label: string;
+  /** The panel as an HTML string. Or leave it out and name a slot in `slot`. */
+  body?: string;
+  /** Name of a slot that fills the panel: `slot: 'delivery'` plus `<div slot="delivery">…</div>`. */
+  slot?: string;
+}
+interface Props {
+  panels: TabcordionPanel[];
+  /** Accessible name of the tab strip, e.g. "Product details". */
+  label: string;
+  /** The element's own width from which it is tabs: sm 30rem, md 40rem, lg 52rem. */
+  breakpoint?: 'sm' | 'md' | 'lg';
+  /** Accordion: several panels open at once (true) or one (false). */
+  multiple?: boolean;
+  /** id of the panel selected (and open) first. Default: the first. */
+  selected?: string;
+  /** Level of each panel's heading: shown without JavaScript, and holding the accordion button. */
+  headingLevel?: 2 | 3 | 4;
+  class?: string;
+}
+const { panels, label, breakpoint = 'md', multiple = true, selected, headingLevel = 3, class: className } = Astro.props;
+
+if (!panels?.length) throw new Error('Tabcordion: `panels` is empty.');
+if (!label) throw new Error('Tabcordion: `label` (the tab strip’s accessible name) is required.');
+const ids = new Set<string>();
+for (const p of panels) {
+  if (!/^[A-Za-z][\w-]*$/.test(p.id)) throw new Error(`Tabcordion: panel id "${p.id}" must start with a letter and use letters, digits, - or _.`);
+  if (ids.has(p.id)) throw new Error(`Tabcordion: panel id "${p.id}" is used twice.`);
+  ids.add(p.id);
+}
+if (selected && !ids.has(selected)) throw new Error(`Tabcordion: selected="${selected}" names no panel.`);
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const bodies = await Promise.all(
+  panels.map((p) => (p.body !== undefined ? Promise.resolve(p.body) : p.slot && Astro.slots.has(p.slot) ? Astro.slots.render(p.slot) : Promise.resolve(''))),
+);
+
+// The runtime goes out once per page; it mounts every tabcordion on it.
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__tabcordionScript;
+locals.__tabcordionScript = true;
+---
+
+<div
+  class:list={['tcd', `tcd--${breakpoint}`, className]}
+  data-tcd
+  data-multiple={multiple ? '' : undefined}
+  data-selected={selected}
+>
+  <div class="tcd__frame">
+    <div class="tcd__strip" role="tablist" aria-label={label} hidden data-tcd-list>
+      {
+        panels.map((p) => (
+          <button class="tcd__tab" type="button" role="tab" id={`${p.id}-tab`} aria-controls={p.id} aria-selected="false" tabindex="-1">
+            {p.label}
+          </button>
+        ))
+      }
+    </div>
+    {
+      panels.map((p, i) => (
+        <section class="tcd__panel" id={p.id} data-tcd-panel>
+          <H class="tcd__heading">
+            <span class="tcd__label">{p.label}</span>
+          </H>
+          <div class="tcd__body" id={`${p.id}-body`} set:html={bodies[i]} />
+        </section>
+      ))
+    }
+  </div>
+</div>
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroTabcordion) return;
+
+        // <tabcordion-state>
+        // The rules, as plain functions of (state, action): no DOM here. npm run check imports
+        // this block from the built page and runs it against golden cases.
+        function tabcordionState() {
+          const valid = (s, i) => Number.isInteger(i) && i >= 0 && i < s.n;
+          /** n panels; `selected` is the tab; `open` the accordion's panels; `recent` their opening order. */
+          const init = ({ n, selected = 0, multiple = true, mode = 'accordion' }) => {
+            const sel = Number.isInteger(selected) && selected >= 0 && selected < n ? selected : 0;
+            // Loaded as an accordion, the selected panel is open. Loaded as tabs, nothing is open
+            // yet: the accordion opens the selected tab's panel when the element narrows.
+            const acc = mode === 'accordion';
+            return { n, mode, multiple, selected: sel, open: Array.from({ length: n }, (_, i) => acc && i === sel), recent: acc ? [sel] : [] };
+          };
+          const opened = (s, i) => {
+            const open = s.multiple ? s.open.slice() : s.open.map(() => false);
+            open[i] = true;
+            const recent = (s.multiple ? s.recent.filter((r) => r !== i) : []).concat(i);
+            return { ...s, open, recent, selected: i };
+          };
+          const reduce = (s, a) => {
+            if (a.type === 'mode') {
+              if (a.mode === s.mode || (a.mode !== 'tabs' && a.mode !== 'accordion')) return s;
+              // To the accordion: the selected tab's panel is open. To tabs: `selected` already
+              // follows the accordion (the panel opened most recently that is still open, or the
+              // last selection when all are closed), so it simply stays.
+              if (a.mode === 'accordion') return { ...opened(s, s.selected), mode: 'accordion' };
+              return { ...s, mode: 'tabs' };
+            }
+            if (!valid(s, a.index)) return s;
+            if (a.type === 'select') return s.mode === 'tabs' ? { ...s, selected: a.index } : opened(s, a.index);
+            if (a.type === 'toggle') {
+              if (!s.open[a.index]) return opened(s, a.index);
+              const open = s.open.slice();
+              open[a.index] = false;
+              const recent = s.recent.filter((r) => r !== a.index);
+              return { ...s, open, recent, selected: recent.length ? recent[recent.length - 1] : s.selected };
+            }
+            return s;
+          };
+          /** Arrow keys: ← → in the tab strip, ↑ ↓ between accordion headings; both wrap. */
+          const move = (mode, key, i, n) => {
+            const next = mode === 'tabs' ? 'ArrowRight' : 'ArrowDown';
+            const prev = mode === 'tabs' ? 'ArrowLeft' : 'ArrowUp';
+            if (key === next) return (i + 1) % n;
+            if (key === prev) return (i - 1 + n) % n;
+            if (key === 'Home') return 0;
+            if (key === 'End') return n - 1;
+            return -1;
+          };
+          /** Attributes per panel; null removes one. `focusable[i]`: the panel holds a focusable element. */
+          const view = (s, ids, focusable = []) => {
+            const tabs = s.mode === 'tabs';
+            return {
+              list: { hidden: tabs ? null : '' },
+              panels: ids.map((id, i) => ({
+                tab: { 'aria-selected': String(tabs && i === s.selected), tabindex: i === s.selected ? '0' : '-1' },
+                button: { 'aria-expanded': String(!!s.open[i]) },
+                panel: {
+                  role: tabs ? 'tabpanel' : null,
+                  'aria-labelledby': tabs ? `${id}-tab` : null,
+                  tabindex: tabs && !focusable[i] ? '0' : null,
+                  hidden: tabs && i !== s.selected ? '' : null,
+                },
+                body: { hidden: !tabs && !s.open[i] ? '' : null },
+              })),
+            };
+          };
+          return { init, reduce, move, view };
+        }
+        // </tabcordion-state>
+
+        const T = tabcordionState();
+        const FOCUSABLE = 'a[href], button, input, select, textarea, iframe, audio[controls], video[controls], summary, [tabindex]:not([tabindex="-1"]), [contenteditable]';
+        const set = (el, attrs) => {
+          for (const [k, v] of Object.entries(attrs)) v === null ? el.removeAttribute(k) : el.setAttribute(k, v);
+        };
+
+        const mount = (root) => {
+          if (root.dataset.ready) return;
+          const frame = root.querySelector('.tcd__frame');
+          const list = root.querySelector('[data-tcd-list]');
+          const tabs = [...list.querySelectorAll('[role="tab"]')];
+          const panels = [...frame.querySelectorAll(':scope > [data-tcd-panel]')];
+          const bodies = panels.map((p) => p.querySelector(':scope > .tcd__body'));
+          const ids = panels.map((p) => p.id);
+          const focusable = bodies.map((b) => !!b.querySelector(FOCUSABLE));
+
+          // Each heading's label moves into a real button: the accordion's control.
+          const buttons = panels.map((p, i) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'tcd__toggle';
+            b.id = `${ids[i]}-acc`;
+            b.setAttribute('aria-controls', bodies[i].id);
+            const span = p.querySelector('.tcd__label');
+            b.append(span);
+            p.querySelector('.tcd__heading').append(b);
+            return b;
+          });
+
+          const layout = () => (getComputedStyle(frame).getPropertyValue('--tcd-layout').trim() === 'tabs' ? 'tabs' : 'accordion');
+          const fromHash = () => {
+            try { return ids.indexOf(decodeURIComponent(location.hash.slice(1))); } catch { return -1; }
+          };
+          const start = fromHash() >= 0 ? fromHash() : Math.max(0, ids.indexOf(root.dataset.selected || ''));
+          let state = T.init({ n: panels.length, selected: start, multiple: 'multiple' in root.dataset, mode: layout() });
+
+          const render = (prev) => {
+            const v = T.view(state, ids, focusable);
+            set(list, v.list);
+            v.panels.forEach((a, i) => {
+              set(tabs[i], a.tab);
+              set(buttons[i], a.button);
+              set(panels[i], a.panel);
+              set(bodies[i], a.body);
+            });
+            root.dataset.layout = state.mode;
+            if (prev && prev.mode === 'tabs' && state.mode === 'tabs' && prev.selected !== state.selected) {
+              const p = panels[state.selected];
+              p.classList.remove('tcd__panel--in');
+              void p.offsetWidth; // restart the fade
+              p.classList.add('tcd__panel--in');
+            }
+          };
+          const dispatch = (action) => {
+            const prev = state;
+            state = T.reduce(state, action);
+            if (state !== prev) render(prev);
+          };
+
+          tabs.forEach((t, i) => t.addEventListener('click', () => dispatch({ type: 'select', index: i })));
+          list.addEventListener('keydown', (e) => {
+            const i = tabs.indexOf(document.activeElement);
+            const n = i < 0 ? -1 : T.move('tabs', e.key, i, tabs.length);
+            if (n < 0) return;
+            e.preventDefault();
+            dispatch({ type: 'select', index: n });
+            tabs[n].focus();
+          });
+          buttons.forEach((b, i) => {
+            b.addEventListener('click', () => dispatch({ type: 'toggle', index: i }));
+            b.addEventListener('keydown', (e) => {
+              const n = T.move('accordion', e.key, i, buttons.length);
+              if (n < 0) return;
+              e.preventDefault();
+              buttons[n].focus();
+            });
+          });
+          addEventListener('hashchange', () => {
+            const i = fromHash();
+            if (i < 0) return;
+            dispatch({ type: 'select', index: i });
+            panels[i].scrollIntoView({ block: 'nearest' });
+          });
+          // The stylesheet decides the layout; follow it whenever the element changes width.
+          new ResizeObserver(() => dispatch({ type: 'mode', mode: layout() })).observe(root);
+
+          root.dataset.ready = '';
+          render(null);
+        };
+
+        const boot = () => document.querySelectorAll('[data-tcd]').forEach(mount);
+        window.__superheroTabcordion = { mount, state: tabcordionState };
+        document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+      })();
+    </script>
+  )
+}
+
+<style>
+  .tcd {
+    container: tabcordion / inline-size;
+    color: var(--tcd-fg, inherit);
+  }
+  .tcd [hidden] {
+    display: none !important;
+  }
+  .tcd__frame {
+    --tcd-layout: accordion;
+    border: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
+    border-radius: var(--tcd-radius, 0.5rem);
+    background: var(--tcd-bg, transparent);
+    overflow: clip;
+  }
+  .tcd :focus-visible {
+    outline: 3px solid var(--tcd-focus, currentColor);
+    outline-offset: -3px;
+  }
+  .tcd__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .tcd__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  /* ---- no JavaScript, and the accordion: panels stacked, each under its heading. */
+  .tcd__panel + .tcd__panel {
+    border-top: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
+  }
+  .tcd__heading {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.35;
+  }
+  .tcd__label {
+    display: block;
+    padding: 0.85rem var(--tcd-pad, 1.25rem) 0;
+  }
+  .tcd__body {
+    padding: 0.5rem var(--tcd-pad, 1.25rem) var(--tcd-pad, 1.25rem);
+  }
+  /* The script moves the label into this button, so it carries no scope attribute: :global. */
+  .tcd :global(.tcd__toggle) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.85rem var(--tcd-pad, 1.25rem);
+    border: 0;
+    background: var(--tcd-strip-bg, rgb(0 0 0 / 0.04));
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-align: start;
+    cursor: pointer;
+  }
+  .tcd :global(.tcd__toggle[aria-expanded='true']) {
+    background: var(--tcd-bg, transparent);
+  }
+  .tcd :global(.tcd__toggle .tcd__label) {
+    padding: 0;
+  }
+  .tcd :global(.tcd__toggle)::after {
+    content: '';
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-inline-end: 0.3rem;
+    border-right: 2px solid var(--tcd-accent, currentColor);
+    border-bottom: 2px solid var(--tcd-accent, currentColor);
+    rotate: 45deg;
+    translate: 0 -0.15rem;
+  }
+  .tcd :global(.tcd__toggle[aria-expanded='true'])::after {
+    rotate: 225deg;
+    translate: 0 0.15rem;
+  }
+
+  /* ---- tabs: only with the script (data-ready), and only when the element is wide enough. */
+  .tcd__strip {
+    display: none;
+  }
+  @container tabcordion (min-width: 30rem) {
+    .tcd--sm > .tcd__frame {
+      --tcd-layout: tabs;
+    }
+  }
+  @container tabcordion (min-width: 40rem) {
+    .tcd--md > .tcd__frame {
+      --tcd-layout: tabs;
+    }
+  }
+  @container tabcordion (min-width: 52rem) {
+    .tcd--lg > .tcd__frame {
+      --tcd-layout: tabs;
+    }
+  }
+  .tcd[data-layout='tabs'] .tcd__strip {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    background: var(--tcd-strip-bg, rgb(0 0 0 / 0.04));
+    border-bottom: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
+  }
+  .tcd[data-layout='tabs'] .tcd__heading {
+    display: none;
+  }
+  .tcd[data-layout='tabs'] .tcd__panel {
+    border-top: 0;
+  }
+  .tcd[data-layout='tabs'] .tcd__body {
+    padding: var(--tcd-pad, 1.25rem);
+  }
+  .tcd__tab {
+    flex: none;
+    min-height: 2.75rem;
+    padding: 0.7rem 1.15rem;
+    border: 0;
+    border-inline-end: 1px solid var(--tcd-border, rgb(0 0 0 / 0.14));
+    background: transparent;
+    color: var(--tcd-muted, color-mix(in srgb, currentColor 72%, transparent));
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tcd__tab:hover {
+    color: var(--tcd-fg, inherit);
+  }
+  .tcd__tab[aria-selected='true'] {
+    background: var(--tcd-bg, transparent);
+    color: var(--tcd-fg, inherit);
+    box-shadow:
+      inset 0 3px 0 var(--tcd-accent, currentColor),
+      0 1px 0 var(--tcd-bg, transparent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tcd :global(.tcd__toggle)::after {
+      transition:
+        rotate 200ms ease,
+        translate 200ms ease;
+    }
+    .tcd[data-layout='tabs'] .tcd__panel--in {
+      animation: tcd-in 150ms ease-out;
+    }
+  }
+  @keyframes tcd-in {
+    from {
+      opacity: 0;
+    }
+  }
+</style>

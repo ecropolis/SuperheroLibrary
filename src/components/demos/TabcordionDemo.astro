@@ -1,0 +1,105 @@
+---
+/**
+ * Demo for `tabcordion`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * Two instances on one page, to show that the element's own width decides:
+ *   1. Product details in a frame the visitor can drag narrower (CSS `resize`): tabs while it
+ *      is 40rem or wider, an accordion (several open at once) below that.
+ *   2. The same kind of content in a 17rem sidebar: an accordion on a desktop screen too, one
+ *      panel open at a time (`multiple={false}`).
+ * A link below the first opens its Delivery panel through the #hash.
+ */
+import Tabcordion from '../../library/tabcordion/Tabcordion.astro';
+
+const mug = [
+  {
+    id: 'mug-description',
+    label: 'Description',
+    body: '<p>A 12 oz stoneware mug, thrown by hand and glazed in a speckled oat colour. Each one is a little different.</p>',
+  },
+  {
+    id: 'mug-size',
+    label: 'Size',
+    body: '<p>9.5 cm tall and 8.5 cm across the rim, with a handle that fits three fingers. It weighs about 380 g.</p>',
+  },
+  {
+    id: 'mug-care',
+    label: 'Care',
+    body: '<p>Dishwasher and microwave safe. Avoid sudden changes of temperature, such as boiling water into a cold mug straight from the fridge.</p>',
+  },
+  {
+    id: 'mug-delivery',
+    label: 'Delivery',
+    body: '<p>Packed in recycled card and sent within two working days. <a href="#mug-description">Back to the description</a>.</p>',
+  },
+];
+const visit = [
+  { id: 'visit-hours', label: 'Opening times', body: '<p>Tuesday to Saturday, 10 am to 5 pm. Closed on public holidays.</p>' },
+  { id: 'visit-parking', label: 'Parking', body: '<p>Free on the street after 9 am, and in the car park behind the library.</p>' },
+  { id: 'visit-access', label: 'Access', body: '<p>Step-free entrance on the side street, and a ramp to the kiln room.</p>' },
+];
+---
+<div class="demo-tcd">
+  <section>
+    <h2 class="demo-tcd__h">Product details</h2>
+    <p class="demo-tcd__note">Drag the corner of the box to make it narrower: below 40rem the tabs become an accordion, and the open panel stays open.</p>
+    <div class="demo-tcd__resize">
+      <Tabcordion label="Product details" panels={mug} class="demo-tcd__mug" />
+    </div>
+    <p class="demo-tcd__note">A link can open a panel: <a href="#mug-delivery">delivery times</a>.</p>
+  </section>
+
+  <section class="demo-tcd__split">
+    <div class="demo-tcd__main">
+      <h2 class="demo-tcd__h">In a sidebar</h2>
+      <p class="demo-tcd__note">The same element in a 17rem column stays an accordion on a wide screen, because its own width decides, not the window’s. This one keeps a single panel open.</p>
+    </div>
+    <aside class="demo-tcd__aside">
+      <Tabcordion label="Visiting the studio" panels={visit} multiple={false} headingLevel={3} class="demo-tcd__visit" />
+    </aside>
+  </section>
+</div>
+<style>
+  .demo-tcd {
+    display: grid;
+    gap: 2.5rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-tcd__h {
+    margin: 0 0 0.5rem;
+    font-size: 1.35rem;
+  }
+  .demo-tcd__note {
+    margin: 0.5rem 0 0.75rem;
+    font-size: 0.95rem;
+  }
+  .demo-tcd__resize {
+    resize: horizontal;
+    overflow: auto;
+    min-width: 16rem;
+    max-width: 100%;
+    padding: 0 0.75rem 0.75rem 0;
+    border: 1px dashed var(--line, #e6e6f0);
+    border-width: 0 1px 1px 0;
+  }
+  .demo-tcd__split {
+    display: grid;
+    gap: 1rem 1.5rem;
+  }
+  @media (min-width: 48rem) {
+    .demo-tcd__split {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+      align-items: start;
+    }
+  }
+  .demo-tcd :global(.demo-tcd__mug),
+  .demo-tcd :global(.demo-tcd__visit) {
+    --tcd-accent: var(--purple, #5933d8);
+    --tcd-border: var(--line, #e6e6f0);
+    --tcd-focus: var(--purple, #5933d8);
+    --tcd-bg: var(--white, #fff);
+    --tcd-strip-bg: var(--tint, #f8f8fc);
+    --tcd-radius: var(--radius, 8px);
+  }
+</style>

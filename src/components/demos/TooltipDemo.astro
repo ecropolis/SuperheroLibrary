@@ -1,0 +1,114 @@
+---
+/**
+ * Demo for `tooltip`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets; the icons are
+ * Font Awesome Free, inlined by the library's `icon` element at build time.
+ *
+ * What it shows: a term in a sentence, two icon-only triggers (44px targets, named by `label`),
+ * a link with a description, the four placements, and one with `inline={false}` (without
+ * JavaScript its text is the trigger's `title` instead of a bracket after it).
+ *
+ * Keep a trigger on the same line as the word before it, after a space: Astro's HTML compression
+ * drops a line break between text and a component, and the words run together.
+ */
+import Tooltip from '../../library/tooltip/Tooltip.astro';
+import Icon from '../../library/icon/Icon.astro';
+---
+<div class="demo-tt">
+  <section>
+    <h2 class="demo-tt__h">In a sentence</h2>
+    <p>
+      Orders placed before noon ship the same day, and arrive in <Tooltip text="Monday to Friday, not counting public holidays.">two working days</Tooltip>.
+      Unused items can go back under our <Tooltip href="#demo-tt-returns" text="30 days from delivery, in the original packaging.">returns policy</Tooltip>.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="demo-tt__h">Icon-only triggers</h2>
+    <dl class="demo-tt__prices">
+      <div>
+        <dt>
+          Standard delivery
+          <Tooltip label="About standard delivery" text="Two to four working days, tracked." placement="right" class="demo-tt__icon">
+            <Icon name="circle-info" />
+          </Tooltip>
+        </dt>
+        <dd>$4.95</dd>
+      </div>
+      <div>
+        <dt>
+          Next-day delivery
+          <Tooltip label="About next-day delivery" text="Order by 2 pm, Monday to Thursday, for delivery the next working day." placement="right" class="demo-tt__icon">
+            <Icon name="truck-fast" />
+          </Tooltip>
+        </dt>
+        <dd>$9.95</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section>
+    <h2 class="demo-tt__h">Placement</h2>
+    <p class="demo-tt__note">Each has a preferred side. Near the edge of the window it flips to the other side and slides to stay on screen.</p>
+    <p class="demo-tt__row">
+      <Tooltip text="Above, unless there is no room." placement="top">Top</Tooltip>
+      <Tooltip text="Below, unless there is no room." placement="bottom">Bottom</Tooltip>
+      <Tooltip text="To the left, unless there is no room." placement="left">Left</Tooltip>
+      <Tooltip text="To the right, unless there is no room." placement="right">Right</Tooltip>
+      <Tooltip text="Without JavaScript this one is the browser’s own tooltip (title), not a bracket." inline={false}>Not inline</Tooltip>
+    </p>
+  </section>
+  <p class="demo-tt__note" id="demo-tt-returns">Hover, or press Tab to reach a trigger; Escape hides the tip.</p>
+</div>
+<style>
+  .demo-tt {
+    display: grid;
+    gap: 2rem;
+    color: var(--ink, #16192a);
+    --tt-bg: var(--navy, #1d2130);
+    --tt-focus: var(--purple, #5933d8);
+  }
+  .demo-tt__h {
+    margin: 0 0 0.5rem;
+    font-size: 1.35rem;
+  }
+  .demo-tt p {
+    margin: 0;
+    line-height: 1.7;
+  }
+  .demo-tt__note {
+    font-size: 0.95rem;
+  }
+  .demo-tt__prices {
+    display: grid;
+    gap: 0.25rem;
+    max-width: 22rem;
+    margin: 0;
+  }
+  .demo-tt__prices > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--line, #e6e6f0);
+  }
+  .demo-tt__prices dt {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
+  .demo-tt__prices dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .demo-tt :global(.demo-tt__icon) {
+    --tt-trigger: var(--purple, #5933d8);
+  }
+  .demo-tt__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    margin-top: 0.75rem !important;
+  }
+</style>

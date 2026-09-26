@@ -1,0 +1,100 @@
+---
+/**
+ * Demo for `responsive-table`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * Two tables:
+ *   1. A class timetable in cards mode, in a frame the visitor can drag narrower (CSS
+ *      `resize`): a table from 40rem, one card per class below it. Striped; Length, Price and
+ *      Places are detected as numbers and right-aligned ("—" is a blank, not text).
+ *   2. A plan comparison in scroll mode: nine columns in a scrollbox, with fades at the edges
+ *      that have more and a one-time "Scroll sideways for more". `maxHeight` makes the box
+ *      scroll down too, so its `sticky` header has something to stick in. (The resizable frame
+ *      of the first is itself a scroll container, where a sticky header could not stick.)
+ */
+import ResponsiveTable from '../../library/responsive-table/ResponsiveTable.astro';
+
+const classes = {
+  columns: [
+    { key: 'name', label: 'Class' },
+    { key: 'day', label: 'Day' },
+    { key: 'time', label: 'Time' },
+    { key: 'length', label: 'Length (min)' },
+    { key: 'price', label: 'Price' },
+    { key: 'places', label: 'Places left' },
+  ],
+  rows: [
+    { name: 'Wheel throwing for beginners', day: 'Tuesday', time: '6:30 pm', length: 120, price: '$45.00', places: 3 },
+    { name: 'Hand building', day: 'Wednesday', time: '10:00 am', length: 90, price: '$35.00', places: 6 },
+    { name: 'Glazing workshop', day: 'Thursday', time: '7:00 pm', length: 90, price: '$40.00', places: 0 },
+    { name: 'Open studio', day: 'Saturday', time: '9:00 am', length: 240, price: '$25.00', places: 10 },
+    { name: 'Family clay morning', day: 'Sunday', time: '10:30 am', length: 60, price: '$20.00', places: '—' },
+  ],
+};
+const plans = {
+  columns: [
+    { key: 'plan', label: 'Plan' },
+    { key: 'monthly', label: 'Monthly' },
+    { key: 'yearly', label: 'Yearly' },
+    { key: 'pages', label: 'Pages' },
+    { key: 'users', label: 'Editors' },
+    { key: 'storage', label: 'Storage (GB)' },
+    { key: 'domain', label: 'Custom domain' },
+    { key: 'support', label: 'Support' },
+    { key: 'more', label: 'Details', html: true },
+  ],
+  rows: [
+    { plan: 'Solo', monthly: '$6', yearly: '$60', pages: 1, users: 1, storage: 1, domain: 'No', support: 'Help pages', more: '<a href="#demo-rt-plans">Solo plan</a>' },
+    { plan: 'Starter', monthly: '$12', yearly: '$120', pages: 5, users: 1, storage: 2, domain: 'No', support: 'Email, next working day', more: '<a href="#demo-rt-plans">Starter plan</a>' },
+    { plan: 'Studio', monthly: '$29', yearly: '$290', pages: 25, users: 3, storage: 20, domain: 'Yes', support: 'Email and phone, same day', more: '<a href="#demo-rt-plans">Studio plan</a>' },
+    { plan: 'Agency', monthly: '$79', yearly: '$790', pages: '1,000', users: 15, storage: 200, domain: 'Yes, up to 10', support: 'A named person, within the hour', more: '<a href="#demo-rt-plans">Agency plan</a>' },
+    { plan: 'Enterprise', monthly: '—', yearly: 'By quote', pages: 'Unlimited', users: 'Unlimited', storage: '1,000', domain: 'Yes, any number', support: 'A named team, around the clock', more: '<a href="#demo-rt-plans">Enterprise plan</a>' },
+  ],
+};
+---
+<div class="demo-rt">
+  <section>
+    <h2 class="demo-rt__h">Cards on a narrow screen</h2>
+    <p class="demo-rt__note">Drag the corner of the box to make it narrower: below 40rem each class becomes a card, every value under its column’s name.</p>
+    <div class="demo-rt__resize">
+      <ResponsiveTable caption="Classes this week" {...classes} striped class="demo-rt__table" />
+    </div>
+  </section>
+
+  <section id="demo-rt-plans">
+    <h2 class="demo-rt__h">A wide table that scrolls</h2>
+    <p class="demo-rt__note">Nine columns keep their shape; the edge fades where there is more, and the box takes arrow keys once it has focus. With a height limit it scrolls down too, and the header row stays in view.</p>
+    <ResponsiveTable caption="Plans compared" {...plans} mode="scroll" sticky maxHeight="15rem" class="demo-rt__table" />
+  </section>
+</div>
+<style>
+  .demo-rt {
+    display: grid;
+    gap: 2.5rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-rt__h {
+    margin: 0 0 0.5rem;
+    font-size: 1.35rem;
+  }
+  .demo-rt__note {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+  }
+  .demo-rt__resize {
+    resize: horizontal;
+    overflow: auto;
+    min-width: 16rem;
+    max-width: 100%;
+    padding: 0 0.75rem 0.75rem 0;
+    border: 1px dashed var(--line, #e6e6f0);
+    border-width: 0 1px 1px 0;
+  }
+  .demo-rt :global(.demo-rt__table) {
+    --rt-border: var(--line, #e6e6f0);
+    --rt-head-bg: var(--tint, #f8f8fc);
+    --rt-card-bg: var(--white, #fff);
+    --rt-radius: var(--radius, 8px);
+    --rt-focus: var(--purple, #5933d8);
+  }
+</style>

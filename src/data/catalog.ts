@@ -2056,6 +2056,197 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     file: 'src/library/link-effects/LinkEffects.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'tabcordion',
+    name: 'Tabcordion',
+    aka: ['responsive tabs', 'tabs to accordion', 'accordion tabs', 'tabs on mobile', 'product details tabs', 'Easy Responsive Tabs'],
+    summary:
+      'One set of panels that is tabs when the element is wide and an accordion when it is narrow, decided by a CSS container query on its own width rather than the window. The ARIA follows the layout (tablist / tab / tabpanel, or buttons with aria-expanded), the open panel carries across the switch, and the accordion can hold several open. Without JavaScript every panel is open under its heading.',
+    pitch: 'The same details as tabs where there is room and as an accordion where there is not, even in a sidebar, and the section someone was reading stays open when it changes.',
+    // SE Ranking US, 2026-09-26: responsive accordion 320/mo, difficulty 32 (rising: 50/mo a
+    // year ago); tabs on mobile 110/11; responsive tabs 40/35; tabs to accordion 10/34. The brief's
+    // "responsive tabs accordion" and "tabcordion" have no measurable volume.
+    search: { query: 'responsive accordion', alsoRanks: ['tabs on mobile', 'responsive tabs', 'tabs to accordion'] },
+    replaces: ['A tabs widget and a toggle widget with the same content, one hidden on desktop and one on mobile (the usual Elementor and Divi workaround)', 'Easy Responsive Tabs and other tabs-to-accordion jQuery plugins'],
+    goodFor:
+      'A few sections that sit in columns of different widths: product details beside a gallery, a service’s scope in a card grid, visiting information in a sidebar. On a phone several sections can stay open at once, so people can compare two without reopening.',
+    notFor:
+      'A tab set that should stay tabs until the phone, or that needs a vertical strip, icons, manual activation or a #hash that follows the selection: use tabs, which decides by the window. A list of questions, FAQ schema, or answers that find-in-page should reach while closed: use accordion, which is native <details>. And anything everyone must read: behind a tab or a tap, most people never see it.',
+    props: [
+      { name: 'panels', type: 'TabcordionPanel[]', note: '`{ id, label, body?, slot? }`. `id` is the anchor (unique on the page); `body` an HTML string, or name a slot in `slot`.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
+      { name: 'breakpoint', type: '“sm” | “md” | “lg”', default: '“md”', note: 'The element’s own width from which it is tabs: 30rem, 40rem or 52rem. Narrower, it is an accordion. Tracked live.' },
+      { name: 'multiple', type: 'boolean', default: 'true', note: 'Accordion: several panels open at once. false keeps one open.' },
+      { name: 'selected', type: 'string', note: 'id of the panel selected, and open, first. Default: the first. A #id in the URL wins.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Level of each panel’s heading: shown without JavaScript, and holding the accordion button.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tcd-accent', fallback: 'currentColor', note: 'Selected tab marker and the accordion chevron.' },
+      { name: '--tcd-fg', fallback: 'inherit', note: 'Text, and the selected tab.' },
+      { name: '--tcd-muted', fallback: 'currentColor at 72%', note: 'Unselected tabs.' },
+      { name: '--tcd-bg', fallback: 'transparent', note: 'Panel, selected tab and open heading fill.' },
+      { name: '--tcd-strip-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Tab strip and closed accordion headings.' },
+      { name: '--tcd-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Frame and rules.' },
+      { name: '--tcd-radius', fallback: '0.5rem', note: 'Frame corners.' },
+      { name: '--tcd-pad', fallback: '1.25rem', note: 'Panel and heading padding.' },
+      { name: '--tcd-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'Tabs: tablist named by `label`, tab and tabpanel with aria-selected, aria-controls and aria-labelledby, a roving tabindex so the strip is one Tab stop; ← → wrap, Home and End jump to the ends, and a tab is selected when it gets focus. A panel with nothing focusable inside is itself focusable.',
+      'Accordion: each heading holds a real button with aria-expanded and aria-controls; Enter and Space toggle, ↑ ↓ Home End move between headings. The tab strip is hidden and the panels lose their tabpanel role, so a screen reader never meets tab semantics it cannot use.',
+      'One breakpoint, in the stylesheet: the script reads the layout the container query chose and sets the ARIA to match whenever the element changes width. The selected tab’s panel is open in the accordion, and the panel opened last is the selected tab when it widens again.',
+      'Without JavaScript there is no tab strip and every panel is open under its label as a heading; #id links jump to the panel.',
+      'prefers-reduced-motion: no panel fade and no chevron turn.',
+    ],
+    usage: `<Tabcordion
+  label="Product details"
+  panels={[
+    { id: 'description', label: 'Description', body: '<p>…</p>' },
+    { id: 'size', label: 'Size', slot: 'size' },
+    { id: 'delivery', label: 'Delivery', body: '<p>…</p>' },
+  ]}
+>
+  <div slot="size"><table>…</table></div>
+</Tabcordion>
+
+<aside class="sidebar">
+  <Tabcordion label="Visiting" panels={visit} multiple={false} breakpoint="sm" />
+</aside>
+<!-- .product { --tcd-accent: var(--brand); --tcd-border: var(--line); --tcd-bg: var(--white); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tabcordion/ (demo)' }],
+    file: 'src/library/tabcordion/Tabcordion.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'tooltip',
+    name: 'Tooltip',
+    aka: ['hover text', 'info icon', 'hint bubble', 'Tippy.js', 'Bootstrap tooltip', 'Elementor Hotspot tooltip'],
+    summary:
+      'A short line of text that describes a button or link, shown on hover and on keyboard focus, hidden by Escape, and placed above, below or beside its trigger with a flip and a slide when the window has no room. role="tooltip" attached with aria-describedby; the Popover API’s top layer where the browser has it. Without JavaScript the text shows in brackets after the trigger, or as its title.',
+    pitch: 'A small explanation on a word or an info icon, there when someone points at it or tabs to it, and out of the way the rest of the time.',
+    // SE Ranking US, 2026-09-26: tooltip html 320/mo, difficulty 24; tooltip ui 260/36;
+    // accessible tooltip 50/14; html tooltip 10/36. The brief's "accessible tooltip" is kept
+    // as a variant: the bigger query is the same page.
+    search: { query: 'tooltip html', alsoRanks: ['accessible tooltip', 'tooltip ui', 'html tooltip'] },
+    replaces: ['Page-builder tooltip add-ons and the tooltips of Elementor Pro’s Hotspot widget', 'Tippy.js, Popper and Bootstrap tooltips', 'title="…" attributes used as tooltips (mouse only, and never on a phone)'],
+    goodFor: 'A term a visitor may not know, an info icon beside a price or a setting, an icon-only button that needs its name spelled out: one sentence that helps and can be skipped.',
+    notFor:
+      'Anything with a link, a button or a form in it: that is a popover (a disclosure, or modal), because a tooltip vanishes as soon as focus moves and nothing inside it can be reached. Information people need to complete a task, such as a password rule or a form field’s format: show it as visible hint text. And a phone-first page that leans on them: on touch they need a tap to see.',
+    props: [
+      { name: 'text', type: 'string', note: 'The tip. Plain text, a sentence at most; markup is refused at build time.' },
+      { name: 'placement', type: '“top” | “bottom” | “left” | “right”', default: '“top”', note: 'Preferred side. With no room there it flips to the opposite side, then tries the other two, and slides along its side to stay 8px inside the window.' },
+      { name: 'label', type: 'string', note: 'Icon-only trigger: its accessible name. The slot (the icon) is then decorative, and the trigger is a 44px target.' },
+      { name: 'href', type: 'string', note: 'Make the trigger a link. A tap then follows the link; hover and focus still show the tip.' },
+      { name: 'inline', type: 'boolean', default: 'true', note: 'Without JavaScript: the text in brackets after the trigger (true) or the trigger’s title (false).' },
+      { name: 'id', type: 'string', default: 'generated', note: 'id of the tip, which the trigger’s aria-describedby names.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tt-bg', fallback: '#1d2130', note: 'Tip fill (the fallback pair is 16.0:1; `npm run check` computes it).' },
+      { name: '--tt-fg', fallback: '#fff', note: 'Tip text. Keep 4.5:1 on --tt-bg.' },
+      { name: '--tt-radius', fallback: '0.375rem', note: 'Tip corners.' },
+      { name: '--tt-max', fallback: '18rem', note: 'Widest the tip gets before it wraps.' },
+      { name: '--tt-font-size', fallback: '0.875rem', note: 'Tip text size.' },
+      { name: '--tt-trigger', fallback: 'inherit', note: 'Trigger colour (text and icon).' },
+      { name: '--tt-focus', fallback: 'currentColor', note: 'Trigger focus ring.' },
+      { name: '--tt-z', fallback: '1000', note: 'Stacking in browsers without the Popover API (elsewhere the tip is in the top layer).' },
+    ],
+    a11y: [
+      'The trigger is a real <button type="button"> (or a link with `href`) whose aria-describedby names the role="tooltip" element, so a screen reader reads the text with the trigger whether or not the tip is showing.',
+      'It shows on keyboard focus as well as on hover, never on hover only. Escape hides it without moving focus or the pointer; the pointer can move onto the tip without losing it; it stays until pointer and focus have both left (WCAG 1.4.13). One shows at a time.',
+      'On touch, a tap on a button trigger shows it and a second tap, or a tap elsewhere, hides it.',
+      'An icon-only trigger is named by `label`, its icon is aria-hidden, and it is at least 44 × 44 px.',
+      'The tip holds plain text only: markup is refused when the site is built, so nothing interactive can end up where focus cannot reach it.',
+      'Without JavaScript the text is in the page, in brackets after the trigger, or as the trigger’s title with `inline={false}`.',
+      'prefers-reduced-motion: no fade.',
+    ],
+    usage: `<p>
+  Arrives in <Tooltip text="Monday to Friday, not counting public holidays.">two working days</Tooltip>.
+</p>
+
+<Tooltip label="About next-day delivery" text="Order by 2 pm for delivery the next working day." placement="right">
+  <Icon name="circle-info" />
+</Tooltip>
+
+<Tooltip href="/returns/" text="30 days from delivery.">returns policy</Tooltip>
+<!-- .site { --tt-bg: var(--navy); --tt-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tooltip/ (demo)' }],
+    file: 'src/library/tooltip/Tooltip.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'responsive-table',
+    name: 'Responsive table',
+    aka: ['mobile table', 'table to cards', 'stacked table', 'TablePress responsive', 'data table', 'comparison table', 'price table'],
+    summary:
+      'A real <table> with a caption, scoped headers and right-aligned numbers, built from columns and rows. Below a breakpoint on its own width each row becomes a card, every value under its column’s name (CSS only, from data-label); or, in scroll mode, the table keeps its shape in a focusable scrollbox named by the caption, with edge fades and a one-time hint. Optional striped rows and sticky header. Without JavaScript: the table.',
+    pitch: 'Timetables, prices and comparisons that read on a phone: a proper table on a wide screen, and a card per row, or a table you can swipe along, on a narrow one.',
+    // SE Ranking US, 2026-09-26: responsive tables 140/mo, difficulty 8; responsive table
+    // 140/23; responsive table html 110/25; responsive table css 110/0; responsive data table
+    // 70/16; sticky table header 50/12. All falling from ~260 a year ago; the brief's
+    // "responsive table html" is a variant of the easiest head term.
+    search: { query: 'responsive tables', alsoRanks: ['responsive table html', 'responsive table css', 'responsive data table', 'sticky table header'] },
+    replaces: ['TablePress with its Responsive Tables extension', 'Ninja Tables and wpDataTables for small, hand-kept tables', 'the page builder’s table widget that overflows the screen on a phone'],
+    goodFor: 'Data people read across and down: class timetables, price lists, opening times by branch, plan comparisons, specifications. Cards when each row stands on its own; scroll when people compare down a column.',
+    notFor:
+      'Layout: a table puts a page’s columns in a grid only if they are data, never to line things up. Large, sortable or filterable data sets: that is a data-grid application, not a page element. And prose: a cell of paragraphs belongs in a list or an accordion.',
+    props: [
+      { name: 'caption', type: 'string', note: 'What the table is. Required: it names the table, and the scroll region.' },
+      { name: 'captionHidden', type: 'boolean', default: 'false', note: 'Hide the caption visually (a heading above already says it); screen readers still announce it.' },
+      { name: 'columns', type: 'Column[]', note: '`{ key, label, numeric?, html? }`. `label` is the header and each cell’s data-label; `numeric` overrides the detection; `html` renders the cells as HTML (a link).' },
+      { name: 'rows', type: 'Record<string, string | number | null>[]', note: 'One object per row, keyed by column `key`. A null or missing value is an empty cell (left out of its card).' },
+      { name: 'rowHeader', type: 'string | false', default: 'the first column', note: 'Key of the column whose cells head their row (<th scope="row">, the card’s title). false for none.' },
+      { name: 'mode', type: '“cards” | “scroll”', default: '“cards”', note: 'Cards below the breakpoint, or always a horizontal scrollbox.' },
+      { name: 'breakpoint', type: '“sm” | “md” | “lg”', default: '“md”', note: 'Cards: the element’s own width below which rows become cards: 30rem, 40rem or 52rem.' },
+      { name: 'sticky', type: 'boolean', default: 'false', note: 'The header row stays in view (offset by --rt-sticky-top). In scroll mode it needs `maxHeight`.' },
+      { name: 'maxHeight', type: 'string (CSS length)', note: 'Scroll mode: the box’s greatest height; it then scrolls down as well.' },
+      { name: 'striped', type: 'boolean', default: 'false', note: 'Tint alternate rows.' },
+      { name: 'hint', type: 'string', default: '“Scroll sideways for more”', note: 'Scroll mode: shown under the box while it overflows, until the first scroll.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--rt-fg', fallback: 'inherit', note: 'Text.' },
+      { name: '--rt-muted', fallback: 'currentColor at 70%', note: 'Card labels and the scroll hint.' },
+      { name: '--rt-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rules and card borders.' },
+      { name: '--rt-head-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Header row fill.' },
+      { name: '--rt-head-fg', fallback: 'inherit', note: 'Header row text.' },
+      { name: '--rt-stripe', fallback: 'rgb(0 0 0 / 0.035)', note: 'Alternate rows with `striped`.' },
+      { name: '--rt-card-bg', fallback: 'transparent', note: 'Card fill; also under a sticky header (Canvas when unset).' },
+      { name: '--rt-radius', fallback: '0.5rem', note: 'Card and scrollbox corners.' },
+      { name: '--rt-pad', fallback: '0.6rem 0.8rem', note: 'Cell padding.' },
+      { name: '--rt-fade', fallback: '2.5rem', note: 'Width of the scroll-edge fade.' },
+      { name: '--rt-sticky-top', fallback: '0px', note: 'Offset of a sticky header, for a sticky site header above it.' },
+      { name: '--rt-focus', fallback: 'currentColor', note: 'Focus ring of the scrollbox.' },
+    ],
+    a11y: [
+      'A real <table>: a <caption> names it, column headers are <th scope="col">, the row header column is <th scope="row">, so a screen reader announces each cell with its headers.',
+      'Explicit roles (table, rowgroup, row, columnheader, rowheader, cell) keep it a table when the cards restyle its rows as blocks, which otherwise drops table semantics in Chrome and Safari.',
+      'Cards take each label from the cell’s data-label, written at build time from the header text, so the two cannot drift. The label is drawn with empty alternative text, so a screen reader hears the column header once, not twice. Empty cells are left out of the card.',
+      'Scroll mode: the box is a region named by the caption and is focusable, so arrow keys scroll it; when nothing overflows it is not a Tab stop. The hint is aria-hidden: it is for eyes, the table is already navigable.',
+      'Numbers are right-aligned with tabular figures, header included, so columns of prices and counts line up.',
+      'No motion. Without JavaScript it is the table (cards need no script); a scroll box scrolls without its fades.',
+    ],
+    usage: `<ResponsiveTable
+  caption="Classes this week"
+  columns={[
+    { key: 'name', label: 'Class' },
+    { key: 'day', label: 'Day' },
+    { key: 'price', label: 'Price' },        // detected as numeric
+  ]}
+  rows={[{ name: 'Wheel throwing', day: 'Tuesday', price: '$45.00' }, …]}
+  striped
+/>
+
+<ResponsiveTable caption="Plans compared" columns={cols} rows={plans} mode="scroll" sticky maxHeight="24rem" />
+<!-- .site { --rt-border: var(--line); --rt-head-bg: var(--tint); --rt-card-bg: var(--white); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/responsive-table/ (demo)' }],
+    file: 'src/library/responsive-table/ResponsiveTable.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

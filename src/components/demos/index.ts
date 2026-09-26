@@ -39,6 +39,9 @@ import OffCanvasDemo from './OffCanvasDemo.astro';
 import VideoGalleryDemo from './VideoGalleryDemo.astro';
 import MapDemo from './MapDemo.astro';
 import LinkEffectsDemo from './LinkEffectsDemo.astro';
+import TabcordionDemo from './TabcordionDemo.astro';
+import TooltipDemo from './TooltipDemo.astro';
+import ResponsiveTableDemo from './ResponsiveTableDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -76,4 +79,7 @@ export const demos: Record<string, AstroComponent> = {
   'video-gallery': VideoGalleryDemo,
   map: MapDemo,
   'link-effects': LinkEffectsDemo,
+  tabcordion: TabcordionDemo,
+  tooltip: TooltipDemo,
+  'responsive-table': ResponsiveTableDemo,
 };
