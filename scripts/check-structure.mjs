@@ -18,6 +18,11 @@
  *                   the strip hidden, every panel open under a heading naming its tab; the
  *                   breakpoint lives only in the stylesheet (--tc-layout), and the runtime is
  *                   emitted once per page.
+ * tooltip           shows on focus as well as hover, Escape hides it, the pointer can reach the
+ *                   tip, taps toggle; placement flips and slides; no-JS: the trigger's
+ *                   aria-describedby names a role="tooltip" of plain text, shown inline (or as
+ *                   the trigger's title); icon-only triggers are named and 44px; the fallback
+ *                   colours pass 4.5:1.
  *
  * Exits 1 with one line per failure.
  */
@@ -45,6 +50,19 @@ try {
 }
 
 // ---------------------------------------------------------------- helpers
+/** WCAG contrast ratio of two #rgb / #rrggbb colours. */
+const contrast = (a, b) => {
+  const lum = (hex) => {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = [...h].map((c) => c + c).join('');
+    return [0, 2, 4]
+      .map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
 const source = (rel) => readFileSync(join(root, rel), 'utf8');
 const page = (id) => {
   const file = join(root, 'dist', id, 'index.html');
@@ -316,6 +334,210 @@ if (ids.has('tabcordion')) {
   killed += await mutate(id, tcSrc, logicMutants, async (js) => tabcordionCases(await load(js, 'tabcordionState')));
   finish('tabcordion mutations');
   summary.push(`tabcordion (golden cases, no-JS render of ${roots(html, 'div', 'data-tc').length}, ${killed} mutants caught)`);
+}
+
+// ================================================================= tooltip
+if (ids.has('tooltip')) {
+  const id = 'tooltip';
+  const file = 'src/library/tooltip/Tooltip.astro';
+  const html = page(id);
+  finish('tooltip page');
+
+  // ---------------------------------------------------------- 1. logic, golden cases
+  /** When a tip is visible, after a run of events from a fresh trigger. */
+  const stateCases = [
+    [[], false, 'nothing has happened'],
+    [['focus'], true, 'keyboard focus alone shows it (never hover only)'],
+    [['enter'], true, 'hover shows it'],
+    [['enter', 'leave'], false, 'hover out hides it'],
+    [['focus', 'enter', 'leave'], true, 'still focused after the pointer leaves'],
+    [['enter', 'focus', 'blur'], true, 'still hovered after focus leaves'],
+    [['focus', 'blur'], false, 'focus leaving hides it'],
+    [['focus', 'dismiss'], false, 'Escape hides it while focused'],
+    [['enter', 'focus', 'dismiss'], false, 'Escape hides it while hovered and focused'],
+    [['focus', 'dismiss', 'blur', 'focus'], true, 'focus again after Escape shows it'],
+    [['enter', 'dismiss', 'leave', 'enter'], true, 'hover again after Escape shows it'],
+    [['focus', 'dismiss', 'enter'], true, 'a new hover after Escape shows it'],
+    [['enter', 'tip-enter', 'leave'], true, 'the pointer can move from the trigger onto the tip'],
+    [['enter', 'tip-enter', 'leave', 'tip-leave'], false, 'leaving the tip too hides it'],
+    [['enter', 'leave', 'tip-enter'], true, 'crossing the gap onto the tip (inside the hide delay) keeps it'],
+    [['enter', 'dismiss', 'tip-enter'], false, 'after Escape, reaching the tip does not bring it back'],
+    [['tap'], true, 'a tap shows it'],
+    [['tap', 'tap'], false, 'a second tap hides it'],
+    [['tap', 'tap', 'tap'], true, 'a third tap shows it again'],
+    [['tap', 'outside'], false, 'a tap elsewhere hides it'],
+    [['focus', 'tap', 'blur'], false, 'focus leaving clears a tap'],
+    [['enter', 'tip-enter', 'outside', 'leave'], false, 'a tap elsewhere forgets the tip hover'],
+  ];
+  const tooltipStateCases = (S) => {
+    const out = [];
+    for (const [events, want, label] of stateCases) {
+      const s = events.reduce((st, e) => S.reduce(st, e), S.initial);
+      if (S.visible(s) !== want) out.push(`${label}: [${events.join(', ')}] leaves it ${S.visible(s) ? 'visible' : 'hidden'}.`);
+    }
+    if (S.reduce(S.initial, 'dismiss') !== S.initial) out.push('dismissing a hidden tip must change nothing (it would block the next hover).');
+    return out;
+  };
+  const rect = (left, top, width = 100, height = 20) => ({ left, top, width, height, right: left + width, bottom: top + height });
+  const TIP = { w: 200, h: 40 };
+  /** [label, trigger rect, tip size, vw, vh, preferred, expected { side, left, top, arrow }] */
+  const placeCases = [
+    ['room above: top, centred', rect(500, 400), TIP, 1000, 800, 'top', { side: 'top', left: 450, top: 352, arrow: 100 }],
+    ['room below: bottom, centred', rect(500, 400), TIP, 1000, 800, 'bottom', { side: 'bottom', left: 450, top: 428 }],
+    ['no room above: flips below', rect(500, 20), TIP, 1000, 800, 'top', { side: 'bottom', top: 48 }],
+    ['no room below: flips above', rect(500, 760), TIP, 1000, 800, 'bottom', { side: 'top', top: 712 }],
+    ['room left: left, centred on the trigger', rect(500, 400), TIP, 1000, 800, 'left', { side: 'left', left: 292, top: 390, arrow: 20 }],
+    ['no room left: flips right', rect(10, 400), TIP, 1000, 800, 'left', { side: 'right', left: 118 }],
+    ['no room right: flips left', rect(890, 400), TIP, 1000, 800, 'right', { side: 'left', left: 682 }],
+    ['no room either side: goes above', rect(450, 400), { w: 480, h: 40 }, 1000, 800, 'right', { side: 'top' }],
+    ['at the right edge: slides left, arrow still on the trigger', rect(960, 400, 30), TIP, 1000, 800, 'top', { side: 'top', left: 792, arrow: 183 }],
+    ['at the left edge: slides right, arrow clamped to the tip', rect(0, 400, 20), TIP, 1000, 800, 'top', { side: 'top', left: 8, arrow: 10 }],
+    ['beside, near the top: slides down', rect(10, 0, 20, 20), TIP, 1000, 800, 'right', { side: 'right', top: 8, arrow: 10 }],
+    ['nowhere fits: the side with the most room', rect(140, 20, 20, 20), TIP, 300, 60, 'left', { side: 'top' }],
+    ['an unknown placement is treated as top', rect(500, 400), TIP, 1000, 800, 'middle', { side: 'top' }],
+  ];
+  const tooltipPlaceCases = (P) => {
+    const out = [];
+    for (const [label, r, size, vw, vh, pref, want] of placeCases) {
+      const got = P.place(r, size, vw, vh, pref);
+      for (const k of Object.keys(want)) if (got[k] !== want[k]) out.push(`${label}: ${k} is ${got[k]}, expected ${want[k]}.`);
+    }
+    return out;
+  };
+
+  const stateSrc = shippedBlock(id, html, file, 'tooltip-state');
+  const placeSrc = shippedBlock(id, html, file, 'tooltip-place');
+  finish('tooltip blocks');
+  for (const m of tooltipStateCases(await load(stateSrc, 'tooltipState'))) fail(`${id}: ${m}`);
+  for (const m of tooltipPlaceCases(await load(placeSrc, 'tooltipPlace'))) fail(`${id}: ${m}`);
+  finish('tooltip logic');
+
+  // ---------------------------------------------------------- 2. no-JS render, wiring, contrast
+  const ttComponent = source(file);
+  const INTERACTIVE = /<(a|button|input|select|textarea|details|summary|iframe|label)\b|\stabindex=|\scontenteditable/;
+  const tooltipRender = (page, css = ttComponent) => {
+    const out = [];
+    const f = (m) => out.push(m);
+    const tts = roots(page, 'span', 'data-tt');
+    const seen = { button: 0, link: 0, icon: 0, title: 0, top: 0, bottom: 0, left: 0, right: 0 };
+    const tipIds = new Set();
+    for (const [n, t] of tts.entries()) {
+      const where = `tooltip ${n + 1}`;
+      const cls = attr(t.open, 'class') ?? '';
+      const placement = attr(t.open, 'data-placement');
+      if (!['top', 'bottom', 'left', 'right'].includes(placement)) f(`${where}: data-placement "${placement}".`);
+      else seen[placement]++;
+      if (has(t.open, 'data-ready')) f(`${where}: rendered as if the script had run (data-ready).`);
+      const trig = t.html.match(/^<span\b[^>]*>\s*<(button|a)\b([^>]*)>([\s\S]*?)<\/\1>/);
+      if (!trig) {
+        f(`${where}: the trigger must be the first child, a <button> or an <a>.`);
+        continue;
+      }
+      const [, tag, attrs, inner] = trig;
+      const open = `<${tag}${attrs}>`;
+      if (tag === 'button') {
+        seen.button++;
+        if (attr(open, 'type') !== 'button') f(`${where}: the trigger button needs type="button".`);
+      } else {
+        seen.link++;
+        if (!attr(open, 'href')) f(`${where}: a link trigger without href is not focusable.`);
+      }
+      const tipTag = t.html.slice(t.html.indexOf(trig[0]) + trig[0].length).match(/^\s*<span\b[^>]*>/)?.[0];
+      if (!tipTag) {
+        f(`${where}: the tip must follow the trigger directly.`);
+        continue;
+      }
+      const tipId = attr(tipTag, 'id');
+      const tipHtml = block(t.html, t.html.indexOf(tipTag), 'span');
+      const tipText = text(tipHtml);
+      if (attr(tipTag, 'role') !== 'tooltip') f(`${where}: the tip is not role="tooltip".`);
+      if (!tipId || attr(open, 'aria-describedby') !== tipId) f(`${where}: the trigger's aria-describedby is "${attr(open, 'aria-describedby')}", not the tip's id "${tipId}".`);
+      if (tipId && tipIds.has(tipId)) f(`${where}: tip id "${tipId}" is used twice on the page.`);
+      tipIds.add(tipId);
+      if (!tipText) f(`${where}: the tip is empty.`);
+      if (INTERACTIVE.test(tipHtml.slice(tipTag.length))) f(`${where}: the tip holds interactive content; that is a popover, not a tooltip.`);
+      const inline = /\btt--inline\b/.test(cls);
+      if (inline) {
+        if (has(tipTag, 'hidden')) f(`${where}: inline, but the tip is hidden; without JavaScript its text must show after the trigger.`);
+        if (has(open, 'title')) f(`${where}: inline, but the trigger also has a title; the text would show twice.`);
+      } else {
+        seen.title++;
+        if (!has(tipTag, 'hidden')) f(`${where}: inline={false}, but the tip is not hidden in the static HTML.`);
+        if (decode(attr(open, 'title') ?? '') !== tipText) f(`${where}: inline={false}: the trigger's title must carry the tip's text for the no-JS render.`);
+      }
+      if (/\btt--icon\b/.test(cls)) {
+        seen.icon++;
+        if (!attr(open, 'aria-label')) f(`${where}: an icon-only trigger needs aria-label.`);
+        const wrap = inner.match(/^\s*<span\b[^>]*class="tt__icon[^"]*"[^>]*>/)?.[0];
+        if (!wrap || attr(wrap, 'aria-hidden') !== 'true') f(`${where}: the icon must sit in an aria-hidden wrapper.`);
+        if (text(inner)) f(`${where}: an icon-only trigger has visible text "${text(inner)}"; drop \`label\` or the text.`);
+      } else if (!text(inner)) f(`${where}: the trigger has no text; an icon-only trigger needs \`label\`.`);
+    }
+    for (const [k, v] of Object.entries(seen)) if (!v) f(`the demo needs at least one ${k === 'title' ? 'inline={false}' : k} tooltip.`);
+    const runtimes = (page.match(/window\.__superheroTooltip\s*=/g) || []).length;
+    if (tts.length && runtimes !== 1) f(`the runtime is on the page ${runtimes} times; it must be emitted once.`);
+    // The component's CSS and wiring.
+    if (!/\.tt--icon \.tt__trigger \{[^}]*min-width: 44px;[^}]*min-height: 44px;/.test(css)) f('an icon-only trigger must be at least 44 × 44 px (min-width / min-height 44px).');
+    if (!/\.tt\[data-ready\] \.tt__tip:not\(\[data-open\]\) \{\s*display: none;/.test(css)) f('with the script, a tip must be hidden until it is shown.');
+    if (!/document\.addEventListener\('focusin',[\s\S]{0,160}send\(t, 'focus'\)/.test(css)) f('the script does not show the tip on focus; hover only fails keyboard users.');
+    if (!/e\.key !== 'Escape'[\s\S]{0,160}send\(t, 'dismiss'\)/.test(css)) f('the script does not hide the tip on Escape.');
+    if (!/@media \(prefers-reduced-motion: no-preference\) \{\s*\.tt\[data-ready\] \.tt__tip\[data-open\] \{\s*animation:/.test(css)) f('the fade must sit inside prefers-reduced-motion: no-preference.');
+    const bg = css.match(/background: var\(--tt-bg, (#[0-9a-f]{3,6})\);/i)?.[1];
+    const fg = css.match(/color: var\(--tt-fg, (#[0-9a-f]{3,6})\);/i)?.[1];
+    if (!bg || !fg) f('no `background: var(--tt-bg, #…)` / `color: var(--tt-fg, #…)` fallbacks to measure.');
+    else if (contrast(bg, fg) < 4.5) f(`the fallback tip colours ${fg} on ${bg} are ${contrast(bg, fg).toFixed(2)}:1, under 4.5:1.`);
+    return out;
+  };
+  for (const m of tooltipRender(html)) fail(`${id}: ${m}`);
+  finish('tooltip render');
+  const ttBg = ttComponent.match(/background: var\(--tt-bg, (#[0-9a-f]{3,6})\);/i)[1];
+  const ttFg = ttComponent.match(/color: var\(--tt-fg, (#[0-9a-f]{3,6})\);/i)[1];
+
+  // ---------------------------------------------------------- 3. mutations
+  const firstTrigger = html.match(/<button class="tt__trigger"[^>]*>/)[0];
+  const iconTrigger = html.match(/<button class="tt__trigger"[^>]*aria-label="[^"]*"[^>]*>/)[0];
+  const firstTip = html.match(/<span class="tt__tip"[^>]*>/)[0];
+  const titled = html.match(/<button class="tt__trigger"[^>]*title="[^"]*"[^>]*>[\s\S]*?<\/button><span class="tt__tip"[^>]*>/)[0];
+  const renderMutants = [
+    ['trigger without aria-describedby', html.replace(firstTrigger, firstTrigger.replace(/ aria-describedby="[^"]*"/, ''))],
+    ['aria-describedby naming another element', html.replace(firstTrigger, firstTrigger.replace(/aria-describedby="[^"]*"/, 'aria-describedby="nowhere"'))],
+    ['tip without role="tooltip"', html.replace(firstTip, firstTip.replace(' role="tooltip"', ''))],
+    ['a link inside the tip', html.replace(firstTip, `${firstTip}<a href="#x">more</a> `)],
+    ['icon trigger without aria-label', html.replace(iconTrigger, iconTrigger.replace(/ aria-label="[^"]*"/, ''))],
+    ['icon not hidden from assistive tech', html.replace('<span class="tt__icon" aria-hidden="true"', '<span class="tt__icon"')],
+    ['inline tip hidden', html.replace(firstTip, firstTip.replace('<span', '<span hidden'))],
+    ['inline={false} tip shown', html.replace(titled, titled.replace(/ hidden(?=[\s>])/, ''))],
+    ['inline trigger also titled', html.replace(firstTrigger, firstTrigger.replace('<button', '<button title="x"'))],
+    ['runtime emitted twice', html.replace('</body>', '<script>window.__superheroTooltip = {};</script></body>')],
+  ];
+  const cssMutants = [
+    ['icon trigger under 44px', ttComponent.replace('min-width: 44px;', 'min-width: 24px;')],
+    ['focus not wired', ttComponent.replace("if (t && t.trigger === e.target) send(t, 'focus');", 'if (t && t.trigger === e.target) void 0;')],
+    ['Escape not wired', ttComponent.replace("for (const t of [...open]) send(t, 'dismiss');", 'open.clear();')],
+    ['fade outside reduced motion', ttComponent.replace('@media (prefers-reduced-motion: no-preference) {\n    .tt[data-ready]', '@media all {\n    .tt[data-ready]')],
+    ['low-contrast fallback', ttComponent.replace(`background: var(--tt-bg, ${ttBg});`, `background: var(--tt-bg, #8a8a8a);`)],
+    ['tip visible before it is shown', ttComponent.replace('.tt[data-ready] .tt__tip:not([data-open]) {\n    display: none;', '.tt[data-ready] .tt__tip:not([data-open]) {\n    opacity: 0;')],
+  ];
+  void ttFg;
+  const logicMutants = [
+    ['focus does not show it', stateSrc.replace("case 'focus': return { ...s, focus: true, dismissed: false };", "case 'focus': return s;")],
+    ['Escape ignored', stateSrc.replace("case 'dismiss': return visible(s) ? { ...s, pinned: false, tip: false, dismissed: true } : s;", "case 'dismiss': return s;")],
+    ['not hoverable', stateSrc.replace("case 'tip-enter': return { ...s, tip: true };", "case 'tip-enter': return s;")],
+    ['Escape sticks for good', stateSrc.replace("case 'enter': return { ...s, hover: true, dismissed: false };", "case 'enter': return { ...s, hover: true };")],
+  ];
+  const placeMutants = [
+    ['never flips', placeSrc.replace('const side = order.find((s) => room[s] >= need[s]) ??', 'const side = order[0] ??')],
+    ['no slide along the side', placeSrc.replace('left = clamp(cx - w / 2, margin, Math.max(margin, vw - margin - w));', 'left = cx - w / 2;')],
+    ['arrow not following the trigger', placeSrc.replace('arrow = clamp(cx - left, 10, Math.max(10, w - 10));', 'arrow = w / 2;')],
+    ['flips to the wrong side first', placeSrc.replace("top: ['top', 'bottom', 'right', 'left']", "top: ['top', 'right', 'bottom', 'left']")],
+  ];
+  let killed = 0;
+  killed += await mutate(id, html, renderMutants, (h) => tooltipRender(h));
+  killed += await mutate(id, ttComponent, cssMutants, (c) => tooltipRender(html, c));
+  killed += await mutate(id, stateSrc, logicMutants, async (js) => tooltipStateCases(await load(js, 'tooltipState')));
+  killed += await mutate(id, placeSrc, placeMutants, async (js) => tooltipPlaceCases(await load(js, 'tooltipPlace')));
+  finish('tooltip mutations');
+  summary.push(`tooltip (${stateCases.length} state and ${placeCases.length} placement cases, no-JS render of ${roots(html, 'span', 'data-tt').length}, contrast ${contrast(ttBg, ttFg).toFixed(2)}:1, ${killed} mutants caught)`);
 }
 
 console.log(`check-structure ok: ${summary.join('; ')}.`);

@@ -1,0 +1,395 @@
+---
+/**
+ * Tooltip — a short line of text that describes its trigger, shown while the trigger is
+ * hovered or focused. The trigger is a real button (or, with `href`, a link); the text is a
+ * `role="tooltip"` element the trigger points at with `aria-describedby`, so a screen reader
+ * reads it with the trigger whether or not it is showing.
+ *
+ * When it shows and hides (WCAG 1.4.13, content on hover or focus):
+ *   - Hover (a mouse or pen, after 100 ms) AND keyboard focus. Never hover only: a keyboard or
+ *     screen-reader user gets it the moment the trigger is focused.
+ *   - Hoverable: the pointer can move from the trigger onto the tip without losing it.
+ *   - Dismissable: Escape hides it without moving the pointer or focus; it comes back on the
+ *     next hover or focus.
+ *   - Persistent: it stays until the pointer and focus have both left, or Escape.
+ *   - Touch: a tap on a button trigger shows it and a second tap (or a tap elsewhere) hides it.
+ *     A link trigger keeps its tap for the link.
+ *   - One at a time: showing one hides any other.
+ * The rules are the `tooltip-state` block below, which `npm run check` runs as golden cases.
+ *
+ * Placement: `top` (default), `bottom`, `left` or `right`. When it is shown it is measured
+ * once against the viewport: if the preferred side has no room it flips to the opposite side,
+ * then tries the other two; it slides along its side to stay 8px inside the viewport, and
+ * the arrow keeps pointing at the trigger. It is placed again if the page scrolls or resizes
+ * while it is open. No library: the `tooltip-place` block is the whole of it, also run as
+ * golden cases. Where the browser has the Popover API the tip is shown in the top layer, so no
+ * `overflow: hidden` ancestor or z-index can clip or cover it.
+ *
+ * It never holds interactive content: `text` is plain text. A link, a button or a form next to
+ * a trigger is a popover (a disclosure, or the `modal` element), not a tooltip: a tooltip
+ * disappears as soon as focus moves, so nothing inside it can be reached.
+ *
+ * Icon-only triggers: pass `label` (the trigger's accessible name) and put the icon in the
+ * slot. The icon is hidden from assistive tech, and the trigger is at least 44 × 44 px.
+ *
+ * Without JavaScript: `inline` (default) shows the text in a <span> straight after the trigger,
+ * in brackets, so nothing is lost. `inline={false}` keeps it out of the flow and puts it in the
+ * trigger's `title` instead (the browser's own tooltip); the script removes the `title` so the
+ * two never show together.
+ *
+ * Motion: a 120 ms fade; none under prefers-reduced-motion.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --tt-bg / --tt-fg          tip fill / text                     (#1d2130 / #fff, 16.0:1)
+ *   --tt-radius / --tt-max     tip corners / widest line           (0.375rem / 18rem)
+ *   --tt-font-size             tip text                            (0.875rem)
+ *   --tt-trigger               text trigger colour                 (inherit)
+ *   --tt-focus                 trigger focus ring                  (currentColor)
+ *   --tt-z                     stacking without the Popover API    (1000)
+ */
+interface Props {
+  /** The tip: plain text, a sentence at most. */
+  text: string;
+  placement?: 'top' | 'bottom' | 'left' | 'right';
+  /** Icon-only trigger: its accessible name. The slot's content is then decorative. */
+  label?: string;
+  /** Make the trigger a link to this URL instead of a button. */
+  href?: string;
+  /** Without JavaScript, show the text inline after the trigger (true) or as `title` (false). */
+  inline?: boolean;
+  /** id of the tip. Default: generated. */
+  id?: string;
+  class?: string;
+}
+const { text, placement = 'top', label, href, inline = true, id, class: className } = Astro.props;
+
+if (!text?.trim()) throw new Error('Tooltip: `text` is empty.');
+if (/<[a-z!/]/i.test(text)) throw new Error('Tooltip: `text` is plain text. A tooltip holds no markup and nothing interactive; a link or a button beside the trigger is a popover.');
+if (!['top', 'bottom', 'left', 'right'].includes(placement)) throw new Error(`Tooltip: placement "${placement}" is not top, bottom, left or right.`);
+const hasSlot = Astro.slots.has('default');
+if (!hasSlot && !label) throw new Error('Tooltip: give the trigger content (the slot) or, for an icon-only trigger, a `label`.');
+const tipId = id ?? `tt-${Math.random().toString(36).slice(2, 8)}`;
+const icon = !!label;
+const Trigger = href ? 'a' : 'button';
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__tooltipScript;
+locals.__tooltipScript = true;
+---
+
+<span class:list={['tt', { 'tt--icon': icon, 'tt--inline': inline }, className]} data-tt data-placement={placement}>
+  <Trigger
+    class="tt__trigger"
+    type={href ? undefined : 'button'}
+    href={href}
+    aria-label={label}
+    aria-describedby={tipId}
+    title={inline ? undefined : text}
+  >
+    {icon ? <span class="tt__icon" aria-hidden="true"><slot /></span> : <slot />}
+  </Trigger><span class="tt__tip" id={tipId} role="tooltip" hidden={!inline}>{text}</span>
+</span>
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroTooltip) return;
+
+        // <tooltip-state>
+        // When a tip shows, as a function of (state, event): no DOM, no timers. npm run check
+        // imports this block from the built page and runs it against golden cases.
+        function tooltipState() {
+          const initial = { hover: false, focus: false, tip: false, pinned: false, dismissed: false };
+          const visible = (s) => !s.dismissed && (s.hover || s.focus || s.tip || s.pinned);
+          const reduce = (s, e) => {
+            switch (e) {
+              case 'enter': return { ...s, hover: true, dismissed: false };
+              case 'leave': return { ...s, hover: false };
+              // The pointer reached the tip, so it was on screen: still showing, or inside the
+              // short delay before a hide. Either way, it keeps it.
+              case 'tip-enter': return { ...s, tip: true };
+              case 'tip-leave': return { ...s, tip: false };
+              case 'focus': return { ...s, focus: true, dismissed: false };
+              case 'blur': return { ...s, focus: false, pinned: false };
+              // A tap or click on a button trigger: shows it, or hides a tip it had shown.
+              case 'tap': return s.pinned ? { ...s, pinned: false, dismissed: true } : { ...s, pinned: true, dismissed: false };
+              case 'outside': return { ...s, pinned: false, tip: false };
+              // Escape, or another tooltip showing.
+              case 'dismiss': return visible(s) ? { ...s, pinned: false, tip: false, dismissed: true } : s;
+              default: return s;
+            }
+          };
+          return { initial, reduce, visible };
+        }
+        // </tooltip-state>
+
+        // <tooltip-place>
+        // Where a tip goes. r: the trigger's viewport rect; size: the tip's { w, h }; vw, vh:
+        // the viewport. Returns the side it went to, its top-left corner and the arrow's offset
+        // along that side. Pure arithmetic; npm run check runs it against golden cases.
+        function tooltipPlace() {
+          const ORDER = { top: ['top', 'bottom', 'right', 'left'], bottom: ['bottom', 'top', 'right', 'left'], left: ['left', 'right', 'top', 'bottom'], right: ['right', 'left', 'top', 'bottom'] };
+          const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+          const place = (r, size, vw, vh, preferred = 'top', gap = 8, margin = 8) => {
+            const { w, h } = size;
+            const room = { top: r.top - gap - margin, bottom: vh - r.bottom - gap - margin, left: r.left - gap - margin, right: vw - r.right - gap - margin };
+            const need = { top: h, bottom: h, left: w, right: w };
+            const order = ORDER[preferred] || ORDER.top;
+            // The first side with room, in order; with none, the side with the most room.
+            const side = order.find((s) => room[s] >= need[s]) ?? order.reduce((a, b) => (room[b] - need[b] > room[a] - need[a] ? b : a));
+            let left, top, arrow;
+            if (side === 'top' || side === 'bottom') {
+              const cx = r.left + r.width / 2;
+              left = clamp(cx - w / 2, margin, Math.max(margin, vw - margin - w));
+              top = side === 'top' ? r.top - gap - h : r.bottom + gap;
+              arrow = clamp(cx - left, 10, Math.max(10, w - 10));
+            } else {
+              const cy = r.top + r.height / 2;
+              top = clamp(cy - h / 2, margin, Math.max(margin, vh - margin - h));
+              left = side === 'left' ? r.left - gap - w : r.right + gap;
+              arrow = clamp(cy - top, 10, Math.max(10, h - 10));
+            }
+            return { side, left: Math.round(left), top: Math.round(top), arrow: Math.round(arrow) };
+          };
+          return { place };
+        }
+        // </tooltip-place>
+
+        const S = tooltipState();
+        const { place } = tooltipPlace();
+        const SHOW_DELAY = 100; // hovering past a trigger does not flash its tip
+        const HIDE_DELAY = 120; // time to move the pointer from the trigger onto the tip
+        const POPOVER = typeof HTMLElement.prototype.showPopover === 'function';
+        const tips = new Map(); // root -> { state, shown, timer }
+        const open = new Set();
+
+        const enhance = (root) => {
+          if (tips.has(root)) return tips.get(root);
+          const trigger = root.querySelector(':scope > .tt__trigger');
+          const tip = root.querySelector(':scope > .tt__tip');
+          trigger.removeAttribute('title'); // the tip replaces the browser's own
+          if (POPOVER) tip.popover = 'manual';
+          tip.hidden = false;
+          root.dataset.ready = '';
+          const t = { root, trigger, tip, state: S.initial, shown: false, timer: 0 };
+          tips.set(root, t);
+          return t;
+        };
+        const position = (t) => {
+          t.tip.style.left = '0px';
+          t.tip.style.top = '0px';
+          const r = t.trigger.getBoundingClientRect();
+          const p = place(r, { w: t.tip.offsetWidth, h: t.tip.offsetHeight }, document.documentElement.clientWidth, innerHeight, t.root.dataset.placement);
+          t.tip.style.left = `${p.left}px`;
+          t.tip.style.top = `${p.top}px`;
+          t.tip.style.setProperty('--tt-arrow', `${p.arrow}px`);
+          t.tip.dataset.side = p.side;
+        };
+        const show = (t) => {
+          for (const o of [...open]) if (o !== t) { o.state = S.reduce(o.state, 'dismiss'); apply(o, true); }
+          t.shown = true;
+          open.add(t);
+          t.tip.dataset.open = '';
+          if (POPOVER && !t.tip.matches(':popover-open')) t.tip.showPopover();
+          position(t);
+        };
+        const hide = (t) => {
+          t.shown = false;
+          open.delete(t);
+          delete t.tip.dataset.open;
+          if (POPOVER && t.tip.matches(':popover-open')) t.tip.hidePopover();
+        };
+        /** Show or hide to match the state; `now` skips the pointer delays. */
+        const apply = (t, now) => {
+          clearTimeout(t.timer);
+          const want = S.visible(t.state);
+          if (want === t.shown) return;
+          if (now) return want ? show(t) : hide(t);
+          t.timer = setTimeout(() => (S.visible(t.state) ? show(t) : hide(t)), want ? SHOW_DELAY : HIDE_DELAY);
+        };
+        const send = (t, event, now = true) => {
+          t.state = S.reduce(t.state, event);
+          apply(t, now);
+        };
+        const find = (node) => {
+          const root = node instanceof Element ? node.closest('[data-tt]') : null;
+          return root ? enhance(root) : null;
+        };
+        const isMouse = (e) => e.pointerType === 'mouse' || e.pointerType === 'pen';
+
+        /** Which part of a tooltip a node is in: its trigger, its tip, or neither. */
+        const part = (t, n) => (!(n instanceof Node) ? null : t.trigger.contains(n) ? 'trigger' : t.tip.contains(n) ? 'tip' : null);
+        document.addEventListener('pointerover', (e) => {
+          const t = isMouse(e) && find(e.target);
+          if (!t) return;
+          const to = part(t, e.target);
+          if (to === part(t, e.relatedTarget)) return; // moving within one part
+          if (to === 'trigger') send(t, 'enter', false);
+          else if (to === 'tip') send(t, 'tip-enter');
+        });
+        document.addEventListener('pointerout', (e) => {
+          const t = isMouse(e) && find(e.target);
+          if (!t) return;
+          const from = part(t, e.target);
+          if (from === part(t, e.relatedTarget)) return;
+          if (from === 'trigger') send(t, 'leave', false);
+          else if (from === 'tip') send(t, 'tip-leave', false);
+        });
+        document.addEventListener('focusin', (e) => {
+          const t = find(e.target);
+          if (t && t.trigger === e.target) send(t, 'focus');
+        });
+        document.addEventListener('focusout', (e) => {
+          const t = find(e.target);
+          if (t && t.trigger === e.target) send(t, 'blur');
+        });
+        document.addEventListener('click', (e) => {
+          const t = find(e.target);
+          if (t && t.trigger.contains(e.target) && t.trigger.tagName === 'BUTTON') send(t, 'tap');
+        });
+        document.addEventListener('pointerdown', (e) => {
+          for (const t of [...open]) if (!t.root.contains(e.target)) send(t, 'outside');
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key !== 'Escape' || !open.size) return;
+          for (const t of [...open]) send(t, 'dismiss');
+          e.preventDefault(); // the Escape was for the tip, not an enclosing dialog
+        });
+        const reposition = () => open.forEach(position);
+        addEventListener('scroll', reposition, { passive: true, capture: true });
+        addEventListener('resize', reposition, { passive: true });
+
+        const boot = () => document.querySelectorAll('[data-tt]').forEach(enhance);
+        window.__superheroTooltip = { refresh: boot, state: tooltipState, place: tooltipPlace };
+        document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+      })();
+    </script>
+  )
+}
+
+<style>
+  .tt {
+    display: inline;
+  }
+  .tt__trigger {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--tt-trigger, inherit);
+    font: inherit;
+    text-align: inherit;
+    text-decoration: underline dotted;
+    text-underline-offset: 0.2em;
+    cursor: help;
+  }
+  a.tt__trigger {
+    text-decoration-style: solid;
+    cursor: pointer;
+  }
+  .tt__trigger:focus-visible {
+    outline: 3px solid var(--tt-focus, currentColor);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* Icon-only: a 44px target however small the icon. */
+  .tt--icon .tt__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    vertical-align: middle;
+    text-decoration: none;
+    border-radius: 50%;
+  }
+  .tt__icon {
+    display: inline-flex;
+  }
+
+  /* Without the script: the text in brackets after the trigger (or, inline={false}, hidden). */
+  .tt__tip {
+    margin-inline-start: 0.3em;
+    font-size: 0.9em;
+    opacity: 0.8;
+  }
+  .tt__tip::before {
+    content: '(';
+  }
+  .tt__tip::after {
+    content: ')';
+  }
+  .tt__tip[hidden] {
+    display: none;
+  }
+
+  /* With the script: out of the flow, shown on demand, placed by the script. */
+  .tt[data-ready] .tt__tip {
+    position: fixed;
+    inset: auto;
+    z-index: var(--tt-z, 1000);
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(var(--tt-max, 18rem), calc(100vw - 16px));
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    border: 0;
+    border-radius: var(--tt-radius, 0.375rem);
+    background: var(--tt-bg, #1d2130);
+    color: var(--tt-fg, #fff);
+    font-size: var(--tt-font-size, 0.875rem);
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: start;
+    white-space: normal;
+    opacity: 1;
+    overflow: visible;
+    pointer-events: auto;
+  }
+  .tt[data-ready] .tt__tip:not([data-open]) {
+    display: none;
+  }
+  .tt[data-ready] .tt__tip::after {
+    content: '';
+    position: absolute;
+    width: 0.6rem;
+    height: 0.6rem;
+    background: inherit;
+    rotate: 45deg;
+  }
+  .tt[data-ready] .tt__tip::before {
+    content: none;
+  }
+  .tt[data-ready] .tt__tip[data-side='top']::after {
+    top: 100%;
+    left: var(--tt-arrow, 50%);
+    translate: -50% -50%;
+  }
+  .tt[data-ready] .tt__tip[data-side='bottom']::after {
+    bottom: 100%;
+    left: var(--tt-arrow, 50%);
+    translate: -50% 50%;
+  }
+  .tt[data-ready] .tt__tip[data-side='left']::after {
+    left: 100%;
+    top: var(--tt-arrow, 50%);
+    translate: -50% -50%;
+  }
+  .tt[data-ready] .tt__tip[data-side='right']::after {
+    right: 100%;
+    top: var(--tt-arrow, 50%);
+    translate: 50% -50%;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .tt[data-ready] .tt__tip[data-open] {
+      animation: tt-in 120ms ease-out;
+    }
+  }
+  @keyframes tt-in {
+    from {
+      opacity: 0;
+    }
+  }
+</style>

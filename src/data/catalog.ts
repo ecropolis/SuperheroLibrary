@@ -1491,6 +1491,64 @@ import { analytics } from '../data/site';
     file: 'src/library/tabcordion/Tabcordion.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'tooltip',
+    name: 'Tooltip',
+    aka: ['hover text', 'info icon', 'hint bubble', 'Tippy.js', 'Bootstrap tooltip', 'Elementor Hotspot tooltip'],
+    summary:
+      'A short line of text that describes a button or link, shown on hover and on keyboard focus, hidden by Escape, and placed above, below or beside its trigger with a flip and a slide when the window has no room. role="tooltip" attached with aria-describedby; the Popover API’s top layer where the browser has it. Without JavaScript the text shows in brackets after the trigger, or as its title.',
+    pitch: 'A small explanation on a word or an info icon, there when someone points at it or tabs to it, and out of the way the rest of the time.',
+    // SE Ranking US, 2026-09-26: tooltip html 320/mo, difficulty 24; tooltip ui 260/36;
+    // accessible tooltip 50/14; html tooltip 10/36. The brief's "accessible tooltip" is kept
+    // as a variant: the bigger query is the same page.
+    search: { query: 'tooltip html', alsoRanks: ['accessible tooltip', 'tooltip ui', 'html tooltip'] },
+    replaces: ['Page-builder tooltip add-ons and the tooltips of Elementor Pro’s Hotspot widget', 'Tippy.js, Popper and Bootstrap tooltips', 'title="…" attributes used as tooltips (mouse only, and never on a phone)'],
+    goodFor: 'A term a visitor may not know, an info icon beside a price or a setting, an icon-only button that needs its name spelled out: one sentence that helps and can be skipped.',
+    notFor:
+      'Anything with a link, a button or a form in it: that is a popover (a disclosure, or modal), because a tooltip vanishes as soon as focus moves and nothing inside it can be reached. Information people need to complete a task, such as a password rule or a form field’s format: show it as visible hint text. And a phone-first page that leans on them: on touch they need a tap to see.',
+    props: [
+      { name: 'text', type: 'string', note: 'The tip. Plain text, a sentence at most; markup is refused at build time.' },
+      { name: 'placement', type: '“top” | “bottom” | “left” | “right”', default: '“top”', note: 'Preferred side. With no room there it flips to the opposite side, then tries the other two, and slides along its side to stay 8px inside the window.' },
+      { name: 'label', type: 'string', note: 'Icon-only trigger: its accessible name. The slot (the icon) is then decorative, and the trigger is a 44px target.' },
+      { name: 'href', type: 'string', note: 'Make the trigger a link. A tap then follows the link; hover and focus still show the tip.' },
+      { name: 'inline', type: 'boolean', default: 'true', note: 'Without JavaScript: the text in brackets after the trigger (true) or the trigger’s title (false).' },
+      { name: 'id', type: 'string', default: 'generated', note: 'id of the tip, which the trigger’s aria-describedby names.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tt-bg', fallback: '#1d2130', note: 'Tip fill (the fallback pair is 16.0:1; `npm run check` computes it).' },
+      { name: '--tt-fg', fallback: '#fff', note: 'Tip text. Keep 4.5:1 on --tt-bg.' },
+      { name: '--tt-radius', fallback: '0.375rem', note: 'Tip corners.' },
+      { name: '--tt-max', fallback: '18rem', note: 'Widest the tip gets before it wraps.' },
+      { name: '--tt-font-size', fallback: '0.875rem', note: 'Tip text size.' },
+      { name: '--tt-trigger', fallback: 'inherit', note: 'Trigger colour (text and icon).' },
+      { name: '--tt-focus', fallback: 'currentColor', note: 'Trigger focus ring.' },
+      { name: '--tt-z', fallback: '1000', note: 'Stacking in browsers without the Popover API (elsewhere the tip is in the top layer).' },
+    ],
+    a11y: [
+      'The trigger is a real <button type="button"> (or a link with `href`) whose aria-describedby names the role="tooltip" element, so a screen reader reads the text with the trigger whether or not the tip is showing.',
+      'It shows on keyboard focus as well as on hover, never on hover only. Escape hides it without moving focus or the pointer; the pointer can move onto the tip without losing it; it stays until pointer and focus have both left (WCAG 1.4.13). One shows at a time.',
+      'On touch, a tap on a button trigger shows it and a second tap, or a tap elsewhere, hides it.',
+      'An icon-only trigger is named by `label`, its icon is aria-hidden, and it is at least 44 × 44 px.',
+      'The tip holds plain text only: markup is refused when the site is built, so nothing interactive can end up where focus cannot reach it.',
+      'Without JavaScript the text is in the page, in brackets after the trigger, or as the trigger’s title with `inline={false}`.',
+      'prefers-reduced-motion: no fade.',
+    ],
+    usage: `<p>
+  Arrives in <Tooltip text="Monday to Friday, not counting public holidays.">two working days</Tooltip>.
+</p>
+
+<Tooltip label="About next-day delivery" text="Order by 2 pm for delivery the next working day." placement="right">
+  <Icon name="circle-info" />
+</Tooltip>
+
+<Tooltip href="/returns/" text="30 days from delivery.">returns policy</Tooltip>
+<!-- .site { --tt-bg: var(--navy); --tt-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tooltip/ (demo)' }],
+    file: 'src/library/tooltip/Tooltip.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
