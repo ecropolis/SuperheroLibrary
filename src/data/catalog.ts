@@ -1559,6 +1559,86 @@ import { analytics } from '../data/site';
     file: 'src/library/info-circle/InfoCircle.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'slide-box',
+    name: 'Slide box',
+    aka: ['UABB Slide Box', 'slide box', 'reveal card', 'sliding card', 'hover reveal box', 'info box with slide-up detail', 'card overlay'],
+    summary:
+      'A card whose back panel slides in over the front from a chosen direction (up, down, left, right): on hover where there is a mouse, and on click, tap, Enter or Space everywhere, through a real button with aria-expanded. The front is a teaser (icon or image, title, a line), the back its detail (text and a link). Both panels share one height; the one out of view is inert.',
+    pitch: 'A card that shows the headline first and slides up the detail when someone wants it, on a phone as well as with a mouse.',
+    // SE Ranking US, 2026-09-26: reveal card 110/mo, difficulty 14; sliding card 260/8; card
+    // hover effects 30/12; card overlay 50/10. "slide box" itself is 1,300/55, but its results
+    // are microscope-slide storage boxes and toolbox drawer slides, not websites, so it stays an aka.
+    search: { query: 'reveal card', alsoRanks: ['sliding card', 'card hover effects', 'card overlay'] },
+    replaces: ['UABB “Slide Box” module (Beaver Builder), overlay style', 'hover-reveal info boxes in Elementor and Divi', 'hand-rolled CSS slide-up card overlays'],
+    goodFor:
+      'A grid of teasers whose detail is worth one more gesture: services that each need three lines of explanation and a link, job openings (title on the front, what the job is and Apply on the back), products with ingredients or specifications, team members with a short bio.',
+    notFor:
+      'Two faces of equal weight: that is flip-box, which turns a card over to a second, equally important side. Pick slide-box when the front is a teaser and the back its detail sliding over it; pick flip-box when both sides stand on their own. Neither is for anything a visitor must read without interacting: the back never holds the only copy of a price, a phone number or an opening time. And a panel that drops open below the card and pushes the page down (UABB’s other styles) is an accordion.',
+    props: [
+      { name: 'title', type: 'string', note: 'Front heading, and the accessible name of the card’s button.' },
+      { name: 'text', type: 'string', note: 'The front’s short line.' },
+      { name: 'icon', type: 'string', note: 'Inline SVG markup, in a tinted circle above the title; decorative. Ignored when there is an `image`.' },
+      { name: 'image', type: 'string', note: 'An image across the top of the front (16:9, cropped to fit).' },
+      { name: 'imageAlt', type: 'string', note: 'Required with `image` (the build fails without it): describe it, or "" when it is decorative on purpose.' },
+      { name: 'backTitle', type: 'string', default: '`title`', note: 'Back heading; "" for none.' },
+      { name: 'backText', type: 'string', note: 'The back’s longer text; about 40 words fit a card of the default size.' },
+      { name: 'cta', type: '{ text: string; href: string }', note: 'A link on the back. On a touch screen the first tap slides the back in, the second follows the link.' },
+      { name: 'direction', type: "'up' | 'down' | 'left' | 'right'", default: "'up'", note: 'Where the back comes from as it moves: up rises from the bottom edge, down drops from the top, left comes in from the right edge, right from the left.' },
+      { name: 'trigger', type: "'both' | 'click'", default: "'both'", note: 'Whether hover ALSO slides it in. Click, tap, Enter and Space always do; a hover-only card would lock out touch screens and keyboards.' },
+      { name: 'duration', type: 'number (ms)', note: 'The slide. Overrides `--sb-duration` (450ms).' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the headings; match the page outline.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the card’s button. Default: `title`, else the front’s first heading.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for theming one card.' },
+      { name: 'slot front / slot back', type: 'slot', note: 'Any HTML for a panel; wins over the props for that panel. Keep links off the front: the whole front is the button.' },
+    ],
+    theming: [
+      { name: '--sb-accent', fallback: '#5933d8', note: 'The back, the icon and the focus ring, unless set separately.' },
+      { name: '--sb-front-bg', fallback: '#fff', note: 'Front background.' },
+      { name: '--sb-front-fg', fallback: '#1e283c', note: 'Front text (14.75:1 on the fallback background).' },
+      { name: '--sb-border', fallback: 'rgb(0 0 0 / 0.08)', note: 'Front border.' },
+      { name: '--sb-back-bg', fallback: 'var(--sb-accent)', note: 'Back background.' },
+      { name: '--sb-back-fg', fallback: '#fff', note: 'Back text (7.27:1 on the fallback accent), and the ring round a focused back link.' },
+      { name: '--sb-cta-bg', fallback: '#fff', note: 'Back link fill.' },
+      { name: '--sb-cta-fg', fallback: 'var(--sb-back-bg)', note: 'Back link text.' },
+      { name: '--sb-icon-color', fallback: 'var(--sb-accent)', note: 'Icon and the corner hint.' },
+      { name: '--sb-icon-bg', fallback: '#f4f1fe', note: 'Circle behind the icon.' },
+      { name: '--sb-icon-size', fallback: '2.25rem', note: 'Icon size; its circle is twice it.' },
+      { name: '--sb-radius', fallback: '14px', note: 'Corner radius.' },
+      { name: '--sb-padding', fallback: '1.75rem 1.5rem', note: 'Inside each panel.' },
+      { name: '--sb-shadow', fallback: '0 1px 2px rgb(0 0 0 / 0.06), 0 10px 28px rgb(0 0 0 / 0.1)', note: 'box-shadow of the card.' },
+      { name: '--sb-min-height', fallback: '14rem', note: 'A floor, not a height: the card grows with its taller panel.' },
+      { name: '--sb-title-size', fallback: '1.2rem', note: 'Title font size.' },
+      { name: '--sb-duration', fallback: '450ms', note: 'The slide; the `duration` prop overrides it.' },
+      { name: '--sb-easing', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Timing of the slide.' },
+      { name: '--sb-fade', fallback: '200ms', note: 'The crossfade under reduced motion.' },
+      { name: '--sb-focus', fallback: 'var(--sb-accent)', note: 'Focus ring round the card.' },
+    ],
+    a11y: [
+      'The card is a real <button> named from the title, with aria-expanded saying whether the back is in and aria-controls pointing at the back. Enter or Space slides it in and out; Escape slides it out and returns focus to the button.',
+      'Both panels are in the DOM. The one out of view is inert and aria-hidden, so its link is not a tab stop and a screen reader reads only what shows. With the back in, Tab goes from the button to the back’s link.',
+      'Focus inside the back keeps it in. Focus leaving the card slides out a back opened from the keyboard; one a pointer clicked in stays until clicked again.',
+      'Hover never works alone: on a touch screen the first tap slides the back in and its link works on the second tap; a tap on the back away from the link slides it out. A corner plus on the front, turned to a cross on the back, says there is more.',
+      'prefers-reduced-motion (tracked live): no sliding; the panels crossfade.',
+      'Without JavaScript the button is never shown and both panels render, the back below the front, link included. Printing shows both.',
+    ],
+    usage: `<div class="jobs">   <!-- grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)) -->
+  <SlideBox
+    icon={wrenchSvg}
+    title="Service technician"
+    text="Full time, Springfield."
+    backText="Install and repair heating systems across the county. Van, tools and training provided."
+    cta={{ text: 'Apply now', href: '/jobs/technician/' }}
+  />
+  <SlideBox image="/images/office.webp" imageAlt="" title="Office manager" direction="left" … />
+</div>
+<!-- global.css: .sb { --sb-accent: var(--brand); --sb-radius: var(--radius); } -->`,
+    license:
+      'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The card takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/slide-box/ (demo)' }],
+    file: 'src/library/slide-box/SlideBox.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

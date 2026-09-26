@@ -39,6 +39,19 @@
  * 6. Items keep a 44px minimum; the fallback colours clear 4.5:1; every icon the demo pastes is
  *    Font Awesome Free, byte for byte the package's path, with its attribution comment.
  *
+ * slide-box
+ * 7. Geometry: each `direction` parks the back one card-size off the matching edge in the
+ *    component's CSS (up: translateY(100%), down: translateY(-100%), left: translateX(100%),
+ *    right: translateX(-100%)), and an open card brings it to `transform: none`.
+ * 8. The built page, per card, against public/demo/slide-box-cards.json:
+ *    - the control is a <button type="button" aria-expanded="false" hidden> named by the title,
+ *      aria-controls → the back;
+ *    - no-JS: both panels, the back after the front, neither inert nor aria-hidden; the front
+ *      has the title, the text and the icon (Font Awesome Free) or image, and no link; the back
+ *      has the title, the back text and the CTA as a real link;
+ *    - data-direction and data-trigger are the fixture's; the script once a page.
+ * 9. The fallback colours clear 4.5:1; the demo's icons are Font Awesome Free.
+ *
  * Exits 1 with one line per failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -528,5 +541,130 @@ finish('info-circle size and colours');
 }
 finish('info-circle mutations');
 summary.push(`info-circle: ${Object.keys(RING).length} ring sizes, ${icExpected.length} circles on ${icPages.length} pages, ${Object.keys(icFa).length} Font Awesome Free icons, ${icRatios.join(', ')}`);
+
+// ================================================================ slide-box
+const sbFile = 'src/library/slide-box/SlideBox.astro';
+const sbSrc = read(sbFile);
+
+// 7. Geometry.
+const WAITING = { up: 'translateY(100%)', down: 'translateY(-100%)', left: 'translateX(100%)', right: 'translateX(-100%)' };
+const checkSlides = (src) => {
+  const out = [];
+  for (const [dir, want] of Object.entries(WAITING)) {
+    const got = src.match(new RegExp(`\\.sb\\[data-direction='${dir}'\\] \\{\\s*--sb-waiting: ([^;]+);`))?.[1];
+    if (got !== want) out.push(`slide-box direction "${dir}": the back waits at ${got ?? 'nothing'}, expected ${want}.`);
+  }
+  if (!/\.sb\[data-ready\] \.sb__back \{\s*transform: var\(--sb-waiting\);/.test(src)) out.push('slide-box: the back does not wait at --sb-waiting once the script runs.');
+  if (!/\.sb\[data-ready\]\[data-open\] \.sb__back \{\s*transform: none;/.test(src)) out.push('slide-box: an open card does not bring the back to transform: none.');
+  if (!/\.sb\[data-ready\] \.sb__card \{[^}]*overflow: hidden;/.test(src)) out.push('slide-box: the card must clip (overflow: hidden) so the waiting back is out of view.');
+  return out;
+};
+checkSlides(sbSrc).forEach(fail);
+finish('slide-box geometry');
+
+const sbDemoSrc = read('src/components/demos/SlideBoxDemo.astro');
+const sbFa = Object.fromEntries([...sbDemoSrc.matchAll(/'([a-z0-9-]+)': `(<svg[\s\S]*?<\/svg>)`/g)].map((m) => [m[1], faPath(m[2])]));
+validateFa(sbDemoSrc, 'SlideBoxDemo.astro').forEach(fail);
+finish('slide-box icons');
+
+// 8. The built page.
+const sbExpected = JSON.parse(read('public/demo/slide-box-cards.json')).cards;
+for (const c of sbExpected) {
+  if (c.image && !existsSync(join(root, 'public/demo', c.image))) fail(`slide-box fixture: "${c.title}" names image ${c.image}, not in public/demo/.`);
+  if (c.icon && !sbFa[c.icon]) fail(`slide-box fixture: "${c.title}" names icon ${c.icon}, which the demo's \`fa\` map lacks.`);
+}
+const validateSlideBox = (html, expected, where) => {
+  const out = [];
+  const bad = (m) => out.push(`${where}: ${m}`);
+  const cards = all(html, /<div\b[^>]*\sdata-sb(?=[\s>])/);
+  if (cards.length !== expected.length) bad(`expected ${expected.length} slide boxes, found ${cards.length}.`);
+  cards.forEach((card, i) => {
+    const e = expected[i];
+    if (!e) return;
+    const at = `card ${i + 1} ("${e.title}")`;
+    const top = openTag(card);
+    if (/\sdata-(ready|open|armed)\b/.test(top)) bad(`${at}: the static root carries a runtime state attribute.`);
+    if (attr(top, 'data-direction') !== e.direction) bad(`${at}: data-direction is ${attr(top, 'data-direction')}, the fixture says ${e.direction}.`);
+    if (attr(top, 'data-trigger') !== (e.trigger ?? 'both')) bad(`${at}: data-trigger is ${attr(top, 'data-trigger')}, the fixture says ${e.trigger ?? 'both'}.`);
+
+    const control = all(card, /<button\b[^>]*\sdata-sb-control/)[0];
+    if (!control) return bad(`${at}: no <button data-sb-control>.`);
+    const ct = openTag(control);
+    if (attr(ct, 'type') !== 'button') bad(`${at}: the control needs type="button".`);
+    if (attr(ct, 'aria-expanded') !== 'false') bad(`${at}: the control needs aria-expanded="false" in the static HTML.`);
+    if (attr(ct, 'hidden') === undefined) bad(`${at}: the control must render hidden, or a visitor without JavaScript meets a button that does nothing.`);
+    if (text(control) !== e.title) bad(`${at}: the control is named "${text(control)}", expected "${e.title}".`);
+
+    const front = all(card, /<div\b[^>]*\sdata-sb-front(?=[\s>])/)[0];
+    const back = all(card, /<div\b[^>]*\sdata-sb-back(?=[\s>])/)[0];
+    if (!front || !back) return bad(`${at}: missing a panel.`);
+    if (card.indexOf(back) < card.indexOf(front)) bad(`${at}: the back comes before the front; without JavaScript they stack in source order.`);
+    if (attr(ct, 'aria-controls') !== attr(openTag(back), 'id')) bad(`${at}: aria-controls does not name the back.`);
+    for (const [name, panel] of [['front', front], ['back', back]]) {
+      const tag = openTag(panel);
+      if (attr(tag, 'inert') !== undefined || attr(tag, 'aria-hidden') !== undefined) bad(`${at}: the ${name} is inert or aria-hidden in the static HTML; without JavaScript it must be readable.`);
+    }
+    const ft = text(front);
+    const bt = text(back);
+    if (!ft.includes(e.title) || !ft.includes(e.text)) bad(`${at}: the front lacks its title or text.`);
+    if (/<a\b[^>]*\shref=/.test(front)) bad(`${at}: a link on the front; the whole front is the button, so it cannot be clicked.`);
+    if (e.icon && faPath(front) !== sbFa[e.icon]) bad(`${at}: the front's icon is not Font Awesome Free "${e.icon}".`);
+    if (e.image) {
+      const img = front.match(/<img\b[^>]*>/)?.[0];
+      if (!img || !attr(img, 'src')?.endsWith(e.image) || attr(img, 'alt') !== e.imageAlt) bad(`${at}: the front lacks its image with alt "${e.imageAlt}".`);
+    }
+    if (!bt.includes(e.title) || !bt.includes(e.backText)) bad(`${at}: the back lacks its title or text.`);
+    const link = [...back.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].find((l) => text(l[2]) === e.cta.text);
+    if (!link) bad(`${at}: the back has no link "${e.cta.text}".`);
+    else if (attr(`<a${link[1]}>`, 'href') !== e.cta.href) bad(`${at}: the back link points at ${attr(`<a${link[1]}>`, 'href')}.`);
+  });
+  const defs = (html.match(/window\.__superheroSlideBox \|\|=/g) || []).length;
+  const calls = (html.match(/window\.__superheroSlideBox && window\.__superheroSlideBox\(\);/g) || []).length;
+  if (defs !== 1) bad(`the slide-box script is on the page ${defs} times; it must be once.`);
+  if (calls !== Math.max(0, cards.length - 1)) bad(`expected ${cards.length - 1} one-line boot calls for later cards, found ${calls}.`);
+  return out;
+};
+const sbPages = pages('slide-box');
+const sbHtml = {};
+for (const rel of sbPages) {
+  sbHtml[rel] = readFileSync(join(root, rel), 'utf8');
+  validateSlideBox(sbHtml[rel], sbExpected, rel).forEach(fail);
+}
+finish('slide-box page');
+
+// 9. Colours.
+const sbRatios = [];
+for (const [label, fg, bg] of [
+  ['front text', '--sb-front-fg', '--sb-front-bg'],
+  ['back text', '--sb-back-fg', '--sb-accent'],
+  ['back link', '--sb-accent', '--sb-cta-bg'],
+]) {
+  const a = fallback(sbSrc, fg);
+  const b = fallback(sbSrc, bg);
+  if (!a || !b) {
+    fail(`${sbFile}: no literal fallback for ${fg} or ${bg} to measure.`);
+    continue;
+  }
+  const r = contrast(a, b);
+  sbRatios.push(`${label} ${r.toFixed(2)}:1`);
+  if (r < 4.5) fail(`slide-box ${label}: ${a} on ${b} is ${r.toFixed(2)}:1, under 4.5:1.`);
+}
+finish('slide-box colours');
+
+// Mutations.
+{
+  const src = sbHtml[sbPages[0]];
+  const v = (html) => validateSlideBox(html, sbExpected, 'mutant');
+  mustFail('slide-box', '"up" parks the back above instead of below', checkSlides(mutate('slide-box', 'up', sbSrc, "--sb-waiting: translateY(100%);", '--sb-waiting: translateY(-100%);')));
+  mustFail('slide-box', 'the card no longer clips', checkSlides(mutate('slide-box', 'clip', sbSrc, /(\.sb\[data-ready\] \.sb__card \{[^}]*)overflow: hidden;/, '$1')));
+  mustFail('slide-box', 'the control without aria-expanded', v(mutate('slide-box', 'expanded', src, ' aria-expanded="false"', '')));
+  mustFail('slide-box', 'the control shown without JavaScript', v(mutate('slide-box', 'hidden', src, /(<button type="button" class="sb__control"[^>]*?) hidden/, '$1')));
+  mustFail('slide-box', 'the back inert without JavaScript', v(mutate('slide-box', 'inert', src, /(<div class="sb__panel sb__back")/, '$1 inert')));
+  mustFail('slide-box', 'a link on the front', v(mutate('slide-box', 'front link', src, /(<p class="sb__text"[^>]*>)/, '$1<a href="/x/">x</a>')));
+  mustFail('slide-box', 'a card that slides from the wrong side', v(mutate('slide-box', 'direction', src, 'data-direction="left"', 'data-direction="right"')));
+  mustFail('slide-box', 'a demo icon that is not Font Awesome Free', validateFa(mutate('slide-box', 'fa', sbDemoSrc, "'mug-hot'", "'mug-saucer'"), 'mutant'));
+}
+finish('slide-box mutations');
+summary.push(`slide-box: 4 directions, ${sbExpected.length} cards on ${sbPages.length} pages, ${Object.keys(sbFa).length} Font Awesome Free icons, ${sbRatios.join(', ')}`);
 
 console.log(`check-reveal-cards ok: ${summary.join('; ')}; ${mutations.length} mutations refused.`);

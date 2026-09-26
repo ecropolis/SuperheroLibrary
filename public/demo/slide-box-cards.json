@@ -1,0 +1,8 @@
+{
+  "cards": [
+    { "icon": "mug-hot", "title": "Coffee", "text": "Roasted on Tuesdays, sold by Friday.", "backText": "Two house blends and a single origin that changes each month. Ask at the counter for a taste of whatever is on the grinder.", "cta": { "text": "See this month’s beans", "href": "#slide-box-demo" }, "direction": "up" },
+    { "icon": "truck-fast", "title": "Delivery", "text": "Beans at your door in two days.", "backText": "Order by noon and it ships the same day, in a bag that keeps the beans fresh for a month.", "cta": { "text": "How delivery works", "href": "#slide-box-demo" }, "direction": "left" },
+    { "image": "promo.svg", "imageAlt": "", "title": "Wholesale", "text": "For cafés, offices and restaurants.", "backText": "Weekly deliveries, a grinder on loan and a morning of barista training for your staff.", "cta": { "text": "Ask for a price list", "href": "#slide-box-demo" }, "direction": "down" },
+    { "icon": "calendar-check", "title": "Tasting mornings", "text": "Tap or click: this one ignores hover.", "backText": "The first Saturday of each month, 9 to 11. Six coffees, one table, no booking needed.", "cta": { "text": "Next dates", "href": "#slide-box-demo" }, "direction": "right", "trigger": "click" }
+  ]
+}
