@@ -1,0 +1,733 @@
+---
+/**
+ * Hotspot — an image with numbered pins at percent coordinates; each pin opens a small panel
+ * (a title and a line of text, optionally a small image). What UABB's Hotspot module and the
+ * "image hotspots" plugins do, with an optional guided tour, and nothing lost without
+ * JavaScript.
+ *
+ * Pins. Each pin is a real <button> with aria-expanded and aria-controls → its panel, named by
+ * the point's title and described by its text, so a screen reader hears both on focus. Its hit
+ * area is 44px whatever the image size; the dot inside is smaller. Click, tap, Enter and Space
+ * toggle it everywhere. On a device with a fine pointer that hovers (a mouse, a trackpad),
+ * hover and keyboard focus also open it; leaving closes a panel hover opened, a click holds it.
+ * One panel is open at a time. Escape closes it and returns focus to its pin; so does a click
+ * or tap anywhere off the pins and panels.
+ *
+ * Tour (`tour`). A "Start tour" button over the image opens the first point; each panel then
+ * carries "2 of 5", Previous, Next and End tour, and focus follows the step. `repeat` wraps the
+ * ends (otherwise the first step has no Previous and the last no Next). `autoplay` (ms) steps
+ * on by itself once the visitor starts the tour, stops on the last step unless `repeat`, and
+ * waits while the pointer is on the open pin or panel, while keyboard focus is in the figure
+ * and while the tab is hidden. Under prefers-reduced-motion (tracked live) it never steps on
+ * by itself. It never starts without the button: nothing moves that the visitor did not ask
+ * for, and End tour (or Escape) stops it.
+ *
+ * Placement. Each panel opens toward the larger space: above a pin in the lower half, below one
+ * in the upper half; from its left edge near the left side, its right edge near the right,
+ * centred otherwise. That rule is decided at build (the `<hs-place>` block, which the check
+ * runs against golden cases), so nothing measures at runtime. When the figure is narrower than
+ * 34rem, the open panel is shown under the image instead of over it, so it never covers the
+ * picture or runs off a phone's screen.
+ *
+ * Without JavaScript. The pins are links (`#`) to a numbered list rendered under the image, one
+ * item per point with its title, text and image: every hotspot's text is on the page, for
+ * search engines and for print. The buttons, the tour and the Start tour button stay hidden.
+ *
+ * Theming (each has a fallback):
+ *   --hs-accent       #5933d8   pins, the Start tour button, focus ring
+ *   --hs-pin-bg       var(--hs-accent)   --hs-pin-fg  #fff     --hs-pin-ring rgb(255 255 255 / 0.9)
+ *   --hs-pin-active   #1e283c   pin whose panel is open
+ *   --hs-pin-size     1.75rem   the visible dot (the hit area stays 44px)
+ *   --hs-panel-bg     #fff      --hs-panel-fg  #1e283c   --hs-panel-width 18rem
+ *   --hs-radius       10px      --hs-shadow    0 0.75rem 2rem rgb(15 20 35 / 0.25)
+ *   --hs-muted        #5b6275   the tour counter (6.09:1 on the panel)
+ *   --hs-focus        var(--hs-accent)
+ */
+interface Point {
+  /** Percent from the left edge of the image, 0–100. */
+  x: number;
+  /** Percent from the top edge of the image, 0–100. */
+  y: number;
+  title: string;
+  text: string;
+  /** A small image shown above the text in the panel. */
+  image?: string;
+  /** Required with `image`: its description, or "" when it is decorative on purpose. */
+  imageAlt?: string;
+}
+interface Labels {
+  start: string;
+  previous: string;
+  next: string;
+  end: string;
+  /** "2 of 5" */
+  of: string;
+}
+interface Props {
+  src: string;
+  /** The image's description. Required; "" only when the pins and their text say everything. */
+  alt: string;
+  /** Intrinsic size, so the page does not shift while the image loads. */
+  width?: number;
+  height?: number;
+  points: Point[];
+  caption?: string;
+  tour?: boolean;
+  /** Tour: Next on the last step goes to the first, Previous on the first to the last. */
+  repeat?: boolean;
+  /** Tour: ms between steps once started. Off by default; never under reduced motion. */
+  autoplay?: number;
+  /** A soft pulse around each pin, to say "press me". Never under reduced motion. */
+  pulse?: boolean;
+  labels?: Partial<Labels>;
+  loading?: 'lazy' | 'eager';
+  class?: string;
+}
+const {
+  src,
+  alt,
+  width,
+  height,
+  points,
+  caption,
+  tour = false,
+  repeat = false,
+  autoplay,
+  pulse = true,
+  labels: labelProp = {},
+  loading = 'lazy',
+  class: className,
+} = Astro.props;
+
+// <hs-place>
+/** Where a point's panel opens: toward the larger space, decided at build. */
+function hotspotPlace(x: number, y: number): { v: 'above' | 'below'; h: 'start' | 'center' | 'end' } {
+  const v = y >= 50 ? 'above' : 'below';
+  const h = x < 25 ? 'start' : x > 75 ? 'end' : 'center';
+  return { v, h };
+}
+// </hs-place>
+
+const where = 'Hotspot';
+if (typeof alt !== 'string') throw new Error(`${where}: \`alt\` is required — describe the image, or pass alt="" if the pins say everything.`);
+if (!Array.isArray(points) || points.length === 0) throw new Error(`${where}: \`points\` needs at least one point.`);
+points.forEach((p, i) => {
+  const n = `${where} point ${i + 1}${p?.title ? ` ("${p.title}")` : ''}`;
+  for (const k of ['x', 'y'] as const) {
+    if (!(typeof p[k] === 'number' && Number.isFinite(p[k]) && p[k] >= 0 && p[k] <= 100)) {
+      throw new Error(`${n}: \`${k}\` must be a percentage of the image, 0 to 100; got ${String(p[k])}.`);
+    }
+  }
+  if (!p.title?.trim()) throw new Error(`${n}: \`title\` is required; it names the pin.`);
+  if (!p.text?.trim()) throw new Error(`${n}: \`text\` is required; it is what the pin opens.`);
+  if (p.image && typeof p.imageAlt !== 'string') throw new Error(`${n}: \`image\` needs \`imageAlt\` — describe it, or "" if it is decorative on purpose.`);
+});
+if (autoplay !== undefined && !tour) throw new Error(`${where}: \`autoplay\` steps through a tour; set \`tour\` too.`);
+if (autoplay !== undefined && !(Number.isFinite(autoplay) && autoplay >= 2000)) {
+  throw new Error(`${where}: \`autoplay\` is the ms between steps, at least 2000 (people need time to read); got ${String(autoplay)}.`);
+}
+
+const labels: Labels = { start: 'Start tour', previous: 'Previous', next: 'Next', end: 'End tour', of: 'of', ...labelProp };
+const uid = 'hs-' + Math.random().toString(36).slice(2, 8);
+const n = points.length;
+const pos = (p: Point) => `--hs-x:${p.x}%;--hs-y:${p.y}%`;
+const cfg = JSON.stringify({ tour, repeat, autoplay: autoplay ?? 0 });
+
+// The script goes out once per page; later figures only call it, right after their own markup.
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__hotspotScript;
+locals.__hotspotScript = true;
+---
+
+<figure class:list={['hs', className]} data-hs={cfg} data-pulse={pulse ? '' : undefined}>
+  <div class="hs__stage">
+    <div class="hs__frame">
+      <img class="hs__img" src={src} alt={alt} width={width} height={height} loading={loading} decoding="async" />
+      {
+        points.map((p, i) => (
+          <>
+            <a class="hs__pin" href={`#${uid}-${i + 1}`} style={pos(p)} data-hs-link>
+              <span class="hs__dot" aria-hidden="true">{i + 1}</span>
+              <span class="hs__sr">{p.title}</span>
+            </a>
+            <button
+              type="button"
+              class="hs__pin"
+              style={pos(p)}
+              aria-expanded="false"
+              aria-controls={`${uid}-${i + 1}`}
+              aria-describedby={`${uid}-${i + 1}-text`}
+              hidden
+              data-hs-pin={i}
+            >
+              <span class="hs__dot" aria-hidden="true">{i + 1}</span>
+              <span class="hs__sr">{p.title}</span>
+            </button>
+          </>
+        ))
+      }
+      {tour && (
+        <button type="button" class="hs__start" hidden data-hs-start>
+          {labels.start}
+        </button>
+      )}
+    </div>
+    <ol class="hs__legend" role="list">
+      {
+        points.map((p, i) => {
+          const place = hotspotPlace(p.x, p.y);
+          const id = `${uid}-${i + 1}`;
+          return (
+            <li class="hs__panel" id={id} style={pos(p)} data-v={place.v} data-h={place.h} data-n={i + 1} data-hs-panel={i}>
+              {p.image && <img class="hs__panel-img" src={p.image} alt={p.imageAlt} loading="lazy" decoding="async" />}
+              <p class="hs__title" id={`${id}-title`}>{p.title}</p>
+              <p class="hs__text" id={`${id}-text`}>{p.text}</p>
+              {tour && (
+                <div class="hs__tour" role="group" aria-labelledby={`${id}-count ${id}-title`} hidden data-hs-tour>
+                  <span class="hs__count" id={`${id}-count`}>
+                    {i + 1} {labels.of} {n}
+                  </span>
+                  <span class="hs__nav">
+                    {(repeat || i > 0) && (
+                      <button type="button" class="hs__navbtn" data-hs-nav="prev">
+                        {labels.previous}
+                      </button>
+                    )}
+                    {(repeat || i < n - 1) && (
+                      <button type="button" class="hs__navbtn hs__navbtn--next" data-hs-nav="next">
+                        {labels.next}
+                      </button>
+                    )}
+                    <button type="button" class="hs__navbtn hs__navbtn--end" data-hs-nav="end">
+                      {labels.end}
+                    </button>
+                  </span>
+                </div>
+              )}
+            </li>
+          );
+        })
+      }
+    </ol>
+  </div>
+  {caption && <figcaption class="hs__caption">{caption}</figcaption>}
+</figure>
+
+{
+  firstOnPage ? (
+    <script is:inline>
+      (() => {
+        const boot = (window.__superheroHotspot ||= (() => {
+          const fine = matchMedia('(hover: hover) and (pointer: fine)');
+          const still = matchMedia('(prefers-reduced-motion: reduce)');
+          // The last input was a key, not a pointer: keyboard focus in a figure pauses its tour.
+          let keyed = false;
+          addEventListener('keydown', (e) => (keyed = !e.metaKey && !e.ctrlKey && !e.altKey), true);
+          addEventListener('pointerdown', () => (keyed = false), true);
+          const init = (root) => {
+            if (root.hasAttribute('data-ready')) return;
+            let cfg = {};
+            try {
+              cfg = JSON.parse(root.dataset.hs || '{}');
+            } catch {}
+            const pins = [...root.querySelectorAll('[data-hs-pin]')];
+            const panels = [...root.querySelectorAll('[data-hs-panel]')];
+            if (!pins.length || pins.length !== panels.length) return;
+            const start = root.querySelector('[data-hs-start]');
+            const n = pins.length;
+            let open = -1;
+            let why = null; // 'hover' | 'focus' | 'click' | 'tour'
+            let touring = false;
+            let reading = false; // the pointer is on the open pin or panel
+            let quiet = false; // focus we moved ourselves: do not treat it as a focus-open
+            let timer = 0;
+            let leaving = 0;
+
+            const focus = (el) => {
+              if (!el) return;
+              quiet = true;
+              el.focus({ preventScroll: true });
+              quiet = false;
+            };
+            const set = (i, reason) => {
+              clearTimeout(leaving);
+              if (i === open) {
+                if (i >= 0) why = reason;
+                return schedule();
+              }
+              if (open >= 0) {
+                const had = panels[open].contains(document.activeElement);
+                pins[open].setAttribute('aria-expanded', 'false');
+                panels[open].hidden = true;
+                if (had && i < 0) focus(pins[open]);
+              }
+              open = i;
+              why = i >= 0 ? reason : null;
+              if (i >= 0) {
+                pins[i].setAttribute('aria-expanded', 'true');
+                panels[i].hidden = false;
+              }
+              root.toggleAttribute('data-open', i >= 0);
+              schedule();
+            };
+            const paused = () => reading || (keyed && root.contains(document.activeElement));
+            const schedule = () => {
+              clearTimeout(timer);
+              if (!touring || !(cfg.autoplay > 0) || still.matches || document.hidden || paused()) return;
+              if (!cfg.repeat && open >= n - 1) return;
+              timer = setTimeout(() => go(open + 1), cfg.autoplay);
+            };
+            /** A tour step. Focus in the old panel moves to the same control in the new one. */
+            const go = (i) => {
+              if (cfg.repeat) i = (i + n) % n;
+              if (i < 0 || i >= n) return;
+              const el = document.activeElement;
+              const role = open >= 0 && panels[open].contains(el) ? el.getAttribute('data-hs-nav') : null;
+              set(i, 'tour');
+              if (!role) return;
+              const q = (r) => panels[i].querySelector(`[data-hs-nav="${r}"]`);
+              focus(q(role) || (role === 'prev' ? q('next') : q('prev')) || q('end'));
+            };
+            const startTour = () => {
+              touring = true;
+              root.setAttribute('data-touring', '');
+              const had = start && document.activeElement === start;
+              if (start) start.hidden = true;
+              set(0, 'tour');
+              // Chrome and Firefox focus a clicked button; Safari does not, and then focus stays put.
+              if (had) focus(panels[0].querySelector('[data-hs-nav="next"]') || panels[0].querySelector('[data-hs-nav="end"]'));
+            };
+            const endTour = () => {
+              const had = root.contains(document.activeElement);
+              touring = false;
+              clearTimeout(timer);
+              root.removeAttribute('data-touring');
+              const was = open;
+              set(-1);
+              if (start) {
+                start.hidden = false;
+                if (had) focus(start);
+              } else if (had && was >= 0) focus(pins[was]);
+            };
+
+            pins.forEach((pin, i) => {
+              pin.addEventListener('pointerenter', (e) => {
+                if (e.pointerType === 'touch' || !fine.matches) return;
+                if (touring) {
+                  reading = i === open;
+                  return schedule();
+                }
+                if (open !== i) set(i, 'hover');
+              });
+              pin.addEventListener('pointerleave', () => {
+                if (touring) {
+                  reading = false;
+                  return schedule();
+                }
+                if (why === 'hover' && open === i) leaving = setTimeout(() => set(-1), 200);
+              });
+              pin.addEventListener('click', (e) => {
+                if (touring) return go(i);
+                if (open === i && (why === 'click' || e.detail === 0)) set(-1);
+                else set(i, 'click');
+              });
+              pin.addEventListener('focusin', () => {
+                if (quiet || touring || !fine.matches) return;
+                if (open !== i) set(i, 'focus');
+              });
+            });
+            panels.forEach((panel, i) => {
+              panel.addEventListener('pointerenter', (e) => {
+                if (e.pointerType === 'touch') return;
+                clearTimeout(leaving);
+                if (touring) {
+                  reading = true;
+                  schedule();
+                }
+              });
+              panel.addEventListener('pointerleave', () => {
+                if (touring) {
+                  reading = false;
+                  return schedule();
+                }
+                if (why === 'hover' && open === i) leaving = setTimeout(() => set(-1), 200);
+              });
+              panel.addEventListener('click', (e) => {
+                const nav = e.target.closest('[data-hs-nav]');
+                if (!nav) return;
+                const r = nav.getAttribute('data-hs-nav');
+                if (r === 'end') endTour();
+                else go(open + (r === 'next' ? 1 : -1));
+              });
+            });
+            if (start) start.addEventListener('click', startTour);
+
+            root.addEventListener('keydown', (e) => {
+              if (e.key !== 'Escape' || open < 0) return;
+              e.preventDefault();
+              if (touring) return endTour();
+              const i = open;
+              const had = root.contains(document.activeElement);
+              set(-1);
+              if (had) focus(pins[i]);
+            });
+            root.addEventListener('focusout', () => {
+              setTimeout(() => {
+                if (why === 'focus' && !root.contains(document.activeElement) && document.hasFocus()) set(-1);
+                else schedule();
+              });
+            });
+            root.addEventListener('focusin', () => schedule());
+            // A click or tap off the pins and panels closes a panel (not a running tour).
+            document.addEventListener('pointerdown', (e) => {
+              if (open < 0 || touring) return;
+              const t = e.target instanceof Element ? e.target : null;
+              if (t && root.contains(t) && t.closest('[data-hs-pin],[data-hs-panel]')) return;
+              set(-1);
+            });
+            document.addEventListener('visibilitychange', schedule);
+            still.addEventListener?.('change', schedule);
+
+            root.querySelectorAll('[data-hs-link]').forEach((a) => (a.hidden = true));
+            pins.forEach((p) => (p.hidden = false));
+            panels.forEach((p) => (p.hidden = true));
+            root.querySelectorAll('[data-hs-tour]').forEach((t) => (t.hidden = false));
+            if (start) start.hidden = false;
+            root.setAttribute('data-ready', '');
+          };
+          return () => document.querySelectorAll('[data-hs]:not([data-ready])').forEach(init);
+        })());
+        boot();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+      })();
+    </script>
+  ) : (
+    <script is:inline>window.__superheroHotspot && window.__superheroHotspot();</script>
+  )
+}
+
+<style>
+  .hs {
+    container-type: inline-size;
+    margin: 0;
+  }
+  .hs__stage {
+    display: grid;
+  }
+  .hs__frame {
+    position: relative;
+    grid-area: 1 / 1;
+  }
+  .hs__img {
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    border-radius: var(--hs-radius, 10px);
+  }
+
+  /* Pins: a 44px hit area around a smaller dot. */
+  .hs__pin {
+    position: absolute;
+    z-index: 1;
+    left: var(--hs-x);
+    top: var(--hs-y);
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--hs-pin-fg, #fff);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    translate: -50% -50%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hs__pin[hidden],
+  .hs__start[hidden],
+  .hs__tour[hidden],
+  .hs__panel[hidden] {
+    display: none;
+  }
+  .hs__pin:focus-visible {
+    outline: 3px solid var(--hs-focus, var(--hs-accent, #5933d8));
+    outline-offset: 2px;
+  }
+  .hs__dot {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: var(--hs-pin-size, 1.75rem);
+    height: var(--hs-pin-size, 1.75rem);
+    border-radius: 50%;
+    background: var(--hs-pin-bg, var(--hs-accent, #5933d8));
+    box-shadow:
+      0 0 0 3px var(--hs-pin-ring, rgb(255 255 255 / 0.9)),
+      0 2px 8px rgb(0 0 0 / 0.35);
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: background-color 0.15s ease, scale 0.15s ease;
+  }
+  .hs__pin:hover .hs__dot,
+  .hs__pin[aria-expanded='true'] .hs__dot {
+    scale: 1.12;
+  }
+  .hs__pin[aria-expanded='true'] .hs__dot {
+    background: var(--hs-pin-active, #1e283c);
+  }
+  .hs__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .hs__start {
+    position: absolute;
+    z-index: 2;
+    left: 1rem;
+    bottom: 1rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.25rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--hs-accent, #5933d8);
+    color: var(--hs-pin-fg, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.3);
+  }
+  .hs__start:focus-visible {
+    outline: 3px solid var(--hs-pin-ring, #fff);
+    outline-offset: 3px;
+  }
+
+  /* The legend: without JavaScript, a numbered list under the image. */
+  .hs__legend {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .hs__panel {
+    position: relative;
+    min-height: 1.75rem;
+    padding-left: 2.5rem;
+  }
+  .hs__panel::before {
+    content: attr(data-n);
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--hs-pin-bg, var(--hs-accent, #5933d8));
+    color: var(--hs-pin-fg, #fff);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .hs__panel:target {
+    border-radius: 6px;
+    outline: 2px solid var(--hs-focus, var(--hs-accent, #5933d8));
+    outline-offset: 4px;
+  }
+  .hs__title {
+    margin: 0 0 0.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .hs__text {
+    margin: 0;
+    line-height: 1.5;
+  }
+  .hs__panel-img {
+    display: block;
+    width: 100%;
+    max-width: 8rem;
+    height: auto;
+    margin-bottom: 0.6rem;
+    border-radius: calc(var(--hs-radius, 10px) - 4px);
+  }
+
+  /* With JavaScript: the legend lies over the image and each item is its point's panel. */
+  .hs[data-ready] .hs__legend {
+    position: relative;
+    z-index: 3;
+    grid-area: 1 / 1;
+    margin: 0;
+    pointer-events: none;
+  }
+  .hs[data-ready] .hs__panel {
+    position: absolute;
+    left: var(--hs-x);
+    top: var(--hs-y);
+    width: min(var(--hs-panel-width, 18rem), 70cqi);
+    padding: 0.9rem 1rem;
+    border-radius: var(--hs-radius, 10px);
+    background: var(--hs-panel-bg, #fff);
+    color: var(--hs-panel-fg, #1e283c);
+    box-shadow: var(--hs-shadow, 0 0.75rem 2rem rgb(15 20 35 / 0.25));
+    pointer-events: auto;
+    --hs-tx: -50%;
+    --hs-ty: 1.6rem;
+    translate: var(--hs-tx) var(--hs-ty);
+  }
+  .hs[data-ready] .hs__panel::before {
+    content: none;
+  }
+  .hs[data-ready] .hs__panel[data-v='above'] {
+    --hs-ty: calc(-100% - 1.6rem);
+  }
+  .hs[data-ready] .hs__panel[data-h='start'] {
+    --hs-tx: -1.4rem;
+  }
+  .hs[data-ready] .hs__panel[data-h='end'] {
+    --hs-tx: calc(-100% + 1.4rem);
+  }
+  .hs[data-ready] .hs__panel-img {
+    max-width: 100%;
+  }
+
+  .hs__tour {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgb(0 0 0 / 0.1);
+  }
+  .hs:not([data-touring]) .hs__tour {
+    display: none;
+  }
+  .hs__count {
+    color: var(--hs-muted, #5b6275);
+    font-size: 0.85rem;
+  }
+  .hs__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .hs__navbtn {
+    min-height: 2.75rem;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .hs__navbtn--next {
+    border-color: var(--hs-accent, #5933d8);
+    background: var(--hs-accent, #5933d8);
+    color: var(--hs-pin-fg, #fff);
+  }
+  .hs__navbtn--end {
+    margin-left: auto;
+    border-color: transparent;
+    text-decoration: underline;
+  }
+  .hs__navbtn:focus-visible {
+    outline: 3px solid var(--hs-focus, var(--hs-accent, #5933d8));
+    outline-offset: 2px;
+  }
+  .hs__caption {
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  /* A narrow figure: the open panel goes under the image, not over it. */
+  @container (max-width: 34rem) {
+    .hs[data-ready] .hs__legend {
+      grid-area: 2 / 1;
+      margin-top: 0.75rem;
+      pointer-events: auto;
+    }
+    .hs[data-ready] .hs__panel {
+      position: relative;
+      left: auto;
+      top: auto;
+      width: auto;
+      padding-left: 3.25rem;
+      translate: none;
+      box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1);
+    }
+    .hs[data-ready] .hs__panel::before {
+      content: attr(data-n);
+      left: 1rem;
+      top: 0.9rem;
+    }
+    .hs[data-ready] .hs__panel-img {
+      max-width: 8rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hs[data-pulse] .hs__pin:not([aria-expanded='true']) .hs__dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 var(--hs-pin-ring, rgb(255 255 255 / 0.9));
+      animation: hs-pulse 2.4s ease-out infinite;
+    }
+    .hs[data-ready] .hs__panel:not([hidden]) {
+      animation: hs-panel-in 0.18s ease-out;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hs__dot {
+      transition: none;
+    }
+  }
+  @keyframes hs-pulse {
+    0% {
+      box-shadow: 0 0 0 0 var(--hs-pin-ring, rgb(255 255 255 / 0.9));
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 12px transparent;
+    }
+  }
+  @keyframes hs-panel-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media print {
+    .hs__pin[data-hs-pin],
+    .hs__start,
+    .hs__tour {
+      display: none !important;
+    }
+    .hs[data-ready] .hs__legend {
+      grid-area: 2 / 1;
+      margin-top: 1rem;
+    }
+    .hs[data-ready] .hs__panel,
+    .hs[data-ready] .hs__panel[hidden] {
+      position: relative;
+      left: auto;
+      top: auto;
+      display: block;
+      width: auto;
+      translate: none;
+      box-shadow: none;
+    }
+  }
+</style>

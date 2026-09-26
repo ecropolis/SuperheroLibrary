@@ -1428,6 +1428,75 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'hotspot',
+    name: 'Image hotspots',
+    aka: ['UABB Hotspot', 'image hotspots', 'interactive image', 'image map', 'hotspot tour', 'product tour image', 'Elementor Hotspot', 'shoppable image'],
+    summary:
+      'An image with numbered pins at percent coordinates; each pin is a button that opens a small panel (title, text, optionally a small image) beside it. Click, tap, Enter and Space toggle a pin everywhere; hover and focus also open it where there is a mouse. One open at a time, Escape closes. An optional tour steps through the pins with "2 of 5", Previous, Next and End tour, and can play itself once started. Without JavaScript the pins link to a numbered list of every point under the image.',
+    pitch: 'Put the explanation on the picture: pins on the parts that matter, each opening a line about it — or a guided tour that walks visitors round.',
+    // SE Ranking US, 2026-09-26: image hotspot 320/mo, difficulty 23; interactive image 390/10;
+    // image hotspots 320/24 and hotspot image 320/24 (one cluster); image tooltip 70/13.
+    // "image map" (760/41) is the old HTML <map> element's term and "hotspot" alone (90,500/93)
+    // is Wi-Fi; neither is this page.
+    search: { query: 'image hotspot', alsoRanks: ['interactive image', 'image hotspots', 'image tooltip'] },
+    replaces: ['UABB “Hotspot” module (Beaver Builder), tour included', 'Elementor Pro Hotspot widget', 'image hotspot / image map plugins', 'HTML <map> / <area> image maps'],
+    goodFor:
+      'One picture that stands for a lot of parts: a room or a product whose features each need a line, a floor plan, a site map of a campus or a trail, a diagram of a machine. The tour suits a picture people should see in order, like the stops of a visit or the steps of an assembly.',
+    notFor:
+      'Text people must read to use the page: behind a pin, many never see it (the numbered list under the image is only there without JavaScript and in print). More than about eight pins, which crowd the picture and a phone. Pins that are links to other pages: that is a list of links, or cards. And a picture without a spot to point at, where a caption does the job.',
+    props: [
+      { name: 'src', type: 'string', note: 'The image.' },
+      { name: 'alt', type: 'string', note: 'Required. Describe the whole picture; the pins add the detail. "" only when the pins and their text say everything.' },
+      { name: 'width / height', type: 'number', note: 'Intrinsic size, so nothing shifts while the image loads. Pins are placed in percent, so any display size works.' },
+      { name: 'points', type: '{ x, y, title, text, image?, imageAlt? }[]', note: '`x` and `y` are percent of the image from its left and top edge (0–100; the build fails outside that). `title` names the pin, `text` is what it opens. `image` shows a small picture above the text and needs `imageAlt` ("" if decorative).' },
+      { name: 'caption', type: 'string', note: 'A <figcaption> under the image.' },
+      { name: 'tour', type: 'boolean', default: 'false', note: 'A “Start tour” button over the image; each panel then carries “2 of 5”, Previous, Next and End tour, in the points’ order.' },
+      { name: 'repeat', type: 'boolean', default: 'false', note: 'Tour: Next on the last step goes back to the first (and Previous on the first to the last). Without it, the first step has no Previous and the last no Next.' },
+      { name: 'autoplay', type: 'number (ms)', note: 'Tour: step on by itself every so many ms (at least 2000) once the visitor presses Start tour. Waits while the pointer is on the open pin or panel, while keyboard focus is in the figure and while the tab is hidden; never under reduced motion. Needs `tour`.' },
+      { name: 'pulse', type: 'boolean', default: 'true', note: 'A soft ring pulsing out of each closed pin. Never under reduced motion.' },
+      { name: 'labels', type: '{ start?, previous?, next?, end?, of? }', default: 'Start tour, Previous, Next, End tour, of', note: 'The tour’s words, for another language.' },
+      { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", note: 'Eager only when the image is in the first screen.' },
+      { name: 'class', type: 'string', note: 'Class on the <figure>, for theming one figure.' },
+    ],
+    theming: [
+      { name: '--hs-accent', fallback: '#5933d8', note: 'Pins, Start tour, Next, focus rings, unless set separately.' },
+      { name: '--hs-pin-bg', fallback: 'var(--hs-accent)', note: 'The pin’s dot.' },
+      { name: '--hs-pin-fg', fallback: '#fff', note: 'The number in the dot, and text on Start tour and Next.' },
+      { name: '--hs-pin-ring', fallback: 'rgb(255 255 255 / 0.9)', note: 'Ring round the dot and the pulse, so a pin shows on a dark or busy picture.' },
+      { name: '--hs-pin-active', fallback: '#1e283c', note: 'The dot of the pin whose panel is open.' },
+      { name: '--hs-pin-size', fallback: '1.75rem', note: 'The visible dot. The hit area stays 44px whatever this is.' },
+      { name: '--hs-panel-bg', fallback: '#fff', note: 'Panel background.' },
+      { name: '--hs-panel-fg', fallback: '#1e283c', note: 'Panel text (14.75:1 on the fallback background).' },
+      { name: '--hs-panel-width', fallback: '18rem', note: 'Panel width over the image; never more than 70% of the figure.' },
+      { name: '--hs-muted', fallback: '#5b6275', note: 'The tour’s “2 of 5” (6.09:1 on the fallback panel).' },
+      { name: '--hs-radius', fallback: '10px', note: 'Image and panel corners.' },
+      { name: '--hs-shadow', fallback: '0 0.75rem 2rem rgb(15 20 35 / 0.25)', note: 'Panel shadow.' },
+      { name: '--hs-focus', fallback: 'var(--hs-accent)', note: 'Focus ring on pins and tour buttons.' },
+    ],
+    a11y: [
+      'Each pin is a real <button> with aria-expanded and aria-controls pointing at its panel, named by the point’s title and described by its text (aria-describedby), so a screen reader hears both on reaching it. The hit area is 44 × 44 px whatever the image size.',
+      'Click, tap, Enter and Space toggle a pin on every device. With a mouse or trackpad, hover and keyboard focus also open it; leaving closes what hover opened, and a click holds it open. One panel at a time. Escape closes it and returns focus to its pin; a click or tap off the pins closes it too.',
+      'Tour: each step’s controls are a group named “2 of 5” plus the title; after Previous or Next, focus moves to the same button in the new panel, so the keyboard stays in the tour. End tour (or Escape) closes it and puts focus back on Start tour.',
+      'Autoplay only after the visitor presses Start tour, never on arrival. It waits while the pointer is on the open pin or panel and while keyboard focus is in the figure, and End tour stops it (WCAG 2.2.2). prefers-reduced-motion (tracked live): no autoplay, no pulse, no fade.',
+      'Panels open toward the larger space, decided at build; in a figure narrower than 34rem the open panel sits under the image, so it never covers the picture or leaves the screen.',
+      'Without JavaScript the pins are links to a numbered list under the image holding every point’s title, text and image: nothing is only behind a pin. Print shows the list too.',
+    ],
+    usage: `<Hotspot
+  src="/images/showroom.webp" width={1600} height={1000}
+  alt="The showroom: a sofa by the window, a lamp and a plant"
+  points={[
+    { x: 50, y: 62, title: 'Three-seat sofa', text: 'Washable covers in twelve colours.' },
+    { x: 73, y: 25, title: 'Arc lamp', text: 'Warm light on a dimmer.' },
+    { x: 87, y: 58, title: 'Rubber plant', text: 'Copes with low light.', image: '/images/plant.webp', imageAlt: '' },
+  ]}
+  tour autoplay={6000}
+/>
+<!-- global.css: .hs { --hs-accent: var(--brand); --hs-radius: var(--radius); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/hotspot/ (demo)' }],
+    file: 'src/library/hotspot/Hotspot.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

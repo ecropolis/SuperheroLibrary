@@ -1,0 +1,62 @@
+{
+  "room": {
+    "alt": "A living room: a sofa under a framed print, a tall window on the left, a floor lamp and a potted plant on the right, a round rug on the floor.",
+    "points": [
+      {
+        "x": 23,
+        "y": 32,
+        "title": "The window",
+        "text": "Double-glazed, south-facing. Blinds are made to measure and fitted in a morning."
+      },
+      {
+        "x": 73,
+        "y": 25,
+        "title": "Arc floor lamp",
+        "text": "Warm 2700 K bulb on a dimmer, so the corner works for reading and for films."
+      },
+      {
+        "x": 50,
+        "y": 62,
+        "title": "Three-seat sofa",
+        "text": "Removable, washable covers in twelve colours. Delivered and assembled in the room."
+      },
+      {
+        "x": 87,
+        "y": 58,
+        "title": "Plant and pot",
+        "text": "A rubber plant that copes with low light, in a terracotta pot with a saucer.",
+        "image": "ticker-leaf.svg",
+        "imageAlt": ""
+      },
+      {
+        "x": 35,
+        "y": 89,
+        "title": "Round rug",
+        "text": "Hand-woven wool, 2 m across. It hides a draughty floorboard nobody has fixed yet."
+      }
+    ]
+  },
+  "hills": {
+    "alt": "Rolling hills at dusk under a purple sky, the sun low over the far ridge.",
+    "points": [
+      {
+        "x": 70,
+        "y": 56,
+        "title": "Sunset Point",
+        "text": "The low sun sits here in late September. Arrive twenty minutes before sunset."
+      },
+      {
+        "x": 22,
+        "y": 64,
+        "title": "West ridge trail",
+        "text": "Two miles, gentle, with benches every half mile."
+      },
+      {
+        "x": 52,
+        "y": 90,
+        "title": "Car park",
+        "text": "Free, 40 spaces, closes at 10 pm."
+      }
+    ]
+  }
+}

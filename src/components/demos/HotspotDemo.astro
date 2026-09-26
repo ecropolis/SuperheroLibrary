@@ -1,0 +1,63 @@
+---
+/**
+ * Demo for `hotspot`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * Two figures. A living room with five pins and a tour that plays itself once started (5 s a
+ * step, repeat), which is the reference's "tour" demo; and a narrow landscape with three pins
+ * and no tour, held under 34rem so its open panel shows under the image, as on a phone.
+ *
+ * The points live in public/demo/hotspot-points.json (image names only; this file prefixes
+ * `assetBase`), which scripts/check-reveal-cards.mjs reads to pin the built page against.
+ */
+import Hotspot from '../../library/hotspot/Hotspot.astro';
+import fixture from '../../../public/demo/hotspot-points.json';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+type Point = { x: number; y: number; title: string; text: string; image?: string; imageAlt?: string };
+const withAssets = (points: Point[]) => points.map((p) => (p.image ? { ...p, image: asset(p.image) } : p));
+---
+<div class="demo-hs">
+  <Hotspot
+    src={asset('hotspot-room.svg')}
+    alt={fixture.room.alt}
+    width={1600}
+    height={1000}
+    points={withAssets(fixture.room.points)}
+    tour
+    repeat
+    autoplay={5000}
+    caption="Hover or tap a pin, or press Start tour: it steps on every 5 seconds and waits while you read."
+  />
+  <div class="demo-hs__narrow">
+    <Hotspot
+      class="demo-hs__navy"
+      src={asset('hills.svg')}
+      alt={fixture.hills.alt}
+      width={1600}
+      height={1000}
+      points={withAssets(fixture.hills.points)}
+      caption="In a column narrower than 34rem the open panel sits under the image."
+    />
+  </div>
+</div>
+<style>
+  .demo-hs {
+    --hs-accent: var(--purple, #5933d8);
+    --hs-radius: var(--radius, 10px);
+    display: grid;
+    gap: 2.5rem;
+  }
+  .demo-hs__narrow {
+    max-width: 30rem;
+  }
+  .demo-hs :global(.demo-hs__navy) {
+    --hs-pin-bg: var(--navy, #1e283c);
+    --hs-pin-active: var(--purple, #5933d8);
+  }
+</style>
