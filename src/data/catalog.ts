@@ -1486,6 +1486,72 @@ import { analytics } from '../data/site';
     file: 'src/library/notice/Notice.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'toast',
+    name: 'Toast',
+    aka: ['snackbar', 'toast notification', 'toastr', 'Notyf', 'flash message', 'pop-up notification', 'growl notification'],
+    summary:
+      'A short message in a corner after something happened, made by script: window.__superheroToast.show({ text, kind, action, timeout }) or a data-toast button. One polite live region per page; timers pause on hover, on focus and in a hidden tab; a toast with an action never leaves by itself; at most three at once; Escape closes the focused one; no slide under reduced motion. Without JavaScript nothing renders.',
+    pitch: 'A quiet “Saved” or “Link copied” in the corner that confirms the click and gets out of the way, with an Undo when one is needed.',
+    // SE Ranking US, 2026-09-26: toast notifications 320/mo, difficulty 32; toast notification
+    // 1,100/67; toast popup 210/33; html toast 70/26. The pre-assigned "toast notification html"
+    // has no US volume; the plural is the reachable head term and the singular a variant.
+    search: { query: 'toast notifications', alsoRanks: ['toast notification', 'toast popup', 'html toast'] },
+    replaces: ['toastr / Notyf / SweetAlert toasts', 'page-builder notification pop-ins', 'Material snackbars'],
+    goodFor:
+      'Confirming an action that worked where the visitor already is: saved, copied, sent, added to the cart, archived (with Undo). Short, and fine to miss, because the page already shows the result.',
+    notFor:
+      'Anything that must be read or that must exist without JavaScript: errors a visitor has to fix, a form’s result, a warning before they act. Those are a notice, in the page. Also not for marketing (that is modal or announcement-bar), and not a second <Toast /> on a page: there is one region.',
+    props: [
+      { name: 'position', type: "'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'", default: "'bottom-right'", note: 'The corner the region is fixed to. A bottom corner rises above the cookie-consent bar while that shows. On a phone the region spans the width.' },
+      { name: 'label', type: 'string', default: '“Notifications”', note: 'The region’s accessible name.' },
+      { name: 'timeout', type: 'number (ms)', default: '6000', note: 'How long a toast stays when show() does not say. 0 keeps toasts until closed. Anything under 4000 is raised to 4000.' },
+      { name: 'closeLabel', type: 'string', default: '“Dismiss notification”', note: 'Name of each toast’s close button.' },
+      { name: 'kindLabels', type: 'Partial<Record<kind, string>>', default: 'info none, then Success / Warning / Error', note: 'The word read (not shown) before a toast’s text.' },
+      { name: 'class', type: 'string', note: 'Class on the region.' },
+      { name: 'show({ text, kind?, action?, timeout? })', type: 'script API', note: 'window.__superheroToast.show() returns { element, dismiss(), open }. text is plain text. kind is info, success, warning or danger. action is { label, onClick?(event, handle) } or { label, href } (http(s), mailto, tel or relative; anything else is refused). Also clear() and count.' },
+      { name: 'data-toast', type: 'attribute', note: 'On any button: its value is the text. Optional data-toast-kind, data-toast-timeout, data-toast-action (a label) with data-toast-href.' },
+    ],
+    theming: [
+      { name: '--ts-bg', fallback: '#1e283c', note: 'The toast.' },
+      { name: '--ts-fg', fallback: '#fff', note: 'Its text (14.75:1).' },
+      { name: '--ts-action', fallback: '#c4b5ff', note: 'The action’s text, underlined (8.01:1).' },
+      { name: '--ts-info / --ts-success / --ts-warning / --ts-danger', fallback: '#8cc2ff / #7fdc9c / #ffd166 / #ffa3a3', note: 'Icon colours per kind, each at least 7:1 on the fallback ground.' },
+      { name: '--ts-focus', fallback: '#c4b5ff', note: 'Focus ring on the action and close button.' },
+      { name: '--ts-radius', fallback: '10px', note: 'Corners.' },
+      { name: '--ts-shadow', fallback: '0 0.75rem 2rem rgb(0 0 0 / 0.28)', note: 'Shadow.' },
+      { name: '--ts-width', fallback: '24rem', note: 'Width, never wider than the screen.' },
+      { name: '--ts-offset', fallback: '1rem', note: 'Distance from the corner.' },
+      { name: '--ts-font-size', fallback: '0.95rem', note: 'Text size.' },
+      { name: '--ts-z', fallback: '110', note: 'Stacking; the consent bar is 120.' },
+    ],
+    a11y: [
+      'One region per page, role="region" named “Notifications” with aria-live="polite": each toast is read once when it appears, without interrupting. The kind is said in words for success, warning and danger (“Error: …”); icons are aria-hidden.',
+      'Timing is adjustable: every timer pauses while the pointer is over a toast, while focus is in one and while the tab is hidden, and resumes with the time it had left. A toast with an action never leaves by itself, so its action can always be reached. Shorter than 4 s is raised to 4 s.',
+      'Each toast has a 44px close button named “Dismiss notification”, and Escape closes the toast with focus. When a focused toast leaves, focus goes to the next toast or back to where it was before, never to nowhere.',
+      'The region sits at the end of the page, so Tab reaches toasts after the content; screen-reader users can jump to the “Notifications” landmark.',
+      'Text is set as text, never parsed as HTML. An action href with a scheme other than http(s), mailto or tel (javascript:) is refused.',
+      'prefers-reduced-motion: toasts appear and leave at once, with no slide or fade.',
+      'Without JavaScript nothing renders: the region is hidden until the script mounts it, and a toast only exists because a script made one. Use a notice for anything that must exist without JavaScript.',
+    ],
+    usage: `<!-- Once, near the end of <body> in the layout: -->
+<Toast position="bottom-right" />
+
+<!-- Then, from any script after an action: -->
+<script>
+  const t = window.__superheroToast.show({ text: 'Conversation archived.', kind: 'success',
+    action: { label: 'Undo', onClick: () => restore() } });
+  // t.dismiss() closes it early.
+</script>
+
+<!-- Or with no script of your own: -->
+<button data-toast="Link copied to the clipboard." data-toast-kind="success">Copy link</button>
+<!-- global.css: .tst { --ts-bg: var(--navy); --ts-action: var(--tint); --ts-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/toast/ (demo)' }],
+    file: 'src/library/toast/Toast.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

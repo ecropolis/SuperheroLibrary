@@ -1,0 +1,99 @@
+---
+/**
+ * Demo for `toast`. The website renders this too (see README, "Consumed by superherotech.ai");
+ * it has no assets, and every host token has a fallback.
+ *
+ * The demo carries the page's one <Toast /> region, bottom right. The first four buttons are
+ * declarative (`data-toast`), no script of their own; "Archive, with undo" and "Four at once"
+ * call window.__superheroToast.show(), the way a host site would after a real action. Nothing
+ * is saved, copied or archived: every toast here is only the message.
+ *
+ * Without JavaScript the buttons do nothing and no toast appears; the note under them says so.
+ */
+import Toast from '../../library/toast/Toast.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+---
+<div class="demo-ts">
+  <div class="demo-ts__row">
+    <button class="demo-ts__btn" type="button" data-toast="Your changes were saved." data-toast-kind="success">Save</button>
+    <button class="demo-ts__btn" type="button" data-toast="Link copied to the clipboard.">Copy link</button>
+    <button class="demo-ts__btn" type="button" data-toast="You are offline. Changes will sync when you reconnect." data-toast-kind="warning" data-toast-timeout="10000">Go offline</button>
+    <button class="demo-ts__btn" type="button" data-toast="The file could not be uploaded." data-toast-kind="danger" data-toast-action="Help" data-toast-href="#upload-help">Fail an upload</button>
+    <button class="demo-ts__btn demo-ts__btn--solid" type="button" data-demo-ts="undo">Archive, with undo</button>
+    <button class="demo-ts__btn demo-ts__btn--quiet" type="button" data-demo-ts="burst">Four at once</button>
+  </div>
+  <p class="demo-ts__note">
+    Toasts appear at the bottom right of this page. Hover or focus one and its timer stops; Escape closes the one with
+    focus; one with an action stays until it is used or closed. At most three show at once. Without JavaScript nothing
+    appears: a toast only exists because a script made one.
+  </p>
+  <p class="demo-ts__status" aria-live="polite" data-demo-ts-said></p>
+</div>
+<Toast />
+
+<script is:inline>
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-demo-ts]');
+    const api = window.__superheroToast;
+    if (!b || !api) return;
+    const said = document.querySelector('[data-demo-ts-said]');
+    if (b.getAttribute('data-demo-ts') === 'undo') {
+      api.show({
+        text: 'Conversation archived.',
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            if (said) said.textContent = 'Undone: the conversation is back.';
+          },
+        },
+      });
+    } else {
+      ['First of four.', 'Second of four.', 'Third of four.', 'Fourth: the first one has left.'].forEach((text) => api.show({ text }));
+    }
+  });
+</script>
+
+<style>
+  .demo-ts {
+    color: var(--ink, #1e283c);
+  }
+  .demo-ts__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .demo-ts__btn {
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-ts__btn--solid {
+    background: var(--purple, #5933d8);
+    color: var(--white, #fff);
+  }
+  .demo-ts__btn--quiet {
+    border-color: var(--line, #dfe3ea);
+  }
+  .demo-ts__btn:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 3px;
+  }
+  .demo-ts__note {
+    max-width: 44rem;
+    margin: 1rem 0 0;
+  }
+  .demo-ts__status {
+    min-height: 1.5em;
+    margin: 0.5rem 0 0;
+    font-weight: 600;
+  }
+</style>
