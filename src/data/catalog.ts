@@ -1549,6 +1549,76 @@ import { analytics } from '../data/site';
     file: 'src/library/tooltip/Tooltip.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'responsive-table',
+    name: 'Responsive table',
+    aka: ['mobile table', 'table to cards', 'stacked table', 'TablePress responsive', 'data table', 'comparison table', 'price table'],
+    summary:
+      'A real <table> with a caption, scoped headers and right-aligned numbers, built from columns and rows. Below a breakpoint on its own width each row becomes a card, every value under its column’s name (CSS only, from data-label); or, in scroll mode, the table keeps its shape in a focusable scrollbox named by the caption, with edge fades and a one-time hint. Optional striped rows and sticky header. Without JavaScript: the table.',
+    pitch: 'Timetables, prices and comparisons that read on a phone: a proper table on a wide screen, and a card per row, or a table you can swipe along, on a narrow one.',
+    // SE Ranking US, 2026-09-26: responsive tables 140/mo, difficulty 8; responsive table
+    // 140/23; responsive table html 110/25; responsive table css 110/0; responsive data table
+    // 70/16; sticky table header 50/12. All falling from ~260 a year ago; the brief's
+    // "responsive table html" is a variant of the easiest head term.
+    search: { query: 'responsive tables', alsoRanks: ['responsive table html', 'responsive table css', 'responsive data table', 'sticky table header'] },
+    replaces: ['TablePress with its Responsive Tables extension', 'Ninja Tables and wpDataTables for small, hand-kept tables', 'the page builder’s table widget that overflows the screen on a phone'],
+    goodFor: 'Data people read across and down: class timetables, price lists, opening times by branch, plan comparisons, specifications. Cards when each row stands on its own; scroll when people compare down a column.',
+    notFor:
+      'Layout: a table puts a page’s columns in a grid only if they are data, never to line things up. Large, sortable or filterable data sets: that is a data-grid application, not a page element. And prose: a cell of paragraphs belongs in a list or an accordion.',
+    props: [
+      { name: 'caption', type: 'string', note: 'What the table is. Required: it names the table, and the scroll region.' },
+      { name: 'captionHidden', type: 'boolean', default: 'false', note: 'Hide the caption visually (a heading above already says it); screen readers still announce it.' },
+      { name: 'columns', type: 'Column[]', note: '`{ key, label, numeric?, html? }`. `label` is the header and each cell’s data-label; `numeric` overrides the detection; `html` renders the cells as HTML (a link).' },
+      { name: 'rows', type: 'Record<string, string | number | null>[]', note: 'One object per row, keyed by column `key`. A null or missing value is an empty cell (left out of its card).' },
+      { name: 'rowHeader', type: 'string | false', default: 'the first column', note: 'Key of the column whose cells head their row (<th scope="row">, the card’s title). false for none.' },
+      { name: 'mode', type: '“cards” | “scroll”', default: '“cards”', note: 'Cards below the breakpoint, or always a horizontal scrollbox.' },
+      { name: 'breakpoint', type: '“sm” | “md” | “lg”', default: '“md”', note: 'Cards: the element’s own width below which rows become cards: 30rem, 40rem or 52rem.' },
+      { name: 'sticky', type: 'boolean', default: 'false', note: 'The header row stays in view (offset by --rt-sticky-top). In scroll mode it needs `maxHeight`.' },
+      { name: 'maxHeight', type: 'string (CSS length)', note: 'Scroll mode: the box’s greatest height; it then scrolls down as well.' },
+      { name: 'striped', type: 'boolean', default: 'false', note: 'Tint alternate rows.' },
+      { name: 'hint', type: 'string', default: '“Scroll sideways for more”', note: 'Scroll mode: shown under the box while it overflows, until the first scroll.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--rt-fg', fallback: 'inherit', note: 'Text.' },
+      { name: '--rt-muted', fallback: 'currentColor at 70%', note: 'Card labels and the scroll hint.' },
+      { name: '--rt-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Rules and card borders.' },
+      { name: '--rt-head-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Header row fill.' },
+      { name: '--rt-head-fg', fallback: 'inherit', note: 'Header row text.' },
+      { name: '--rt-stripe', fallback: 'rgb(0 0 0 / 0.035)', note: 'Alternate rows with `striped`.' },
+      { name: '--rt-card-bg', fallback: 'transparent', note: 'Card fill; also under a sticky header (Canvas when unset).' },
+      { name: '--rt-radius', fallback: '0.5rem', note: 'Card and scrollbox corners.' },
+      { name: '--rt-pad', fallback: '0.6rem 0.8rem', note: 'Cell padding.' },
+      { name: '--rt-fade', fallback: '2.5rem', note: 'Width of the scroll-edge fade.' },
+      { name: '--rt-sticky-top', fallback: '0px', note: 'Offset of a sticky header, for a sticky site header above it.' },
+      { name: '--rt-focus', fallback: 'currentColor', note: 'Focus ring of the scrollbox.' },
+    ],
+    a11y: [
+      'A real <table>: a <caption> names it, column headers are <th scope="col">, the row header column is <th scope="row">, so a screen reader announces each cell with its headers.',
+      'Explicit roles (table, rowgroup, row, columnheader, rowheader, cell) keep it a table when the cards restyle its rows as blocks, which otherwise drops table semantics in Chrome and Safari.',
+      'Cards take each label from the cell’s data-label, written at build time from the header text, so the two cannot drift. The label is drawn with empty alternative text, so a screen reader hears the column header once, not twice. Empty cells are left out of the card.',
+      'Scroll mode: the box is a region named by the caption and is focusable, so arrow keys scroll it; when nothing overflows it is not a Tab stop. The hint is aria-hidden: it is for eyes, the table is already navigable.',
+      'Numbers are right-aligned with tabular figures, header included, so columns of prices and counts line up.',
+      'No motion. Without JavaScript it is the table (cards need no script); a scroll box scrolls without its fades.',
+    ],
+    usage: `<ResponsiveTable
+  caption="Classes this week"
+  columns={[
+    { key: 'name', label: 'Class' },
+    { key: 'day', label: 'Day' },
+    { key: 'price', label: 'Price' },        // detected as numeric
+  ]}
+  rows={[{ name: 'Wheel throwing', day: 'Tuesday', price: '$45.00' }, …]}
+  striped
+/>
+
+<ResponsiveTable caption="Plans compared" columns={cols} rows={plans} mode="scroll" sticky maxHeight="24rem" />
+<!-- .site { --rt-border: var(--line); --rt-head-bg: var(--tint); --rt-card-bg: var(--white); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/responsive-table/ (demo)' }],
+    file: 'src/library/responsive-table/ResponsiveTable.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

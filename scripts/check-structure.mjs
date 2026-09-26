@@ -23,10 +23,16 @@
  *                   aria-describedby names a role="tooltip" of plain text, shown inline (or as
  *                   the trigger's title); icon-only triggers are named and 44px; the fallback
  *                   colours pass 4.5:1.
+ * responsive-table  caption, scope and explicit table roles on every part; each cell's
+ *                   data-label is its column's header text; numeric columns agree with the
+ *                   checked detection (run at build time, in the frontmatter); cards are CSS
+ *                   only at each size; the scrollbox is a named, focusable region with a
+ *                   hidden, aria-hidden hint; the edge maths holds in right-to-left.
  *
  * Exits 1 with one line per failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -538,6 +544,212 @@ if (ids.has('tooltip')) {
   killed += await mutate(id, placeSrc, placeMutants, async (js) => tooltipPlaceCases(await load(js, 'tooltipPlace')));
   finish('tooltip mutations');
   summary.push(`tooltip (${stateCases.length} state and ${placeCases.length} placement cases, no-JS render of ${roots(html, 'span', 'data-tt').length}, contrast ${contrast(ttBg, ttFg).toFixed(2)}:1, ${killed} mutants caught)`);
+}
+
+// ================================================================= responsive-table
+if (ids.has('responsive-table')) {
+  const id = 'responsive-table';
+  const file = 'src/library/responsive-table/ResponsiveTable.astro';
+  const html = page(id);
+  finish('responsive-table page');
+  const rtComponent = source(file);
+
+  // ---------------------------------------------------------- 1. logic, golden cases
+  // Numeric detection runs at build time, in the component's frontmatter (TypeScript).
+  const numericTs = logicBlock(rtComponent, 'table-numeric');
+  if (!numericTs) fail(`${id}: ${file} has no \`// <table-numeric>\` … \`// </table-numeric>\` block.`);
+  finish('responsive-table numeric block');
+  const loadNumeric = async (ts) => {
+    const js = stripTypeScriptTypes(ts, { mode: 'strip' });
+    const mod = await import(`data:text/javascript;base64,${Buffer.from(`${js}\nexport default numericColumn;`).toString('base64')}`);
+    return mod.default;
+  };
+  const numericCases = [
+    [['1', '2', '30'], true, 'plain integers'],
+    [[1, 2.5, 30], true, 'numbers'],
+    [['$4.95', '$12.00'], true, 'prices'],
+    [['1,200', '35', '1,000,000'], true, 'thousands separators'],
+    [['12%', '−3.5%', '-0.25'], true, 'percentages and signs (hyphen and minus)'],
+    [['€9', '£1,250.50', '¥300'], true, 'other currencies'],
+    [['—', '44', '', null, 'n/a'], true, 'blanks do not count against a column'],
+    [['', null, '—'], false, 'a column of blanks is not numeric'],
+    [['1959', 'Ongoing'], false, 'one word makes it text'],
+    [['2026-09-26'], false, 'a date is not a number'],
+    [['1,20'], false, 'a misplaced separator'],
+    [['4.95 USD'], false, 'a trailing unit'],
+    [['Apollo', 'Gemini'], false, 'words'],
+    [[Infinity], false, 'a non-finite number'],
+  ];
+  const tableNumericCases = (numericColumn) => {
+    const out = [];
+    for (const [values, want, label] of numericCases) {
+      const got = numericColumn(values);
+      if (got !== want) out.push(`numericColumn(${JSON.stringify(values)}) is ${got}, expected ${want} (${label}).`);
+    }
+    return out;
+  };
+  const edgeCases = [
+    // [label, scrollLeft, scrollWidth, clientWidth, rtl, { overflow, start, end }]
+    ['fits: no fades, no hint', 0, 600, 600, false, { overflow: false, start: false, end: false }],
+    ['one pixel over is rounding, not overflow', 0, 601, 600, false, { overflow: false, start: false, end: false }],
+    ['at the start: more at the end only', 0, 1200, 600, false, { overflow: true, start: false, end: true }],
+    ['in the middle: both', 300, 1200, 600, false, { overflow: true, start: true, end: true }],
+    ['at the end: more at the start only', 600, 1200, 600, false, { overflow: true, start: true, end: false }],
+    ['sub-pixel short of the end counts as the end', 599.4, 1200, 600, false, { overflow: true, start: true, end: false }],
+    ['right-to-left, at the start (scrollLeft 0)', 0, 1200, 600, true, { overflow: true, start: false, end: true }],
+    ['right-to-left, at the end (scrollLeft negative)', -600, 1200, 600, true, { overflow: true, start: true, end: false }],
+    ['right-to-left, in the middle', -250, 1200, 600, true, { overflow: true, start: true, end: true }],
+  ];
+  const tableEdgeCases = (E) => {
+    const out = [];
+    for (const [label, sl, sw, cw, rtl, want] of edgeCases) {
+      const got = E.edges(sl, sw, cw, rtl);
+      for (const k of Object.keys(want)) if (got[k] !== want[k]) out.push(`${label}: ${k} is ${got[k]}, expected ${want[k]}.`);
+    }
+    return out;
+  };
+  const numericColumn = await loadNumeric(numericTs);
+  for (const m of tableNumericCases(numericColumn)) fail(`${id}: ${m}`);
+  const edgesSrc = shippedBlock(id, html, file, 'table-edges');
+  finish('responsive-table blocks');
+  for (const m of tableEdgeCases(await load(edgesSrc, 'tableEdges'))) fail(`${id}: ${m}`);
+  finish('responsive-table logic');
+
+  // ---------------------------------------------------------- 2. no-JS render and CSS
+  const tableRender = (page, css = rtComponent) => {
+    const out = [];
+    const f = (m) => out.push(m);
+    const tables = roots(page, 'div', 'data-rt');
+    const modes = new Set(tables.map((t) => attr(t.open, 'data-rt')));
+    if (!modes.has('cards') || !modes.has('scroll')) f('the demo needs one table in cards mode and one in scroll mode.');
+    if (!tables.some((t) => /\brt--sticky\b/.test(attr(t.open, 'class') ?? ''))) f('the demo needs a sticky table.');
+    for (const [n, t] of tables.entries()) {
+      const where = `table ${n + 1}`;
+      const mode = attr(t.open, 'data-rt');
+      if (has(t.open, 'data-ready') || has(t.open, 'data-more-end')) f(`${where}: rendered as if the script had run.`);
+      const table = t.html.match(/<table\b[^>]*>/)?.[0];
+      if (!table) {
+        f(`${where}: no <table>.`);
+        continue;
+      }
+      if (attr(table, 'role') !== 'table') f(`${where}: the <table> needs role="table" (cards drop table semantics without it).`);
+      const cap = t.html.match(/<table\b[^>]*>\s*<caption\b([^>]*)>([\s\S]*?)<\/caption>/);
+      if (!cap || !text(cap[2])) f(`${where}: no <caption> with text as the table's first child.`);
+      const heads = [...t.html.matchAll(/<thead\b[^>]*>[\s\S]*?<\/thead>/g)][0]?.[0] ?? '';
+      if (!/<thead\b[^>]*role="rowgroup"/.test(heads) || !/<tbody\b[^>]*role="rowgroup"/.test(t.html)) f(`${where}: thead and tbody need role="rowgroup".`);
+      const cols = [...heads.matchAll(/<th\b([^>]*)>([\s\S]*?)<\/th>/g)].map((m) => ({ open: `<th${m[1]}>`, label: text(m[2]) }));
+      if (!cols.length) f(`${where}: no column headers.`);
+      cols.forEach((c) => {
+        if (attr(c.open, 'scope') !== 'col') f(`${where}: column header "${c.label}" has no scope="col".`);
+        if (attr(c.open, 'role') !== 'columnheader') f(`${where}: column header "${c.label}" has no role="columnheader".`);
+      });
+      const body = t.html.match(/<tbody\b[^>]*>([\s\S]*?)<\/tbody>/)?.[1] ?? '';
+      const rows = [...body.matchAll(/<tr\b([^>]*)>([\s\S]*?)<\/tr>/g)];
+      if (!rows.length) f(`${where}: no rows.`);
+      const columnValues = cols.map(() => []);
+      const columnNum = cols.map(() => []);
+      rows.forEach((r, ri) => {
+        if (attr(`<tr${r[1]}>`, 'role') !== 'row') f(`${where}: row ${ri + 1} has no role="row".`);
+        const cells = [...r[2].matchAll(/<(th|td)\b([^>]*)>([\s\S]*?)<\/\1>/g)];
+        if (cells.length !== cols.length) f(`${where}: row ${ri + 1} has ${cells.length} cells for ${cols.length} columns.`);
+        cells.forEach(([, tag, attrs, inner], ci) => {
+          const open = `<${tag}${attrs}>`;
+          const col = cols[ci];
+          if (!col) return;
+          columnValues[ci].push(text(inner));
+          columnNum[ci].push(/\brt__num\b/.test(attr(open, 'class') ?? ''));
+          if (tag === 'th') {
+            if (attr(open, 'scope') !== 'row' || attr(open, 'role') !== 'rowheader') f(`${where}: row ${ri + 1}'s header cell needs scope="row" and role="rowheader".`);
+          } else {
+            if (attr(open, 'role') !== 'cell') f(`${where}: row ${ri + 1}, "${col.label}": no role="cell".`);
+            if (decode(attr(open, 'data-label') ?? '') !== col.label) f(`${where}: row ${ri + 1}, "${col.label}": data-label is "${decode(attr(open, 'data-label') ?? '')}"; the card would label it wrongly.`);
+          }
+        });
+        if (!/<th\b[^>]*scope="row"/.test(r[2])) f(`${where}: row ${ri + 1} has no row header.`);
+      });
+      // Numbers: a column's header and cells agree, and agree with the checked detection.
+      cols.forEach((c, ci) => {
+        const headNum = /\brt__num\b/.test(attr(c.open, 'class') ?? '');
+        if (columnNum[ci].some((v) => v !== headNum)) f(`${where}: column "${c.label}" is aligned as a number in some cells and not others.`);
+        if (numericColumn(columnValues[ci]) !== headNum) f(`${where}: column "${c.label}" is ${headNum ? '' : 'not '}marked numeric, but its values say otherwise.`);
+      });
+      const box = t.html.match(/<div\b[^>]*\sdata-rt-box[^>]*>/)?.[0] ?? '';
+      const hint = t.html.match(/<p\b[^>]*\sdata-rt-hint[^>]*>/)?.[0];
+      if (mode === 'scroll') {
+        if (attr(box, 'role') !== 'region') f(`${where}: the scrollbox must be role="region".`);
+        if (!cap || attr(box, 'aria-labelledby') !== attr(`<caption${cap[1]}>`, 'id')) f(`${where}: the scrollbox must be labelled by the caption's id.`);
+        if (attr(box, 'tabindex') !== '0') f(`${where}: the scrollbox must be focusable (tabindex="0") so a keyboard can scroll it.`);
+        if (!hint) f(`${where}: no scroll hint.`);
+        else {
+          if (!has(hint, 'hidden')) f(`${where}: the hint must be hidden until the script knows the box overflows.`);
+          if (attr(hint, 'aria-hidden') !== 'true') f(`${where}: the hint must be aria-hidden.`);
+        }
+      } else {
+        if (attr(box, 'role') || attr(box, 'tabindex')) f(`${where}: a cards table is not a region or a Tab stop.`);
+        if (hint) f(`${where}: a cards table has no scroll hint.`);
+      }
+    }
+    const runtimes = (page.match(/window\.__superheroResponsiveTable\s*=/g) || []).length;
+    if (runtimes !== (modes.has('scroll') ? 1 : 0)) f(`the scroll runtime is on the page ${runtimes} times; it must be emitted once, and only with a scroll table.`);
+    // Cards are CSS only: each size turns rows into blocks and draws data-label.
+    if (!/\.rt \{\s*container: rtable \/ inline-size;/.test(css)) f('the root must be the `rtable` inline-size container.');
+    for (const [size, rem] of [['sm', 30], ['md', 40], ['lg', 52]]) {
+      const q = css.match(new RegExp(`@container rtable \\(width < ${rem}rem\\) \\{([\\s\\S]*?)\\n  \\}\\n`))?.[1] ?? '';
+      const c = `.rt--cards.rt--${size}`;
+      if (!q.includes(`${c} td {\n      display: block;`)) f(`no \`@container rtable (width < ${rem}rem)\` block turning ${c} rows into blocks.`);
+      if (!q.includes(`${c} td::before {\n      content: attr(data-label);\n      content: attr(data-label) / '';`)) f(`the ${size} card block must draw each cell's label from data-label, with empty alternative text so it is not read twice.`);
+      if (!q.includes(`${c} thead {`)) f(`the ${size} card block must hide the header row visually (the labels replace it).`);
+    }
+    if (!/\.rt--scroll \.rt__frame:has\(> \.rt__box:focus-visible\) \{\s*outline:/.test(css)) f('the scrollbox needs a visible focus ring (on the frame: the mask would hide one on the box).');
+    return out;
+  };
+  for (const m of tableRender(html)) fail(`${id}: ${m}`);
+  finish('responsive-table render');
+
+  // ---------------------------------------------------------- 3. mutations
+  const firstTd = html.match(/<td\b[^>]*data-label="[^"]*"[^>]*>/)[0];
+  const firstCol = html.match(/<th scope="col"[^>]*>/)[0];
+  const numHead = html.match(/<th scope="col"[^>]*class="rt__num"[^>]*>/)[0];
+  const scrollBox = html.match(/<div\b[^>]*role="region"[^>]*data-rt-box[^>]*>/)[0];
+  const hintTag = html.match(/<p\b[^>]*data-rt-hint[^>]*>/)[0];
+  const renderMutants = [
+    ['caption removed', html.replace(/<caption\b[^>]*>[\s\S]*?<\/caption>/, '')],
+    ['a wrong data-label', html.replace(firstTd, firstTd.replace(/data-label="[^"]*"/, 'data-label="Something else"'))],
+    ['a column header without scope', html.replace(firstCol, firstCol.replace(' scope="col"', ''))],
+    ['a cell without role', html.replace(firstTd, firstTd.replace(' role="cell"', ''))],
+    ['a row header without scope', html.replace('<th scope="row"', '<th')],
+    ['table role removed', html.replace('<table class="rt__table" role="table"', '<table class="rt__table"')],
+    ['a numeric column not aligned', html.replace(numHead, numHead.replace(' class="rt__num"', ''))],
+    ['scrollbox not focusable', html.replace(scrollBox, scrollBox.replace(' tabindex="0"', ''))],
+    ['scrollbox unnamed', html.replace(scrollBox, scrollBox.replace(/ aria-labelledby="[^"]*"/, ''))],
+    ['hint shown before the script', html.replace(hintTag, hintTag.replace(/ hidden(?=[\s>])/, ''))],
+    ['runtime emitted twice', html.replace('</body>', '<script>window.__superheroResponsiveTable = {};</script></body>')],
+  ];
+  const cssMutants = [
+    ['sm rows never become cards', rtComponent.replace('.rt--cards.rt--sm td {\n      display: block;', '.rt--cards.rt--sm td {\n      display: table-cell;')],
+    ['md cards without labels', rtComponent.replace('.rt--cards.rt--md td::before {\n      content: attr(data-label);', '.rt--cards.rt--md td::before {\n      content: "";')],
+    ['lg card labels read twice', rtComponent.replace(".rt--cards.rt--lg td::before {\n      content: attr(data-label);\n      content: attr(data-label) / '';", ".rt--cards.rt--lg td::before {\n      content: attr(data-label);")],
+    ['lg cards keep the header row', rtComponent.replace('.rt--cards.rt--lg thead {', '.rt--cards.rt--lg thead:not(*) {')],
+    ['the root no longer a container', rtComponent.replace('container: rtable / inline-size;', '')],
+    ['no focus ring on the scrollbox', rtComponent.replace('.rt--scroll .rt__frame:has(> .rt__box:focus-visible) {', '.rt--scroll .rt__frame:has(> .rt__box:hover) {')],
+  ];
+  const numericMutants = [
+    ['thousands separators refused', numericTs.replace('(\\d{1,3}(,\\d{3})+|\\d+)', '(\\d+)')],
+    ['blanks count as text', numericTs.replace('if (BLANK.test(s)) continue;', '')],
+    ['a column of blanks counts as numeric', numericTs.replace('return numbers > 0;', 'return true;')],
+  ];
+  const edgeMutants = [
+    ['right-to-left ignored', edgesSrc.replace('const pos = rtl ? -scrollLeft : scrollLeft;', 'const pos = scrollLeft;')],
+    ['no tolerance at the end', edgesSrc.replace('end: pos < max - 1', 'end: pos < max')],
+    ['rounding counts as overflow', edgesSrc.replace('if (max < 2)', 'if (max < 1)')],
+  ];
+  let killed = 0;
+  killed += await mutate(id, html, renderMutants, (h) => tableRender(h));
+  killed += await mutate(id, rtComponent, cssMutants, (c) => tableRender(html, c));
+  killed += await mutate(id, numericTs, numericMutants, async (ts) => tableNumericCases(await loadNumeric(ts)));
+  killed += await mutate(id, edgesSrc, edgeMutants, async (js) => tableEdgeCases(await load(js, 'tableEdges')));
+  finish('responsive-table mutations');
+  summary.push(`responsive-table (${numericCases.length} numeric and ${edgeCases.length} edge cases, no-JS render of ${roots(html, 'div', 'data-rt').length}, ${killed} mutants caught)`);
 }
 
 console.log(`check-structure ok: ${summary.join('; ')}.`);

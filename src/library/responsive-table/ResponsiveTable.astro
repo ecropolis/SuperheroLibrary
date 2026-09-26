@@ -1,0 +1,526 @@
+---
+/**
+ * Responsive table — a real <table> of data, with a <caption>, header cells with `scope` and
+ * numbers aligned for reading, that stays readable when its column is narrow. Two ways:
+ *
+ *   mode="cards" (default): below `breakpoint` (the element's OWN width, a container query)
+ *     each row becomes a card: the row header as its title, then every cell under its column's
+ *     name. CSS only. Each <td> carries `data-label` (its column header's text, written at
+ *     build time) and the card draws it with `content: attr(data-label)`.
+ *   mode="scroll": the table keeps its shape inside a horizontal scrollbox. The box is a
+ *     `region` named by the caption and is focusable, so a keyboard can scroll it. Edges fade
+ *     where there is more to see, and "Scroll sideways for more" shows until the first scroll.
+ *     The fades and the hint are a small script; without it the box still scrolls.
+ *
+ * The card labels are drawn with `content: attr(data-label) / ''`: the empty alternative text
+ * keeps a screen reader from reading "Day" twice (once as the column header it already
+ * announces, once as the label). Browsers without that syntax keep the first declaration.
+ *
+ * Why the explicit ARIA roles (table, rowgroup, row, columnheader, rowheader, cell): a table
+ * whose rows are restyled with `display: block` loses its table semantics in Chrome and Safari,
+ * so the cards would reach a screen reader as loose text. The roles keep it a table in both
+ * layouts; they change nothing where the browser already knew.
+ *
+ * Numbers: a column whose every non-empty value is a number ("1,200", "$4.95", "−3.5%") is
+ * right-aligned with tabular figures, header included. The test runs at build time (the
+ * `table-numeric` block, which `npm run check` runs as golden cases); `numeric` on a column
+ * overrides it.
+ *
+ * `sticky` keeps the header row in view while the page scrolls past a long table (offset by
+ * `--rt-sticky-top` for a sticky site header). In scroll mode the box is what scrolls, so give
+ * it `maxHeight` and the header sticks inside the box instead. Cards have no header row.
+ *
+ * Without JavaScript: the table (cards mode has no script at all); a scroll-mode box scrolls
+ * with its own scrollbar, without fades or the hint.
+ *
+ * Not for layout. A table is for data with rows and columns that mean something; putting a
+ * page's columns in one is what this element exists to never do.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --rt-fg / --rt-muted        text / card labels and the hint      (inherit / inherit at 70%)
+ *   --rt-border                 rules and card borders               (rgb(0 0 0 / 0.14))
+ *   --rt-head-bg / --rt-head-fg header row                           (rgb(0 0 0 / 0.04) / inherit)
+ *   --rt-stripe                 alternate rows with `striped`        (rgb(0 0 0 / 0.035))
+ *   --rt-card-bg / --rt-radius  card fill / card and box corners     (transparent / 0.5rem)
+ *   --rt-pad                    cell padding                         (0.6rem 0.8rem)
+ *   --rt-fade                   width of the scroll-edge fade        (2.5rem)
+ *   --rt-sticky-top             offset of a sticky header            (0px)
+ *   --rt-focus                  focus ring of the scrollbox          (currentColor)
+ */
+type Cell = string | number | null | undefined;
+export interface Column {
+  /** The row object's key for this column. */
+  key: string;
+  /** Header text; also each cell's `data-label` in cards. */
+  label: string;
+  /** Right-align with tabular figures. Default: detected from the values. */
+  numeric?: boolean;
+  /** Render the cells as HTML (a link, emphasis). Default: text. */
+  html?: boolean;
+}
+interface Props {
+  /** What the table is. Required: it names the table (and the scroll region). */
+  caption: string;
+  /** Hide the caption visually; screen readers still announce it. */
+  captionHidden?: boolean;
+  columns: Column[];
+  rows: Record<string, Cell>[];
+  /** Key of the column whose cells head their row (<th scope="row">). Default: the first; false for none. */
+  rowHeader?: string | false;
+  mode?: 'cards' | 'scroll';
+  /** Cards: the element's own width below which rows become cards: sm 30rem, md 40rem, lg 52rem. */
+  breakpoint?: 'sm' | 'md' | 'lg';
+  /** Header row stays in view. In scroll mode it needs `maxHeight`. */
+  sticky?: boolean;
+  /** Scroll mode: the box's greatest height (any CSS length); it then scrolls both ways. */
+  maxHeight?: string;
+  striped?: boolean;
+  /** Scroll mode: the one-time hint. */
+  hint?: string;
+  class?: string;
+}
+const {
+  caption,
+  captionHidden = false,
+  columns,
+  rows,
+  rowHeader,
+  mode = 'cards',
+  breakpoint = 'md',
+  sticky = false,
+  maxHeight,
+  striped = false,
+  hint = 'Scroll sideways for more',
+  class: className,
+} = Astro.props;
+
+// <table-numeric>
+// Whether a column holds numbers, from its values. Blank cells (empty, "—", "–", "-", "n/a")
+// do not count either way; at least one number is needed. Run as golden cases by npm run check.
+const BLANK = /^(|—|–|-|n\/a)$/i;
+const NUMBER = /^[+\-−]?[$€£¥]?[+\-−]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?%?$/;
+function numericColumn(values: unknown[]): boolean {
+  let numbers = 0;
+  for (const v of values) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'number') {
+      if (!Number.isFinite(v)) return false;
+      numbers++;
+      continue;
+    }
+    const s = String(v).trim();
+    if (BLANK.test(s)) continue;
+    if (!NUMBER.test(s)) return false;
+    numbers++;
+  }
+  return numbers > 0;
+}
+// </table-numeric>
+
+if (!caption?.trim()) throw new Error('ResponsiveTable: `caption` is required; it is what names the table.');
+if (!columns?.length) throw new Error('ResponsiveTable: `columns` is empty.');
+const keys = new Set<string>();
+for (const c of columns) {
+  if (keys.has(c.key)) throw new Error(`ResponsiveTable: column key "${c.key}" is used twice.`);
+  keys.add(c.key);
+}
+const headKey = rowHeader === false ? null : (rowHeader ?? columns[0].key);
+if (headKey !== null && !keys.has(headKey)) throw new Error(`ResponsiveTable: rowHeader "${headKey}" is not a column key.`);
+const uid = `rt-${Math.random().toString(36).slice(2, 8)}`;
+const capId = `${uid}-caption`;
+const cols = columns.map((c) => ({ ...c, num: c.numeric ?? numericColumn(rows.map((r) => r[c.key])) }));
+const show = (v: Cell) => (v === null || v === undefined ? '' : String(v));
+const scroll = mode === 'scroll';
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstScrollOnPage = scroll && !locals.__responsiveTableScript;
+if (scroll) locals.__responsiveTableScript = true;
+---
+
+<div
+  class:list={['rt', `rt--${mode}`, `rt--${breakpoint}`, { 'rt--sticky': sticky, 'rt--striped': striped }, className]}
+  data-rt={mode}
+>
+  <div class="rt__frame">
+    <div
+      class="rt__box"
+      role={scroll ? 'region' : undefined}
+      aria-labelledby={scroll ? capId : undefined}
+      tabindex={scroll ? '0' : undefined}
+      style={scroll && maxHeight ? `max-height:${maxHeight}` : undefined}
+      data-rt-box
+    >
+      <table class="rt__table" role="table">
+        <caption id={capId} class:list={['rt__caption', { rt__sr: captionHidden }]}><span class="rt__caption-text">{caption}</span></caption>
+        <thead role="rowgroup">
+          <tr role="row">
+            {cols.map((c) => <th scope="col" role="columnheader" class:list={{ rt__num: c.num }}>{c.label}</th>)}
+          </tr>
+        </thead>
+        <tbody role="rowgroup">
+          {
+            rows.map((r) => (
+              <tr role="row">
+                {cols.map((c) =>
+                  c.key === headKey ? (
+                    c.html ? (
+                      <th scope="row" role="rowheader" class:list={['rt__head', { rt__num: c.num }]} set:html={show(r[c.key])} />
+                    ) : (
+                      <th scope="row" role="rowheader" class:list={['rt__head', { rt__num: c.num }]}>{show(r[c.key])}</th>
+                    )
+                  ) : c.html ? (
+                    <td role="cell" data-label={c.label} class:list={{ rt__num: c.num }} set:html={show(r[c.key])} />
+                  ) : (
+                    <td role="cell" data-label={c.label} class:list={{ rt__num: c.num }}>{show(r[c.key])}</td>
+                  ),
+                )}
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {scroll && <p class="rt__hint" aria-hidden="true" hidden data-rt-hint>{hint}</p>}
+</div>
+
+{
+  firstScrollOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroResponsiveTable) return;
+
+        // <table-edges>
+        // Which edges of a scrollbox have more beyond them. In right-to-left, scrollLeft is 0 at
+        // the start and negative towards the end (every current engine). npm run check runs this.
+        function tableEdges() {
+          const edges = (scrollLeft, scrollWidth, clientWidth, rtl = false) => {
+            const max = scrollWidth - clientWidth;
+            if (max < 2) return { overflow: false, start: false, end: false };
+            const pos = rtl ? -scrollLeft : scrollLeft;
+            return { overflow: true, start: pos > 1, end: pos < max - 1 };
+          };
+          return { edges };
+        }
+        // </table-edges>
+
+        const { edges } = tableEdges();
+        const mount = (root) => {
+          if (root.dataset.ready !== undefined) return;
+          root.dataset.ready = '';
+          const box = root.querySelector('[data-rt-box]');
+          const hint = root.querySelector('[data-rt-hint]');
+          const rtl = getComputedStyle(box).direction === 'rtl';
+          let scrolled = false;
+          const update = () => {
+            const e = edges(box.scrollLeft, box.scrollWidth, box.clientWidth, rtl);
+            root.toggleAttribute('data-more-start', e.start);
+            root.toggleAttribute('data-more-end', e.end);
+            // A box with nothing to scroll is not a Tab stop.
+            e.overflow ? box.setAttribute('tabindex', '0') : box.removeAttribute('tabindex');
+            if (hint) hint.hidden = scrolled || !e.overflow;
+          };
+          box.addEventListener(
+            'scroll',
+            () => {
+              scrolled = true; // the hint has done its job, for good
+              update();
+            },
+            { passive: true },
+          );
+          new ResizeObserver(update).observe(box);
+          update();
+        };
+        const boot = () => document.querySelectorAll('[data-rt="scroll"]').forEach(mount);
+        window.__superheroResponsiveTable = { mount, edges: tableEdges };
+        document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+      })();
+    </script>
+  )
+}
+
+<style>
+  .rt {
+    container: rtable / inline-size;
+    color: var(--rt-fg, inherit);
+  }
+  .rt__table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: lining-nums;
+  }
+  .rt__caption {
+    padding: 0 0 0.6rem;
+    font-weight: 700;
+    text-align: start;
+    caption-side: top;
+  }
+  .rt__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .rt__table th,
+  .rt__table td {
+    padding: var(--rt-pad, 0.6rem 0.8rem);
+    border-bottom: 1px solid var(--rt-border, rgb(0 0 0 / 0.14));
+    text-align: start;
+    vertical-align: top;
+  }
+  .rt__table thead th {
+    background: var(--rt-head-bg, rgb(0 0 0 / 0.04));
+    color: var(--rt-head-fg, inherit);
+    font-weight: 700;
+    vertical-align: bottom;
+  }
+  .rt__table .rt__head {
+    font-weight: 600;
+  }
+  .rt__table .rt__num {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+  .rt--striped tbody tr:nth-child(even) > * {
+    background: var(--rt-stripe, rgb(0 0 0 / 0.035));
+  }
+  .rt--sticky thead th {
+    position: sticky;
+    top: var(--rt-sticky-top, 0px);
+    z-index: 1;
+  }
+  /* A sticky header needs an opaque fill, or rows show through it. */
+  .rt--sticky thead th {
+    background:
+      linear-gradient(var(--rt-head-bg, rgb(0 0 0 / 0.04)), var(--rt-head-bg, rgb(0 0 0 / 0.04))),
+      var(--rt-card-bg, Canvas);
+  }
+
+  /* ---- cards: below the breakpoint (the element's own width), CSS only. One block per size,
+     identical but for the width: an @container condition cannot read a custom property. */
+  @container rtable (width < 30rem) {
+    .rt--cards.rt--sm .rt__table,
+    .rt--cards.rt--sm tbody,
+    .rt--cards.rt--sm tr,
+    .rt--cards.rt--sm th,
+    .rt--cards.rt--sm td {
+      display: block;
+    }
+    .rt--cards.rt--sm .rt__caption:not(.rt__sr) {
+      display: block;
+    }
+    .rt--cards.rt--sm thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .rt--cards.rt--sm tbody tr {
+      margin-block-end: 0.75rem;
+      border: 1px solid var(--rt-border, rgb(0 0 0 / 0.14));
+      border-radius: var(--rt-radius, 0.5rem);
+      background: var(--rt-card-bg, transparent);
+      overflow: clip;
+    }
+    .rt--cards.rt--sm tbody tr > * {
+      border-bottom: 0;
+      background: none;
+    }
+    .rt--cards.rt--sm .rt__head {
+      padding-block-end: 0.35rem;
+      font-size: 1.05em;
+      font-weight: 700;
+      text-align: start;
+    }
+    .rt--cards.rt--sm td {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      gap: 1rem;
+      padding-block: 0.3rem;
+      text-align: start;
+    }
+    .rt--cards.rt--sm td::before {
+      content: attr(data-label);
+      content: attr(data-label) / '';
+      color: var(--rt-muted, color-mix(in srgb, currentColor 70%, transparent));
+      font-weight: 600;
+    }
+    .rt--cards.rt--sm td:empty {
+      display: none;
+    }
+    .rt--cards.rt--sm tbody tr > :last-child {
+      padding-block-end: 0.75rem;
+    }
+  }
+  @container rtable (width < 40rem) {
+    .rt--cards.rt--md .rt__table,
+    .rt--cards.rt--md tbody,
+    .rt--cards.rt--md tr,
+    .rt--cards.rt--md th,
+    .rt--cards.rt--md td {
+      display: block;
+    }
+    .rt--cards.rt--md .rt__caption:not(.rt__sr) {
+      display: block;
+    }
+    .rt--cards.rt--md thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .rt--cards.rt--md tbody tr {
+      margin-block-end: 0.75rem;
+      border: 1px solid var(--rt-border, rgb(0 0 0 / 0.14));
+      border-radius: var(--rt-radius, 0.5rem);
+      background: var(--rt-card-bg, transparent);
+      overflow: clip;
+    }
+    .rt--cards.rt--md tbody tr > * {
+      border-bottom: 0;
+      background: none;
+    }
+    .rt--cards.rt--md .rt__head {
+      padding-block-end: 0.35rem;
+      font-size: 1.05em;
+      font-weight: 700;
+      text-align: start;
+    }
+    .rt--cards.rt--md td {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      gap: 1rem;
+      padding-block: 0.3rem;
+      text-align: start;
+    }
+    .rt--cards.rt--md td::before {
+      content: attr(data-label);
+      content: attr(data-label) / '';
+      color: var(--rt-muted, color-mix(in srgb, currentColor 70%, transparent));
+      font-weight: 600;
+    }
+    .rt--cards.rt--md td:empty {
+      display: none;
+    }
+    .rt--cards.rt--md tbody tr > :last-child {
+      padding-block-end: 0.75rem;
+    }
+  }
+  @container rtable (width < 52rem) {
+    .rt--cards.rt--lg .rt__table,
+    .rt--cards.rt--lg tbody,
+    .rt--cards.rt--lg tr,
+    .rt--cards.rt--lg th,
+    .rt--cards.rt--lg td {
+      display: block;
+    }
+    .rt--cards.rt--lg .rt__caption:not(.rt__sr) {
+      display: block;
+    }
+    .rt--cards.rt--lg thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .rt--cards.rt--lg tbody tr {
+      margin-block-end: 0.75rem;
+      border: 1px solid var(--rt-border, rgb(0 0 0 / 0.14));
+      border-radius: var(--rt-radius, 0.5rem);
+      background: var(--rt-card-bg, transparent);
+      overflow: clip;
+    }
+    .rt--cards.rt--lg tbody tr > * {
+      border-bottom: 0;
+      background: none;
+    }
+    .rt--cards.rt--lg .rt__head {
+      padding-block-end: 0.35rem;
+      font-size: 1.05em;
+      font-weight: 700;
+      text-align: start;
+    }
+    .rt--cards.rt--lg td {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+      gap: 1rem;
+      padding-block: 0.3rem;
+      text-align: start;
+    }
+    .rt--cards.rt--lg td::before {
+      content: attr(data-label);
+      content: attr(data-label) / '';
+      color: var(--rt-muted, color-mix(in srgb, currentColor 70%, transparent));
+      font-weight: 600;
+    }
+    .rt--cards.rt--lg td:empty {
+      display: none;
+    }
+    .rt--cards.rt--lg tbody tr > :last-child {
+      padding-block-end: 0.75rem;
+    }
+  }
+
+  /* ---- scroll: one line per cell, the box scrolls; fades where there is more. */
+  .rt--scroll .rt__frame {
+    border-radius: var(--rt-radius, 0.5rem);
+  }
+  .rt--scroll .rt__frame:has(> .rt__box:focus-visible) {
+    outline: 3px solid var(--rt-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .rt--scroll .rt__box {
+    --rt-fs: 0px;
+    --rt-fe: 0px;
+    overflow: auto;
+    overscroll-behavior-x: contain;
+    outline: none;
+    mask-image: linear-gradient(to right, transparent, #000 var(--rt-fs), #000 calc(100% - var(--rt-fe)), transparent);
+  }
+  .rt--scroll .rt__box:dir(rtl) {
+    mask-image: linear-gradient(to left, transparent, #000 var(--rt-fs), #000 calc(100% - var(--rt-fe)), transparent);
+  }
+  .rt--scroll[data-more-start] .rt__box {
+    --rt-fs: var(--rt-fade, 2.5rem);
+  }
+  .rt--scroll[data-more-end] .rt__box {
+    --rt-fe: var(--rt-fade, 2.5rem);
+  }
+  .rt--scroll .rt__table {
+    width: max-content;
+    min-width: 100%;
+  }
+  /* The caption is as wide as the table; its text stays at the box's start edge. */
+  .rt--scroll .rt__caption-text {
+    display: inline-block;
+    position: sticky;
+    inset-inline-start: 0;
+  }
+  .rt--scroll th,
+  .rt--scroll td {
+    white-space: nowrap;
+  }
+  .rt__hint {
+    margin: 0.4rem 0 0;
+    color: var(--rt-muted, color-mix(in srgb, currentColor 70%, transparent));
+    font-size: 0.875rem;
+  }
+  .rt__hint::after {
+    content: ' →';
+  }
+  .rt__hint:dir(rtl)::after {
+    content: ' ←';
+  }
+  .rt__hint[hidden] {
+    display: none;
+  }
+</style>
