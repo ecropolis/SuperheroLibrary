@@ -1428,6 +1428,76 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'countdown',
+    name: 'Countdown',
+    aka: ['UABB Countdown', 'Elementor Countdown', 'countdown timer', 'evergreen countdown timer', 'sale timer', 'deadline timer', 'order cut-off timer'],
+    summary:
+      'Days, hours, minutes and seconds to a wall-clock moment in the business’s time zone, or an evergreen run that starts per visitor and is remembered in localStorage. Square, circle or plain. At zero it shows a message, hides, or counts to the next day’s or week’s occurrence. A named image to screen readers (“Ends Oct 3, 5:00 PM CDT”), never a live region; the digits tick visually only.',
+    pitch: 'Show exactly how long is left — to the end of a sale, the start of an event or today’s order cut-off — in your time zone, not the visitor’s guess.',
+    // SE Ranking US, 2026-09-26: countdown timer widget 320/mo, difficulty 36; countdown timer
+    // html 320/53; sales countdown timer 40/44; evergreen countdown timer 10/13. "countdown
+    // widget" 4,400/64 is out of reach and "email countdown timer" 480/37 is a different
+    // product (an image in an email), so neither is claimed.
+    search: { query: 'countdown timer widget', alsoRanks: ['countdown timer html', 'sales countdown timer', 'evergreen countdown timer'] },
+    replaces: ['UABB “Countdown” module (Beaver Builder)', 'Elementor Pro Countdown widget', 'evergreen timer plugins (Deadline Funnel style)', 'embedded third-party countdown widgets'],
+    goodFor:
+      'A real deadline: a sale that ends, an event that starts, a daily order cut-off (onEnd="repeat" every day), a webinar. Evergreen suits an offer that is genuinely held for each visitor for a set time, such as a welcome discount.',
+    notFor:
+      'A deadline that is not real. An evergreen timer that restarts on every visit, or a sale that never ends, is a false urgency claim, and the FTC and UK CMA treat fake countdowns as a deceptive practice; this element keeps a visitor’s evergreen start on return precisely so the deadline stays true. Also not a clock or a stopwatch, and not for the page’s one line of news (announcement-bar has its own “Ends in 2 days” countdown).',
+    props: [
+      { name: 'to', type: "'YYYY-MM-DD' | 'YYYY-MM-DDTHH:MM'", note: 'The end, as the business’s wall clock reads it. A date alone is that day’s midnight. Give `to` or `evergreen`.' },
+      { name: 'timeZone', type: 'string (IANA)', note: 'Required with `to`: “America/Chicago”, not the visitor’s zone. A time inside a spring-forward gap resolves to the jump.' },
+      { name: 'evergreen', type: 'number (minutes)', note: 'Starts on the visitor’s first view; the start instant is stored in localStorage under `key` (never a cookie), so a return shows the same deadline.' },
+      { name: 'key', type: 'string', default: '“countdown-evergreen”', note: 'localStorage key of the evergreen start. Countdowns sharing a key share a deadline; give each offer its own.' },
+      { name: 'units', type: "('days' | 'hours' | 'minutes' | 'seconds')[]", default: 'all four', note: 'The largest shown takes the rest (no days: 51 hours). The smallest rounds up, so it reaches zero exactly at the end.' },
+      { name: 'labels', type: '{ days?, hours?, minutes?, seconds? }', default: 'English', note: 'Each a word, or [singular, plural]: `{ days: [\'día\', \'días\'] }`. For other languages, with `ends`, `endsIn`, `endedText` and `locale`.' },
+      { name: 'style', type: "'square' | 'circle' | 'plain'", default: "'square'", note: 'Boxes, rings whose arc is the unit’s share of its range, or bare digits.' },
+      { name: 'onEnd', type: "'message' | 'hide' | 'repeat'", default: "'message'", note: 'At zero: show `endedText`; remove it; or count again (with `to`, to the next occurrence per `every`; evergreen, a fresh run).' },
+      { name: 'every', type: "'day' | 'week'", note: 'With `to` and onEnd="repeat": the same wall-clock time the next day or week, in `timeZone`, across DST.' },
+      { name: 'endedText', type: 'string', default: '“This offer has ended.”', note: 'Shown at zero with onEnd="message", and the accessible name then.' },
+      { name: 'ends', type: 'string', default: '“Ends”', note: 'Word before the end date: the accessible name and the no-JavaScript line.' },
+      { name: 'endsIn', type: 'string', default: '“Ends in”', note: 'Before an evergreen duration in the no-JavaScript line (“Ends in 30 minutes”).' },
+      { name: 'showEnd', type: 'boolean', default: 'false', note: 'Keep the “Ends Oct 3, 5:00 PM CDT” line visible under the running digits.' },
+      { name: 'locale', type: 'string', default: '“en-US”', note: 'Locale of the end date.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and place it.' },
+    ],
+    theming: [
+      { name: '--cd-bg', fallback: '#1e283c', note: 'style="square" box (14.75:1 with its digits).' },
+      { name: '--cd-fg', fallback: '#fff', note: 'style="square" digits and labels.' },
+      { name: '--cd-text', fallback: 'inherit', note: 'Digits of circle and plain; the end line and the ended message.' },
+      { name: '--cd-label', fallback: 'currentColor at 80–85%', note: 'Unit labels. Keep 4.5:1 if you set it.' },
+      { name: '--cd-ring', fallback: '#5933d8', note: 'style="circle" arc.' },
+      { name: '--cd-track', fallback: 'rgb(127 127 127 / 0.25)', note: 'style="circle" track under the arc.' },
+      { name: '--cd-size', fallback: 'clamp(1.75rem, 6vw, 2.75rem)', note: 'Digit size; circle units scale with it.' },
+      { name: '--cd-radius', fallback: '10px', note: 'Square box corners.' },
+      { name: '--cd-gap', fallback: '0.75rem', note: 'Space between units.' },
+      { name: '--cd-align', fallback: 'center', note: 'justify-content of the units: flex-start to sit left.' },
+      { name: '--cd-font', fallback: 'inherit', note: 'Digit font family; the digits are tabular so they do not jitter.' },
+    ],
+    a11y: [
+      'Not a live region. The wrapper is role="img" named by the absolute end, “Ends Oct 3, 5:00 PM CDT”, or by `endedText` once ended; the digits are aria-hidden and change visually only, so a screen reader is never read seconds.',
+      'The name changes only when the end does: a daily repeat rolling over, or an evergreen run starting.',
+      'Without JavaScript: the static line “Ends Oct 3, 5:00 PM CDT” in a <time datetime> (an evergreen one reads “Ends in 30 minutes”). The digits from the build’s clock are not shown, because they would be stale and never tick.',
+      'No layout shift: the script placed right after the element shows and corrects the digits before the first paint.',
+      'prefers-reduced-motion: no tick animation on a changing digit and no ring transition; the numbers simply change.',
+      'The square style’s fallback colours clear 4.5:1 (14.75:1); `npm run check` computes it.',
+    ],
+    usage: `<!-- A sale that ends at 5 PM Chicago time, whatever zone the visitor is in. -->
+<h2>The autumn sale ends in</h2>
+<Countdown to="2026-10-03T17:00" timeZone="America/Chicago" endedText="The autumn sale has ended." />
+
+<!-- Today's order cut-off, then tomorrow's, for ever. -->
+<Countdown to="2026-09-28T15:00" timeZone="America/New_York" onEnd="repeat" every="day"
+  style="plain" units={['hours', 'minutes', 'seconds']} />
+
+<!-- 30 minutes per visitor, the same deadline when they come back. -->
+<Countdown evergreen={30} key="welcome-offer" style="circle" units={['minutes', 'seconds']} />
+<!-- .cd { --cd-bg: var(--navy); --cd-fg: var(--white); --cd-ring: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/countdown/ (demo)' }],
+    file: 'src/library/countdown/Countdown.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

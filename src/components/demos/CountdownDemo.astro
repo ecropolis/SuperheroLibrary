@@ -1,0 +1,104 @@
+---
+/**
+ * Demo for `countdown`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Three countdowns, one per style and one per kind of end:
+ *   - square, to a fixed moment: seven days after the build, at 5 PM Chicago time. The website
+ *     rebuilds whenever this library's main changes, so it stays a week or less ahead; after a
+ *     week without a rebuild it shows its ended message, which is the element working.
+ *   - circle, evergreen: 30 minutes from this visitor's first view, remembered in localStorage
+ *     under its own key (so it never touches a real site's default key). "Start again" forgets it.
+ *   - plain, repeating: today's 3 PM New York order cut-off, then tomorrow's, for ever.
+ */
+import Countdown from '../../library/countdown/Countdown.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+const zone = 'America/Chicago';
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
+const [y, m, d] = today.split('-').map(Number);
+const saleEnds = `${new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10)}T17:00`;
+const cutoffFrom = `${new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)}T15:00`;
+---
+<div class="demo-cd">
+  <section class="demo-cd__item" aria-labelledby="demo-cd-sale">
+    <h3 id="demo-cd-sale" class="demo-cd__title">The autumn sale ends in</h3>
+    <Countdown to={saleEnds} timeZone={zone} showEnd endedText="The autumn sale has ended." />
+  </section>
+
+  <section class="demo-cd__item" aria-labelledby="demo-cd-offer">
+    <h3 id="demo-cd-offer" class="demo-cd__title">Your welcome offer is held for</h3>
+    <Countdown evergreen={30} key="demo-cd-evergreen" style="circle" units={['minutes', 'seconds']} endedText="Your welcome offer has lapsed." showEnd />
+    <p class="demo-cd__note">
+      Thirty minutes from your first view, kept in this browser, so it is the same deadline when you come back.
+      <button class="demo-cd__btn" type="button" data-demo-cd-reset>Start again</button>
+      <span aria-live="polite" data-demo-cd-said></span>
+    </p>
+  </section>
+
+  <section class="demo-cd__item" aria-labelledby="demo-cd-ship">
+    <h3 id="demo-cd-ship" class="demo-cd__title">Order within this to ship today</h3>
+    <Countdown to={cutoffFrom} timeZone="America/New_York" onEnd="repeat" every="day" style="plain" units={['hours', 'minutes', 'seconds']} showEnd ends="Next dispatch" />
+    <p class="demo-cd__note">Resets to tomorrow's 3 PM New York cut-off the moment today's passes, across daylight saving.</p>
+  </section>
+</div>
+
+<script is:inline>
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-demo-cd-reset]');
+    if (!b || !window.__superheroCountdown) return;
+    window.__superheroCountdown.reset('demo-cd-evergreen');
+    const said = document.querySelector('[data-demo-cd-said]');
+    if (said) said.textContent = 'Started again from now.';
+  });
+</script>
+
+<style>
+  .demo-cd {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1.25rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-cd__item {
+    min-width: 0;
+    padding: 1.25rem 1rem;
+    border: 1px solid var(--line, #dfe3ea);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+    text-align: center;
+  }
+  .demo-cd__title {
+    margin: 0 0 0.9rem;
+    font-size: 1.05rem;
+  }
+  .demo-cd__note {
+    margin: 0.9rem 0 0;
+    font-size: 0.9rem;
+  }
+  .demo-cd__btn {
+    display: block;
+    min-height: 2.75rem;
+    margin: 0.6rem auto 0;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid var(--purple, #5933d8);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--purple-dark, #3f1fb0);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .demo-cd__btn:focus-visible {
+    outline: 3px solid var(--purple-dark, #3f1fb0);
+    outline-offset: 3px;
+  }
+  .demo-cd :global(.cd--circle) {
+    --cd-ring: var(--purple, #5933d8);
+  }
+  .demo-cd :global(.cd--plain) {
+    --cd-text: var(--navy, #1e283c);
+  }
+</style>
