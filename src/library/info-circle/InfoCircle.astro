@@ -1,0 +1,509 @@
+---
+/**
+ * InfoCircle — items (an icon or a small image each) spaced round a circle; the chosen item's
+ * title and text show in the middle. What UABB's Info Circle does, without its fixed pixel
+ * sizes, and a plain list wherever a circle would not fit.
+ *
+ * Choosing. Each item is a real <button> with aria-pressed (exactly one is pressed) and
+ * aria-controls → the centre, named by its title. Hover (with a mouse or trackpad), focus and
+ * click all choose it. The centre is a polite live region, so a screen reader hears the text
+ * when the choice changes. The item at `startAt` is chosen when the page loads.
+ *
+ * Autoplay (`autoplay`, off by default): the choice moves on every so many ms. It comes with a
+ * visible pause button (WCAG 2.2.2), waits while the pointer is on the circle or focus is in
+ * the element, while it is off screen and while the tab is hidden, stops for good once the
+ * visitor clicks an item, and never runs under prefers-reduced-motion (tracked live). While it
+ * runs the centre is not a live region, so nothing is read out on its own.
+ *
+ * Geometry. Positions are computed at build (the `<ic-geometry>` block, which the check runs
+ * against golden cases): item i of n sits at angle −90° + 360°·i/n, clockwise from the top,
+ * on the circle's circumference, as percentages of the ring. Nothing measures at runtime.
+ *
+ * The circle needs about 28rem. In a container narrower than that, and without JavaScript, the
+ * same items are a vertical list with every item's icon, title and text showing; that list is
+ * the element's only copy of the content, and the centre shows a copy of the chosen entry.
+ *
+ * Theming (each has a fallback):
+ *   --ic-accent     #5933d8   chosen item, icons, ring, focus
+ *   --ic-item-bg    #fff      an item not chosen          --ic-item-fg  var(--ic-accent)
+ *   --ic-active-fg  #fff      the chosen item's icon (7.27:1 on the accent)
+ *   --ic-centre-bg  #f4f1fe   the disc behind the text    --ic-fg       #1e283c (13.24:1 on it)
+ *   --ic-ring       rgb(89 51 216 / 0.35)   the circumference line
+ *   --ic-size       32rem     the circle's diameter (never wider than its container)
+ *   --ic-item-size  4.5rem    each item's disc            --ic-focus    var(--ic-accent)
+ */
+interface Item {
+  title: string;
+  text: string;
+  /** Inline SVG markup, decorative (the title names the item). */
+  icon?: string;
+  /** A small round image instead of an icon; decorative for the same reason. */
+  image?: string;
+  /** A link under the text, in the centre and in the list. */
+  link?: { text: string; href: string };
+}
+interface Props {
+  items: Item[];
+  /** Diameter of the circle, any CSS length. Default 32rem; never wider than the container. */
+  size?: string;
+  /** ms between items, or `true` for 5000. Off by default; never under reduced motion. */
+  autoplay?: number | boolean;
+  /** The item chosen on load (0-based). */
+  startAt?: number;
+  /** Accessible name of the whole group, e.g. "What we offer". */
+  label?: string;
+  headingLevel?: 2 | 3 | 4 | 5 | 6;
+  /** Name of the pause button. */
+  pauseLabel?: string;
+  playLabel?: string;
+  class?: string;
+}
+const {
+  items,
+  size,
+  autoplay = false,
+  startAt = 0,
+  label,
+  headingLevel = 3,
+  pauseLabel = 'Pause the rotation',
+  playLabel = 'Start the rotation',
+  class: className,
+} = Astro.props;
+
+// <ic-geometry>
+/** Item i of n on the circumference, clockwise from `startDeg` (the top), in percent of the ring. */
+function circlePositions(n: number, startDeg = -90): { x: number; y: number }[] {
+  const round = (v: number) => Math.round(v * 1000) / 1000 + 0; // + 0 turns -0 into 0
+  return Array.from({ length: n }, (_, i) => {
+    const a = ((startDeg + (360 * i) / n) * Math.PI) / 180;
+    return { x: round(50 + 50 * Math.cos(a)), y: round(50 + 50 * Math.sin(a)) };
+  });
+}
+// </ic-geometry>
+
+const where = 'InfoCircle';
+if (!Array.isArray(items) || items.length < 2 || items.length > 10) {
+  throw new Error(`${where}: \`items\` needs 2 to 10 items (more crowd the circle); got ${Array.isArray(items) ? items.length : 'none'}.`);
+}
+items.forEach((it, i) => {
+  const n = `${where} item ${i + 1}${it?.title ? ` ("${it.title}")` : ''}`;
+  if (!it.title?.trim()) throw new Error(`${n}: \`title\` is required; it names the item.`);
+  if (!it.text?.trim()) throw new Error(`${n}: \`text\` is required; it is what the centre shows.`);
+  if (!it.icon && !it.image) throw new Error(`${n}: give it an \`icon\` or an \`image\`; the circle shows nothing else.`);
+});
+if (!(Number.isInteger(startAt) && startAt >= 0 && startAt < items.length)) {
+  throw new Error(`${where}: \`startAt\` must be an item's index, 0 to ${items.length - 1}; got ${String(startAt)}.`);
+}
+const interval = autoplay === true ? 5000 : autoplay === false ? 0 : autoplay;
+if (interval !== 0 && !(Number.isFinite(interval) && interval >= 2000)) {
+  throw new Error(`${where}: \`autoplay\` is the ms between items, at least 2000 (people need time to read); got ${String(autoplay)}.`);
+}
+
+const uid = 'ic-' + Math.random().toString(36).slice(2, 8);
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+const positions = circlePositions(items.length);
+const cfg = JSON.stringify({ autoplay: interval, pause: pauseLabel, play: playLabel });
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__infoCircleScript;
+locals.__infoCircleScript = true;
+---
+
+<div
+  class:list={['ic', className]}
+  data-ic={cfg}
+  role={label ? 'group' : undefined}
+  aria-label={label}
+  style={size ? `--ic-size:${size}` : undefined}
+>
+  <div class="ic__circle" hidden data-ic-circle>
+    <div class="ic__orbit">
+      <span class="ic__ring" aria-hidden="true"></span>
+      <div class="ic__centre" id={`${uid}-centre`} aria-live="polite" data-ic-centre></div>
+      {
+        items.map((it, i) => (
+          <button
+            type="button"
+            class="ic__item"
+            style={`--ic-x:${positions[i].x}%;--ic-y:${positions[i].y}%`}
+            aria-pressed={i === startAt ? 'true' : 'false'}
+            aria-controls={`${uid}-centre`}
+            data-ic-item={i}
+          >
+            {it.image ? (
+              <img class="ic__img" src={it.image} alt="" loading="lazy" decoding="async" />
+            ) : (
+              <span class="ic__glyph" aria-hidden="true" set:html={it.icon} />
+            )}
+            <span class="ic__sr">{it.title}</span>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+  <ol class="ic__list" role="list">
+    {
+      items.map((it) => (
+        <li class="ic__entry" data-ic-entry>
+          {it.image ? (
+            <img class="ic__img ic__img--list" src={it.image} alt="" loading="lazy" decoding="async" />
+          ) : (
+            <span class="ic__glyph ic__glyph--list" aria-hidden="true" set:html={it.icon} />
+          )}
+          <div class="ic__body" data-ic-body>
+            <H class="ic__title">{it.title}</H>
+            <p class="ic__text">{it.text}</p>
+            {it.link && (
+              <a class="ic__link" href={it.link.href}>
+                {it.link.text}
+              </a>
+            )}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+  {
+    interval > 0 && (
+      <button type="button" class="ic__play" hidden data-ic-play>
+        <span class="ic__play-icon" aria-hidden="true" />
+        <span data-ic-play-text>{pauseLabel}</span>
+      </button>
+    )
+  }
+</div>
+
+{
+  firstOnPage ? (
+    <script is:inline>
+      (() => {
+        const boot = (window.__superheroInfoCircle ||= (() => {
+          const fine = matchMedia('(hover: hover) and (pointer: fine)');
+          const still = matchMedia('(prefers-reduced-motion: reduce)');
+          const init = (root) => {
+            if (root.hasAttribute('data-ready')) return;
+            let cfg = {};
+            try {
+              cfg = JSON.parse(root.dataset.ic || '{}');
+            } catch {}
+            const circle = root.querySelector('[data-ic-circle]');
+            const centre = root.querySelector('[data-ic-centre]');
+            const buttons = [...root.querySelectorAll('[data-ic-item]')];
+            const bodies = [...root.querySelectorAll('[data-ic-body]')];
+            if (!circle || !centre || !buttons.length || buttons.length !== bodies.length) return;
+            const play = root.querySelector('[data-ic-play]');
+            const playText = root.querySelector('[data-ic-play-text]');
+            const n = buttons.length;
+            let active = Math.max(0, buttons.findIndex((b) => b.getAttribute('aria-pressed') === 'true'));
+            let hovered = false;
+            let focused = false;
+            let onScreen = false;
+            let stopped = false; // the visitor paused it, or chose an item by clicking
+            let timer = 0;
+
+            const running = () => cfg.autoplay > 0 && !still.matches && !stopped && !hovered && !focused && onScreen && !document.hidden;
+            const choose = (i) => {
+              active = i;
+              buttons.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+              const copy = bodies[i].cloneNode(true);
+              copy.removeAttribute('data-ic-body');
+              centre.replaceChildren(copy);
+            };
+            const render = () => {
+              clearTimeout(timer);
+              centre.setAttribute('aria-live', running() ? 'off' : 'polite');
+              if (play) {
+                play.hidden = !(cfg.autoplay > 0) || still.matches;
+                play.toggleAttribute('data-paused', stopped);
+                playText.textContent = stopped ? cfg.play : cfg.pause;
+              }
+              if (running()) timer = setTimeout(() => (choose((active + 1) % n), render()), cfg.autoplay);
+            };
+
+            buttons.forEach((b, i) => {
+              b.addEventListener('pointerenter', (e) => {
+                if (e.pointerType === 'touch' || !fine.matches || i === active) return;
+                choose(i);
+              });
+              b.addEventListener('focus', () => i !== active && choose(i));
+              b.addEventListener('click', () => {
+                if (cfg.autoplay > 0) stopped = true;
+                render();
+                if (i !== active) choose(i);
+              });
+            });
+            circle.addEventListener('pointerenter', (e) => {
+              if (e.pointerType === 'touch') return;
+              hovered = true;
+              render();
+            });
+            circle.addEventListener('pointerleave', () => {
+              hovered = false;
+              render();
+            });
+            // Focus on an item or a link pauses it; focus on the pause button itself does not,
+            // or pressing it could never start anything.
+            const focusIn = () => root.contains(document.activeElement) && document.activeElement !== play;
+            root.addEventListener('focusin', () => {
+              focused = focusIn();
+              render();
+            });
+            root.addEventListener('focusout', () =>
+              setTimeout(() => {
+                focused = focusIn();
+                render();
+              }),
+            );
+            if (play) {
+              play.addEventListener('click', () => {
+                stopped = !stopped;
+                render();
+              });
+            }
+            document.addEventListener('visibilitychange', render);
+            still.addEventListener?.('change', render);
+            // Off screen, or hidden because the container is too narrow for the circle.
+            new IntersectionObserver(([e]) => {
+              onScreen = e.isIntersecting;
+              render();
+            }).observe(circle);
+
+            choose(active);
+            circle.hidden = false;
+            root.setAttribute('data-ready', '');
+            render();
+          };
+          return () => document.querySelectorAll('[data-ic]:not([data-ready])').forEach(init);
+        })());
+        boot();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+      })();
+    </script>
+  ) : (
+    <script is:inline>window.__superheroInfoCircle && window.__superheroInfoCircle();</script>
+  )
+}
+
+<style>
+  .ic {
+    container-type: inline-size;
+    color: var(--ic-fg, #1e283c);
+  }
+  .ic__circle[hidden],
+  .ic__play[hidden] {
+    display: none;
+  }
+
+  /* The list: without JavaScript, and in a container too narrow for the circle. */
+  .ic__list {
+    display: grid;
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ic__entry {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 1rem;
+  }
+  .ic__glyph,
+  .ic__img {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+  }
+  .ic__glyph--list {
+    background: var(--ic-centre-bg, #f4f1fe);
+    color: var(--ic-accent, #5933d8);
+  }
+  .ic__glyph :global(svg) {
+    width: 45%;
+    height: 45%;
+  }
+  .ic__img {
+    object-fit: cover;
+  }
+  .ic__title {
+    margin: 0 0 0.35rem;
+    color: inherit;
+    font-size: 1.15rem;
+    line-height: 1.25;
+  }
+  .ic__text {
+    margin: 0;
+    line-height: 1.5;
+  }
+  .ic__link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    color: var(--ic-accent, #5933d8);
+    font-weight: 700;
+  }
+  .ic__link:focus-visible {
+    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+    outline-offset: 2px;
+  }
+
+  /* The circle. */
+  .ic__circle {
+    position: relative;
+    width: min(var(--ic-size, 32rem), 100%);
+    aspect-ratio: 1;
+    margin-inline: auto;
+  }
+  .ic__orbit {
+    position: absolute;
+    inset: calc(var(--ic-item-size, 4.5rem) / 2);
+  }
+  .ic__ring {
+    position: absolute;
+    inset: 0;
+    border: 2px dashed var(--ic-ring, rgb(89 51 216 / 0.35));
+    border-radius: 50%;
+  }
+  .ic__ring::after {
+    content: '';
+    position: absolute;
+    inset: calc(var(--ic-item-size, 4.5rem) / 2 + 0.75rem);
+    border-radius: 50%;
+    background: var(--ic-centre-bg, #f4f1fe);
+  }
+  /* The text sits in the square inscribed in the free disc inside the items. */
+  .ic__centre {
+    position: absolute;
+    inset: calc((100% - (100% - var(--ic-item-size, 4.5rem)) * 0.7071) / 2);
+    display: grid;
+    place-content: center;
+    overflow: auto;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  .ic__centre .ic__body {
+    display: grid;
+    justify-items: center;
+    font-size: clamp(0.85rem, 3.2cqi, 1rem);
+  }
+  .ic__centre .ic__title {
+    font-size: clamp(1rem, 3.6cqi, 1.15rem);
+  }
+  .ic__item {
+    position: absolute;
+    left: var(--ic-x);
+    top: var(--ic-y);
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: var(--ic-item-size, 4.5rem);
+    height: var(--ic-item-size, 4.5rem);
+    min-width: 44px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 2px solid var(--ic-accent, #5933d8);
+    border-radius: 50%;
+    background: var(--ic-item-bg, #fff);
+    color: var(--ic-item-fg, var(--ic-accent, #5933d8));
+    font: inherit;
+    cursor: pointer;
+    translate: -50% -50%;
+    transition: background-color 0.2s ease, color 0.2s ease, scale 0.2s ease;
+  }
+  .ic__item .ic__glyph,
+  .ic__item .ic__img {
+    width: 100%;
+    height: 100%;
+  }
+  .ic__item[aria-pressed='true'] {
+    background: var(--ic-accent, #5933d8);
+    color: var(--ic-active-fg, #fff);
+    scale: 1.1;
+  }
+  .ic__item:has(.ic__img)[aria-pressed='true'] {
+    box-shadow: 0 0 0 4px var(--ic-accent, #5933d8);
+  }
+  .ic__item:focus-visible {
+    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+    outline-offset: 4px;
+  }
+  .ic__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .ic__play {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    margin: 1rem auto 0;
+    padding: 0.4rem 1rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .ic__play:focus-visible {
+    outline: 3px solid var(--ic-focus, var(--ic-accent, #5933d8));
+    outline-offset: 2px;
+  }
+  .ic__play-icon {
+    width: 0.7rem;
+    height: 0.8rem;
+    border-inline: 0.22rem solid currentColor;
+  }
+  .ic__play[data-paused] .ic__play-icon {
+    border: 0;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+
+  /* With JavaScript and room for it: the circle, and the list stays only as its source. */
+  @container (width >= 28rem) {
+    .ic[data-ready] .ic__list {
+      display: none;
+    }
+  }
+  @container (width < 28rem) {
+    .ic__circle,
+    .ic__play {
+      display: none !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ic[data-ready] .ic__centre > :global(*) {
+      animation: ic-in 0.25s ease-out;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ic__item {
+      transition: none;
+    }
+  }
+  @keyframes ic-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media print {
+    .ic__circle,
+    .ic__play {
+      display: none !important;
+    }
+    .ic[data-ready] .ic__list {
+      display: grid;
+    }
+  }
+</style>

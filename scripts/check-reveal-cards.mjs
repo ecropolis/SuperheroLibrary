@@ -25,6 +25,20 @@
  *    - the script once per page, and one boot call per later figure.
  * 3. The pin's hit area is 44px in the component's CSS; the fallback colours clear 4.5:1.
  *
+ * info-circle
+ * 4. Geometry: the `<ic-geometry>` block of InfoCircle.astro against golden positions (n = 2 to
+ *    6, clockwise from the top, three decimals, never -0).
+ * 5. The built page, per circle, against public/demo/info-circle-items.json:
+ *    - no-JS: the circle is `hidden`; a numbered list (role="list") holds every item's title
+ *      (a heading), text and link, none of it hidden;
+ *    - the centre is aria-live="polite" and empty (the script copies the chosen entry in);
+ *    - each item is a <button type="button"> named by its title, aria-controls → the centre,
+ *      aria-pressed, exactly one "true" and it is `startAt`; --ic-x/--ic-y are the geometry's;
+ *      its icon is the named Font Awesome Free icon, or its image with alt="";
+ *    - a hidden, named pause button exactly when the circle autoplays; the script once a page.
+ * 6. Items keep a 44px minimum; the fallback colours clear 4.5:1; every icon the demo pastes is
+ *    Font Awesome Free, byte for byte the package's path, with its attribution comment.
+ *
  * Exits 1 with one line per failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -314,5 +328,205 @@ finish('hotspot hit area and colours');
 }
 finish('hotspot mutations');
 summary.push(`hotspot: ${PLACES.length} placement cases, ${hsExpected.length} figures on ${hsPages.length} pages, 44px pins, ${hsRatios.join(', ')}`);
+
+// ============================================================== info-circle
+const icFile = 'src/library/info-circle/InfoCircle.astro';
+const icSrc = read(icFile);
+
+// 4. Geometry.
+const circlePositions = await block(icSrc, 'ic-geometry', 'circlePositions');
+if (!circlePositions) {
+  fail(`${icFile} has no \`// <ic-geometry>\` … \`// </ic-geometry>\` block.`);
+  finish('info-circle geometry');
+}
+const RING = {
+  2: [[50, 0], [50, 100]],
+  3: [[50, 0], [93.301, 75], [6.699, 75]],
+  4: [[50, 0], [100, 50], [50, 100], [0, 50]],
+  5: [[50, 0], [97.553, 34.549], [79.389, 90.451], [20.611, 90.451], [2.447, 34.549]],
+  6: [[50, 0], [93.301, 25], [93.301, 75], [50, 100], [6.699, 75], [6.699, 25]],
+};
+const checkRing = (fn) =>
+  Object.entries(RING).flatMap(([n, want]) => {
+    const got = fn(Number(n));
+    if (got.length !== want.length) return [`info-circle geometry n=${n}: ${got.length} positions.`];
+    return got.flatMap((g, i) =>
+      g.x === want[i][0] && g.y === want[i][1] && !Object.is(g.x, -0) && !Object.is(g.y, -0)
+        ? []
+        : [`info-circle geometry n=${n}, item ${i + 1}: (${g.x}, ${g.y}), expected (${want[i][0]}, ${want[i][1]}).`],
+    );
+  });
+checkRing(circlePositions).forEach(fail);
+finish('info-circle geometry');
+
+// Font Awesome Free: every icon the demo pastes is the package's, attribution included.
+const faRoot = join(root, 'node_modules/@fortawesome/fontawesome-free/svgs');
+const faPath = (svg) => svg.match(/<path[^>]*\sd="([^"]+)"/)?.[1];
+/** Everything wrong with the `fa` map of a demo's source: `'name': \`<svg…>\`` entries. */
+const validateFa = (demoSrc, where) => {
+  const out = [];
+  const entries = [...demoSrc.matchAll(/'([a-z0-9-]+)': `(<svg[\s\S]*?<\/svg>)`/g)];
+  if (!entries.length) out.push(`${where}: no Font Awesome icons found in its \`fa\` map.`);
+  for (const [, name, svg] of entries) {
+    const file = join(faRoot, 'solid', `${name}.svg`);
+    if (!existsSync(file)) {
+      out.push(`${where}: "${name}" is not a Font Awesome Free solid icon.`);
+      continue;
+    }
+    if (faPath(svg) !== faPath(readFileSync(file, 'utf8'))) out.push(`${where}: "${name}" is not Font Awesome Free's path for it.`);
+    if (!svg.includes('<!--! Font Awesome Free')) out.push(`${where}: "${name}" lost Font Awesome's attribution comment (CC BY 4.0 needs it).`);
+  }
+  return out;
+};
+if (!existsSync(faRoot)) fail('@fortawesome/fontawesome-free is not installed; `npm i` first.');
+finish('font awesome');
+const icDemoSrc = read('src/components/demos/InfoCircleDemo.astro');
+const icFa = Object.fromEntries([...icDemoSrc.matchAll(/'([a-z0-9-]+)': `(<svg[\s\S]*?<\/svg>)`/g)].map((m) => [m[1], faPath(m[2])]));
+validateFa(icDemoSrc, 'InfoCircleDemo.astro').forEach(fail);
+finish('info-circle icons');
+
+// 5. The built page.
+const icFixture = JSON.parse(read('public/demo/info-circle-items.json'));
+const icExpected = [
+  { name: 'process', ...icFixture.process, startAt: 0, autoplay: 5000 },
+  { name: 'cafes', ...icFixture.cafes, autoplay: 0 },
+];
+for (const e of icExpected) {
+  for (const it of e.items) {
+    if (it.image && !existsSync(join(root, 'public/demo', it.image))) fail(`info-circle fixture: ${e.name} "${it.title}" names image ${it.image}, not in public/demo/.`);
+    if (it.icon && !icFa[it.icon]) fail(`info-circle fixture: ${e.name} "${it.title}" names icon ${it.icon}, which the demo's \`fa\` map lacks.`);
+  }
+}
+const icPos = (tag) => {
+  const m = (attr(tag, 'style') ?? '').match(/^--ic-x:(-?[\d.]+)%;--ic-y:(-?[\d.]+)%$/);
+  return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+};
+const validateInfoCircle = (html, expected, ring, where) => {
+  const out = [];
+  const bad = (m) => out.push(`${where}: ${m}`);
+  const roots = all(html, /<div\b[^>]*\sdata-ic=/);
+  if (roots.length !== expected.length) bad(`expected ${expected.length} info circles, found ${roots.length}.`);
+  roots.forEach((el, r) => {
+    const e = expected[r];
+    if (!e) return;
+    const n = e.items.length;
+    const at = `circle ${r + 1} (${e.name})`;
+    const top = openTag(el);
+    if (/\sdata-ready\b/.test(top)) bad(`${at}: the static root carries data-ready.`);
+    if (attr(top, 'role') !== 'group' || attr(top, 'aria-label') !== e.label) bad(`${at}: the root should be role="group" named "${e.label}".`);
+    let cfg = {};
+    try {
+      cfg = JSON.parse(attr(top, 'data-ic'));
+    } catch {
+      bad(`${at}: data-ic is not JSON.`);
+    }
+    if (cfg.autoplay !== e.autoplay) bad(`${at}: autoplay is ${cfg.autoplay}, the demo sets ${e.autoplay}.`);
+
+    const circle = all(el, /<div\b[^>]*\sdata-ic-circle/)[0];
+    if (!circle) return bad(`${at}: no circle.`);
+    if (attr(openTag(circle), 'hidden') === undefined) bad(`${at}: the circle must render hidden; without JavaScript the list is the element.`);
+    const centre = all(circle, /<div\b[^>]*\sdata-ic-centre/)[0];
+    const centreId = centre && attr(openTag(centre), 'id');
+    if (!centre || attr(openTag(centre), 'aria-live') !== 'polite') bad(`${at}: the centre must be aria-live="polite".`);
+    else if (text(centre)) bad(`${at}: the centre holds text in the static HTML; it would be a second copy of an entry.`);
+    const buttons = all(circle, /<button\b[^>]*\sdata-ic-item=/);
+    if (buttons.length !== n) bad(`${at}: ${buttons.length} item buttons for ${n} items.`);
+    const want = ring(n);
+    const pressed = buttons.map((b) => attr(openTag(b), 'aria-pressed'));
+    if (pressed.filter((v) => v === 'true').length !== 1 || pressed[e.startAt] !== 'true') bad(`${at}: aria-pressed is [${pressed}]; exactly item ${e.startAt + 1} should be "true".`);
+    if (pressed.some((v) => v !== 'true' && v !== 'false')) bad(`${at}: every item needs aria-pressed "true" or "false".`);
+
+    const list = all(el, /<ol\b[^>]*class="ic__list"/)[0];
+    if (!list) return bad(`${at}: no list.`);
+    if (attr(openTag(list), 'role') !== 'list') bad(`${at}: the list needs role="list".`);
+    const entries = all(list, /<li\b/);
+    if (entries.length !== n) bad(`${at}: ${entries.length} list entries for ${n} items.`);
+
+    e.items.forEach((it, i) => {
+      const pt = `${at}, item ${i + 1} ("${it.title}")`;
+      const b = buttons[i];
+      if (b) {
+        const bt = openTag(b);
+        if (attr(bt, 'type') !== 'button') bad(`${pt}: the item needs type="button".`);
+        if (!centreId || attr(bt, 'aria-controls') !== centreId) bad(`${pt}: aria-controls should name the centre (#${centreId}).`);
+        const p = icPos(bt);
+        if (!p || p.x !== want[i].x || p.y !== want[i].y) bad(`${pt}: at ${JSON.stringify(p)}, the geometry says (${want[i].x}, ${want[i].y}).`);
+        const name = text(b.replace(/<span\b[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/span>/g, ''));
+        if (name !== it.title) bad(`${pt}: the button is named "${name}".`);
+        if (it.icon && faPath(b) !== icFa[it.icon]) bad(`${pt}: the button's icon is not Font Awesome Free "${it.icon}".`);
+        if (it.image) {
+          const img = b.match(/<img\b[^>]*>/)?.[0];
+          if (!img || !attr(img, 'src')?.endsWith(it.image) || attr(img, 'alt') !== '') bad(`${pt}: the button needs its image with alt="" (the title names it).`);
+        }
+      }
+      const li = entries[i];
+      if (!li) return;
+      if (attr(openTag(li), 'hidden') !== undefined) bad(`${pt}: its list entry is hidden.`);
+      const h = li.match(/<h([2-6])\b[^>]*class="ic__title"[^>]*>([\s\S]*?)<\/h\1>/);
+      if (!h || text(h[2]) !== it.title) bad(`${pt}: the list entry's heading is not "${it.title}".`);
+      const t = li.match(/<p\b[^>]*class="ic__text"[^>]*>([\s\S]*?)<\/p>/);
+      if (!t || text(t[1]) !== it.text) bad(`${pt}: the list entry's text is not the fixture's.`);
+      if (it.link) {
+        const a = li.match(/<a\b([^>]*)>([\s\S]*?)<\/a>/);
+        if (!a || attr(`<a${a[1]}>`, 'href') !== it.link.href || text(a[2]) !== it.link.text) bad(`${pt}: the list entry lacks its link "${it.link.text}".`);
+      }
+    });
+
+    const play = el.match(/<button\b[^>]*\sdata-ic-play[^>]*>([\s\S]*?)<\/button>/);
+    if (e.autoplay) {
+      if (!play || attr(play[0], 'hidden') === undefined || attr(play[0], 'type') !== 'button' || !text(play[1])) bad(`${at}: autoplay needs a named, hidden pause button (WCAG 2.2.2).`);
+    } else if (play) bad(`${at}: a pause button without autoplay.`);
+  });
+  const defs = (html.match(/window\.__superheroInfoCircle \|\|=/g) || []).length;
+  const calls = (html.match(/window\.__superheroInfoCircle && window\.__superheroInfoCircle\(\);/g) || []).length;
+  if (defs !== 1) bad(`the info-circle script is on the page ${defs} times; it must be once.`);
+  if (calls !== Math.max(0, roots.length - 1)) bad(`expected ${roots.length - 1} one-line boot calls for later circles, found ${calls}.`);
+  return out;
+};
+
+const icPages = pages('info-circle');
+const icHtml = {};
+for (const rel of icPages) {
+  icHtml[rel] = readFileSync(join(root, rel), 'utf8');
+  validateInfoCircle(icHtml[rel], icExpected, circlePositions, rel).forEach(fail);
+}
+finish('info-circle page');
+
+// 6. Size and colours.
+const itemRule = icSrc.match(/\n {2}\.ic__item \{([\s\S]*?)\n {2}\}/)?.[1] ?? '';
+if (!/\n\s+min-width: 44px;/.test(itemRule) || !/\n\s+min-height: 44px;/.test(itemRule)) fail(`${icFile}: the .ic__item rule must keep min-width and min-height at 44px.`);
+const icRatios = [];
+for (const [label, fg, bg] of [
+  ['centre text', '--ic-fg', '--ic-centre-bg'],
+  ['chosen icon', '--ic-active-fg', '--ic-accent'],
+  ['link on the disc', '--ic-accent', '--ic-centre-bg'],
+]) {
+  const a = fallback(icSrc, fg);
+  const b = fallback(icSrc, bg);
+  if (!a || !b) {
+    fail(`${icFile}: no literal fallback for ${fg} or ${bg} to measure.`);
+    continue;
+  }
+  const r = contrast(a, b);
+  icRatios.push(`${label} ${r.toFixed(2)}:1`);
+  if (r < 4.5) fail(`info-circle ${label}: ${a} on ${b} is ${r.toFixed(2)}:1, under 4.5:1.`);
+}
+finish('info-circle size and colours');
+
+// Mutations.
+{
+  const src = icHtml[icPages[0]];
+  const v = (html) => validateInfoCircle(html, icExpected, circlePositions, 'mutant');
+  mustFail('info-circle', 'the ring starts at 3 o’clock, not the top', checkRing(await block(mutate('info-circle', 'start angle', icSrc, 'startDeg = -90', 'startDeg = 0'), 'ic-geometry', 'circlePositions')));
+  mustFail('info-circle', 'two items pressed', v(mutate('info-circle', 'pressed', src, 'aria-pressed="false"', 'aria-pressed="true"')));
+  mustFail('info-circle', 'the circle shown without JavaScript', v(mutate('info-circle', 'circle hidden', src, /(class="ic__circle") hidden/, '$1')));
+  mustFail('info-circle', 'the centre not a live region', v(mutate('info-circle', 'live', src, 'aria-live="polite"', '')));
+  mustFail('info-circle', 'an item moved off the ring', v(mutate('info-circle', 'moved', src, '--ic-x:50%;--ic-y:0%', '--ic-x:50%;--ic-y:3%')));
+  mustFail('info-circle', "a list entry's text dropped", v(mutate('info-circle', 'text', src, `>${icFixture.process.items[2].text}</p>`, '></p>')));
+  mustFail('info-circle', 'autoplay without its pause button', v(mutate('info-circle', 'pause', src, /<button type="button" class="ic__play"[\s\S]*?<\/button>/, '')));
+  mustFail('info-circle', 'a demo icon that is not Font Awesome Free', validateFa(mutate('info-circle', 'fa', icDemoSrc, /(<path fill="currentColor" d="M)(\d)/, '$19'), 'mutant'));
+}
+finish('info-circle mutations');
+summary.push(`info-circle: ${Object.keys(RING).length} ring sizes, ${icExpected.length} circles on ${icPages.length} pages, ${Object.keys(icFa).length} Font Awesome Free icons, ${icRatios.join(', ')}`);
 
 console.log(`check-reveal-cards ok: ${summary.join('; ')}; ${mutations.length} mutations refused.`);

@@ -1497,6 +1497,68 @@ import { analytics } from '../data/site';
     file: 'src/library/hotspot/Hotspot.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'info-circle',
+    name: 'Info circle',
+    aka: ['UABB Info Circle', 'circular infographic', 'circle infographic', 'process circle', 'cycle diagram', 'radial menu', 'interactive infographic'],
+    summary:
+      'Items (an icon or a round image each) spaced evenly round a circle, positions computed at build; the chosen item’s title and text show in the middle. Hover, focus and click choose; each item is a button with aria-pressed and the centre is a polite live region. Optional autoplay with a pause button. In a container narrower than 28rem, and without JavaScript, it is a plain list with every item’s text showing.',
+    pitch: 'Five things you do, round one circle: point at one and it tells its story in the middle — and on a phone it is simply a list.',
+    // SE Ranking US, 2026-09-26: circular infographic 320/mo, difficulty 7 (circle infographic
+    // and infographic circle are the same cluster, 320/7); info circle 40/10; interactive
+    // infographic 320/25; cycle diagram 810/7 (people making slides, so a variant, not the title).
+    search: { query: 'circular infographic', alsoRanks: ['info circle', 'interactive infographic', 'cycle diagram'] },
+    replaces: ['UABB “Info Circle” module (Beaver Builder)', 'Ultimate Addons / Elementor “info circle” widgets', 'circular infographic images with the text baked in'],
+    goodFor:
+      'Three to eight things of equal weight that belong together: the steps of a process that repeats, the services round one promise, the branches of a small business, the parts of a method. The circle says “these go round together”; the middle gives each its moment.',
+    notFor:
+      'Content people must read in order or all at once (a list does that better), more than eight items (they crowd the circle and the text box in its middle), or items with long texts: the middle holds about 30 words. Steps with a start and an end, which are info-list’s vertical timeline. And not a navigation menu, whatever “radial menu” searches suggest: items choose text, they do not go anywhere.',
+    props: [
+      { name: 'items', type: '{ title, text, icon?, image?, link?: { text, href } }[]', note: '2 to 10 items (the build fails outside that); each needs a title, a text and an `icon` (inline SVG) or an `image`. Both are decorative: the title names the item. `link` adds a link under the text.' },
+      { name: 'size', type: 'string (CSS length)', default: '32rem', note: 'The circle’s diameter; never wider than its container. The circle needs a container at least 28rem wide; below that it is a list.' },
+      { name: 'autoplay', type: 'number (ms) | boolean', default: 'false', note: 'Move to the next item every so many ms (`true` = 5000, at least 2000). Comes with a pause button; waits on hover, focus, off screen and in a hidden tab; stops for good when the visitor clicks an item; never under reduced motion.' },
+      { name: 'startAt', type: 'number', default: '0', note: 'The item chosen when the page loads (0-based).' },
+      { name: 'label', type: 'string', note: 'Accessible name of the whole group (it becomes role="group"), e.g. “What we offer”.' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the item titles; match the page outline.' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: '“Pause the rotation” / “Start the rotation”', note: 'The pause button’s words.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for theming one circle.' },
+    ],
+    theming: [
+      { name: '--ic-accent', fallback: '#5933d8', note: 'The chosen item, item borders and icons, links, focus ring.' },
+      { name: '--ic-item-bg', fallback: '#fff', note: 'An item that is not chosen.' },
+      { name: '--ic-item-fg', fallback: 'var(--ic-accent)', note: 'Its icon.' },
+      { name: '--ic-active-fg', fallback: '#fff', note: 'The chosen item’s icon (7.27:1 on the accent).' },
+      { name: '--ic-centre-bg', fallback: '#f4f1fe', note: 'The disc behind the text in the middle, and behind list icons.' },
+      { name: '--ic-fg', fallback: '#1e283c', note: 'Text (13.24:1 on the centre disc).' },
+      { name: '--ic-ring', fallback: 'rgb(89 51 216 / 0.35)', note: 'The dashed circumference.' },
+      { name: '--ic-size', fallback: '32rem', note: 'Diameter; the `size` prop sets it.' },
+      { name: '--ic-item-size', fallback: '4.5rem', note: 'Each item’s disc (never under 44px).' },
+      { name: '--ic-focus', fallback: 'var(--ic-accent)', note: 'Focus ring.' },
+    ],
+    a11y: [
+      'Each item is a real <button> named by its title, with aria-pressed (exactly one is pressed) and aria-controls pointing at the middle. Hover (with a mouse or trackpad), focus and click all choose it, so Tab alone walks the circle.',
+      'The middle is aria-live="polite": when the choice changes, a screen reader reads the new title and text. While autoplay runs it is not live, so nothing is read out on its own.',
+      'Autoplay has a visible pause button (WCAG 2.2.2), waits while the pointer is on the circle or focus is inside, while off screen and in a hidden tab, stops for good once the visitor clicks an item, and never runs under prefers-reduced-motion (tracked live), which also drops the fade.',
+      'The circle needs about 28rem. In a narrower container it becomes a vertical list with each item’s icon, title and text showing, and there is nothing to press.',
+      'Without JavaScript it is that list, whatever the width: every item’s text is on the page. The list is the only copy of the content; the middle shows a copy of the chosen entry. Print shows the list.',
+      'Icons and images are decorative (the title names the item); items are at least 44px.',
+    ],
+    usage: `<InfoCircle
+  label="What we offer"
+  items={[
+    { icon: listenSvg, title: 'Listen', text: 'An hour about your customers.' },
+    { icon: planSvg, title: 'Plan', text: 'A page list, agreed first.' },
+    { image: '/images/team.webp', title: 'Build', text: 'Tested parts.', link: { text: 'How we build', href: '/process/' } },
+  ]}
+  autoplay={6000}
+/>
+<!-- global.css: .ic { --ic-accent: var(--brand); --ic-centre-bg: var(--tint); } -->`,
+    license:
+      'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The circle takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/info-circle/ (demo)' }],
+    file: 'src/library/info-circle/InfoCircle.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
