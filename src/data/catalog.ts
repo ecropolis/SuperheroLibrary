@@ -1428,6 +1428,69 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'tabcordion',
+    name: 'Tabcordion',
+    aka: ['responsive tabs', 'tabs to accordion', 'accordion tabs', 'tabs on mobile', 'product details tabs', 'Easy Responsive Tabs'],
+    summary:
+      'One set of panels that is tabs when the element is wide and an accordion when it is narrow, decided by a CSS container query on its own width rather than the window. The ARIA follows the layout (tablist / tab / tabpanel, or buttons with aria-expanded), the open panel carries across the switch, and the accordion can hold several open. Without JavaScript every panel is open under its heading.',
+    pitch: 'The same details as tabs where there is room and as an accordion where there is not, even in a sidebar, and the section someone was reading stays open when it changes.',
+    // SE Ranking US, 2026-09-26: responsive accordion 320/mo, difficulty 32 (rising: 50/mo a
+    // year ago); tabs on mobile 110/11; responsive tabs 40/35; tabs to accordion 10/34. The brief's
+    // "responsive tabs accordion" and "tabcordion" have no measurable volume.
+    search: { query: 'responsive accordion', alsoRanks: ['tabs on mobile', 'responsive tabs', 'tabs to accordion'] },
+    replaces: ['A tabs widget and a toggle widget with the same content, one hidden on desktop and one on mobile (the usual Elementor and Divi workaround)', 'Easy Responsive Tabs and other tabs-to-accordion jQuery plugins'],
+    goodFor:
+      'A few sections that sit in columns of different widths: product details beside a gallery, a service’s scope in a card grid, visiting information in a sidebar. On a phone several sections can stay open at once, so people can compare two without reopening.',
+    notFor:
+      'A tab set that should stay tabs until the phone, or that needs a vertical strip, icons, manual activation or a #hash that follows the selection: use tabs, which decides by the window. A list of questions, FAQ schema, or answers that find-in-page should reach while closed: use accordion, which is native <details>. And anything everyone must read: behind a tab or a tap, most people never see it.',
+    props: [
+      { name: 'panels', type: 'TabcordionPanel[]', note: '`{ id, label, body?, slot? }`. `id` is the anchor (unique on the page); `body` an HTML string, or name a slot in `slot`.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
+      { name: 'breakpoint', type: '“sm” | “md” | “lg”', default: '“md”', note: 'The element’s own width from which it is tabs: 30rem, 40rem or 52rem. Narrower, it is an accordion. Tracked live.' },
+      { name: 'multiple', type: 'boolean', default: 'true', note: 'Accordion: several panels open at once. false keeps one open.' },
+      { name: 'selected', type: 'string', note: 'id of the panel selected, and open, first. Default: the first. A #id in the URL wins.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Level of each panel’s heading: shown without JavaScript, and holding the accordion button.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--tc-accent', fallback: 'currentColor', note: 'Selected tab marker and the accordion chevron.' },
+      { name: '--tc-fg', fallback: 'inherit', note: 'Text, and the selected tab.' },
+      { name: '--tc-muted', fallback: 'currentColor at 72%', note: 'Unselected tabs.' },
+      { name: '--tc-bg', fallback: 'transparent', note: 'Panel, selected tab and open heading fill.' },
+      { name: '--tc-strip-bg', fallback: 'rgb(0 0 0 / 0.04)', note: 'Tab strip and closed accordion headings.' },
+      { name: '--tc-border', fallback: 'rgb(0 0 0 / 0.14)', note: 'Frame and rules.' },
+      { name: '--tc-radius', fallback: '0.5rem', note: 'Frame corners.' },
+      { name: '--tc-pad', fallback: '1.25rem', note: 'Panel and heading padding.' },
+      { name: '--tc-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'Tabs: tablist named by `label`, tab and tabpanel with aria-selected, aria-controls and aria-labelledby, a roving tabindex so the strip is one Tab stop; ← → wrap, Home and End jump to the ends, and a tab is selected when it gets focus. A panel with nothing focusable inside is itself focusable.',
+      'Accordion: each heading holds a real button with aria-expanded and aria-controls; Enter and Space toggle, ↑ ↓ Home End move between headings. The tab strip is hidden and the panels lose their tabpanel role, so a screen reader never meets tab semantics it cannot use.',
+      'One breakpoint, in the stylesheet: the script reads the layout the container query chose and sets the ARIA to match whenever the element changes width. The selected tab’s panel is open in the accordion, and the panel opened last is the selected tab when it widens again.',
+      'Without JavaScript there is no tab strip and every panel is open under its label as a heading; #id links jump to the panel.',
+      'prefers-reduced-motion: no panel fade and no chevron turn.',
+    ],
+    usage: `<Tabcordion
+  label="Product details"
+  panels={[
+    { id: 'description', label: 'Description', body: '<p>…</p>' },
+    { id: 'size', label: 'Size', slot: 'size' },
+    { id: 'delivery', label: 'Delivery', body: '<p>…</p>' },
+  ]}
+>
+  <div slot="size"><table>…</table></div>
+</Tabcordion>
+
+<aside class="sidebar">
+  <Tabcordion label="Visiting" panels={visit} multiple={false} breakpoint="sm" />
+</aside>
+<!-- .product { --tc-accent: var(--brand); --tc-border: var(--line); --tc-bg: var(--white); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tabcordion/ (demo)' }],
+    file: 'src/library/tabcordion/Tabcordion.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
