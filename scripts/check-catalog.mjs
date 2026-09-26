@@ -3,7 +3,8 @@
  * npm run check — holds the rules that make an element "finished" and the layout that
  * superherotech.ai depends on (README, "Consumed by superherotech.ai").
  *
- * 1. Catalogue rules, read from src/data/catalog.ts (Node strips the types).
+ * 1. Catalogue rules, read from src/data/catalog.ts (Node strips the types), including one
+ *    theming prefix per element: no two entries' `--<prefix>-*` variables share a prefix.
  * 2. The demos index, read as text: Node cannot import .astro files, so the
  *    `'<id>': Component` lines and the `import Component from './File.astro'` lines are
  *    parsed. Keep one entry per line there.
@@ -107,6 +108,23 @@ for (const e of catalog) {
     if (owner && owner !== e.id) {
       fail(`Entry "${e.id}" lists "${a}" in alsoRanks, but that is the query "${owner}" targets.`);
     }
+  }
+}
+
+// Each element themes through its own `--<prefix>-*`; two elements on one prefix means a host
+// that themes one silently themes the other. The prefix is the first segment of each theming
+// variable's name. An element may use more than one; no two elements may share one.
+const prefixes = new Map(); // prefix -> id
+for (const e of catalog) {
+  for (const t of e.theming ?? []) {
+    const p = String(t.name).match(/^--([a-z0-9]+)-/)?.[1];
+    if (!p) {
+      fail(`Entry "${e.id}" has theming variable ${t.name}; name it --<prefix>-<what>.`);
+      continue;
+    }
+    const owner = prefixes.get(p);
+    if (owner && owner !== e.id) fail(`Entry "${e.id}" themes through --${p}-*, which "${owner}" already uses; give it a prefix of its own (three letters when two are taken, as announcement-bar's --anb-).`);
+    else prefixes.set(p, e.id);
   }
 }
 finish('catalogue');
