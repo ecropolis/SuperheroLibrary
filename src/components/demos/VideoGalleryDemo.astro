@@ -1,0 +1,97 @@
+---
+/**
+ * Demo for `video-gallery`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * The same public videos video-player's demo uses and names: the Blender Foundation's open
+ * films Big Buck Bunny (2008) and Sintel (2010), CC BY 3.0 (the credit is in each caption, as
+ * the licence asks), on Blender's YouTube channel, plus Big Buck Bunny's copy on Vimeo to show
+ * a Vimeo tile, and the neutral three-second "drift" loop served from public/demo/ with its
+ * captions file. The posters are our own neutral SVGs, not frames from the films. Nothing is
+ * fetched from YouTube or Vimeo until a tile is pressed.
+ */
+import VideoGallery from '../../library/video-gallery/VideoGallery.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+const drift = {
+  url: [
+    { src: asset('drift.webm'), type: 'video/webm' },
+    { src: asset('drift.mp4'), type: 'video/mp4' },
+  ],
+  title: 'Drift, a three-second loop',
+  poster: asset('drift-poster.jpg'),
+  tracks: [{ src: asset('drift.vtt'), srclang: 'en', label: 'English' }],
+};
+---
+<div class="demo-vg">
+  <p class="demo-vg__label">Lightbox, filtered by category, with counts</p>
+  <VideoGallery
+    columns={2}
+    counts
+    videos={[
+      {
+        url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
+        title: 'Big Buck Bunny',
+        poster: asset('film-poster.svg'),
+        caption: '© Blender Foundation, peach.blender.org, CC BY 3.0. On YouTube.',
+        category: 'Open films',
+      },
+      {
+        url: 'https://youtu.be/eRsGyueVLvQ',
+        title: 'Sintel',
+        poster: asset('film-poster-dusk.svg'),
+        caption: '© Blender Foundation, durian.blender.org, CC BY 3.0. On YouTube.',
+        category: 'Open films',
+      },
+      {
+        url: 'https://vimeo.com/1084537',
+        title: 'Big Buck Bunny, on Vimeo',
+        poster: asset('hills.svg'),
+        caption: 'The same film, CC BY 3.0, played from Vimeo with Do Not Track on.',
+        category: ['Open films', 'Vimeo'],
+      },
+      { ...drift, caption: 'Self-hosted, with a captions track.', category: 'Loops' },
+    ]}
+  />
+
+  <p class="demo-vg__label">Inline: the tile becomes the player</p>
+  <VideoGallery
+    mode="inline"
+    columns={2}
+    titleTag="p"
+    videos={[
+      {
+        url: 'aqz-KE-bpKQ',
+        title: 'Big Buck Bunny, without a poster',
+        caption: 'No poster given: a neutral panel, never YouTube’s thumbnail.',
+      },
+      { ...drift, caption: 'Pressing the other tile puts this one back.' },
+    ]}
+  />
+</div>
+<style>
+  .demo-vg {
+    --vg-radius: var(--radius, 14px);
+    --vg-play-bg: var(--purple, #5933d8);
+    --vg-play-fg: var(--white, #fff);
+    --vg-bg: var(--navy, #1e283c);
+    --vg-focus: var(--purple, #5933d8);
+    --vg-chip-on-bg: var(--purple, #5933d8);
+    --vg-chip-fg: var(--ink, #1e283c);
+    --vg-chip-border: var(--line, #c9cedb);
+    --vg-title: var(--ink, #1e283c);
+    display: grid;
+    gap: 0.75rem;
+  }
+  .demo-vg__label {
+    margin: 0.5rem 0 0;
+    font-weight: 700;
+  }
+  .demo-vg__label:not(:first-child) {
+    margin-top: 2rem;
+  }
+</style>

@@ -36,6 +36,9 @@ import SlideBoxDemo from './SlideBoxDemo.astro';
 import CountdownDemo from './CountdownDemo.astro';
 import ContentToggleDemo from './ContentToggleDemo.astro';
 import OffCanvasDemo from './OffCanvasDemo.astro';
+import VideoGalleryDemo from './VideoGalleryDemo.astro';
+import MapDemo from './MapDemo.astro';
+import LinkEffectsDemo from './LinkEffectsDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,4 +73,7 @@ export const demos: Record<string, AstroComponent> = {
   countdown: CountdownDemo,
   'content-toggle': ContentToggleDemo,
   'off-canvas': OffCanvasDemo,
+  'video-gallery': VideoGalleryDemo,
+  map: MapDemo,
+  'link-effects': LinkEffectsDemo,
 };

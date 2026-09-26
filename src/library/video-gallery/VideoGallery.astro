@@ -1,0 +1,771 @@
+---
+/**
+ * VideoGallery — a grid of videos from YouTube, Vimeo or your own files, each behind your own
+ * poster and play button, with optional category filter chips. A click plays the video in one
+ * lightbox <dialog> (`mode="lightbox"`, the default) or in the tile itself (`mode="inline"`).
+ * WordPress calls it UABB's or PowerPack's "Video Gallery", Elementor's Video Playlist, or a
+ * YouTube gallery plugin. One video on its own is video-player; this is several at once.
+ *
+ * The facade contract, the same as video-player's (the URL parser below is a COPY of its
+ * `<video-player-parse>` block; elements never import each other, and
+ * scripts/check-media-and-links.mjs fails if the two copies drift apart). At load the page
+ * has the posters, a play control per tile and nothing from YouTube or Vimeo: no iframe, no
+ * script, no preconnect, no thumbnail. A tile without `poster` shows a neutral panel, never
+ * YouTube's thumbnail. On a click the iframe is created on youtube-nocookie.com or
+ * player.vimeo.com with dnt=1 and autoplay; a file gets a <video> with native controls, its
+ * poster and its caption tracks. So no YouTube cookie exists before someone presses play.
+ *
+ * The play control is a real <button type="button"> named "Play: <title>". Without JavaScript
+ * each tile is instead a link to the video's own page (YouTube, Vimeo, or the file itself),
+ * named "Watch “<title>” on YouTube", and the filter chips are not shown: every video is. The
+ * script that turns links into buttons runs straight after the gallery, before the first
+ * paint, so nothing flickers or shifts.
+ *
+ * Filter chips (when videos carry a `category` and there are two or more): a group of
+ * <button aria-pressed>, "All" first and pressed. Choosing one hides the other tiles and says
+ * how many are shown in a polite live region. Tiles fade in when shown, except under
+ * prefers-reduced-motion.
+ *
+ * Lightbox: ONE native <dialog> per gallery, filled on open. showModal() traps focus, Escape
+ * and a backdrop click close it, the close button is labelled, the page does not scroll
+ * underneath (the scrollbar's width is kept), and focus returns to the tile that opened it.
+ * On open a YouTube or Vimeo video starts and focus goes to the close button, not into the
+ * iframe: a cross-origin player keeps every key, Escape included. Tab moves on into it. A file
+ * gets focus itself. Closing empties the dialog, so the sound stops.
+ *
+ * Inline: the tile's poster and button are replaced by the player, and focus moves into it.
+ * Pressing another tile puts the first one back to its poster (which stops it), so one video
+ * plays at a time. A filter that hides a playing tile stops it too.
+ *
+ * Self-hosted files: pass `tracks` with a captions track (WCAG 1.2.2); the build warns
+ * without one. Track files must be same-origin.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --vg-min / --vg-gap   no tile narrower than min (`columns` is the most per row)        (14rem / 1.25rem)
+ *   --vg-template       the whole grid-template-columns, when the host wants its own grid    (unset)
+ *   --vg-radius         corner radius of each frame                                          (0.5rem)
+ *   --vg-bg             frame colour behind poster and player                                (#000)
+ *   --vg-panel          the tile's background when it has no poster                          (linear-gradient(135deg, #2c3656, #1e283c))
+ *   --vg-overlay        tint over the poster                                                 (rgb(0 0 0 / 0.12))
+ *   --vg-play-bg / --vg-play-fg / --vg-play-size   the play button                         (rgb(0 0 0 / 0.7) / #fff / 3.5rem)
+ *   --vg-focus          focus ring on tiles, chips and the close button                     (#5933d8)
+ *   --vg-title / --vg-caption   title and caption text                                       (inherit / inherit)
+ *   --vg-chip-bg / --vg-chip-fg / --vg-chip-border                                           (#fff / #1e283c / #c9cedb)
+ *   --vg-chip-on-bg / --vg-chip-on-fg   the pressed chip                                     (#1e283c / #fff)
+ *   --vg-backdrop       lightbox backdrop                                                    (rgb(0 0 0 / 0.88))
+ *   --vg-close-bg / --vg-close-fg   lightbox close button and title                          (rgb(255 255 255 / 0.15) / #fff)
+ */
+interface Source {
+  src: string;
+  /** MIME type. Inferred from .mp4 / .m4v / .webm / .ogv when left out. */
+  type?: string;
+}
+interface Track {
+  src: string;
+  srclang: string;
+  label: string;
+  kind?: 'captions' | 'subtitles' | 'descriptions' | 'chapters';
+  default?: boolean;
+}
+export interface GalleryVideo {
+  /** A YouTube URL or id, a Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }] sources. */
+  url: string | Source[];
+  /** Shown under the tile; names the play button ("Play: …"), the iframe and the lightbox. */
+  title: string;
+  caption?: string;
+  /** Your thumbnail, served by your site. Without one the tile is a neutral panel. */
+  poster?: string;
+  /** One category, or several; the filter chips are made from these. */
+  category?: string | string[];
+  /** Text tracks for a self-hosted file. */
+  tracks?: Track[];
+}
+interface Props {
+  videos: GalleryVideo[];
+  /** 'lightbox' plays in one dialog over the page; 'inline' plays in the tile. Default 'lightbox'. */
+  mode?: 'lightbox' | 'inline';
+  /** At most this many columns (1–6). Default 3. Tiles never go narrower than --vg-min. */
+  columns?: number;
+  /** Show the category chips. Default: when the videos carry two or more categories. */
+  filter?: boolean;
+  /** Show how many videos each chip holds. Default false. */
+  counts?: boolean;
+  /** The first chip. Default "All". */
+  allLabel?: string;
+  /** Accessible name of the chip group. Default "Filter videos". */
+  filterLabel?: string;
+  /** Width / height of every frame. Default 16/9. */
+  aspect?: number | string;
+  /** Start playing on the click. Default true. */
+  autoplay?: boolean;
+  /** Element for each tile's title. Default 'h3'. */
+  titleTag?: 'h2' | 'h3' | 'h4' | 'p';
+  /** Prefix of each button's name. Default "Play". */
+  playLabel?: string;
+  /** Name of the lightbox close button. Default "Close video". */
+  closeLabel?: string;
+  /** Inline SVG markup for the play icon. Default: a triangle. */
+  playIcon?: string;
+  class?: string;
+}
+
+// A copy of video-player’s <video-player-parse> block. Keep the two identical: the check compares them.
+// <video-gallery-parse>
+type Parsed =
+  | { kind: 'youtube'; id: string }
+  | { kind: 'vimeo'; id: string; hash?: string }
+  | { kind: 'file'; sources: { src: string; type?: string }[] };
+
+function mimeOf(url: string): string | undefined {
+  const ext = (url.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i) || [])[1]?.toLowerCase();
+  return ext === 'mp4' || ext === 'm4v' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : ext === 'ogv' ? 'video/ogg' : undefined;
+}
+
+function parseVideoSrc(src: string | { src: string; type?: string }[]): Parsed | null {
+  if (Array.isArray(src)) {
+    if (!src.length) return null;
+    return { kind: 'file', sources: src.map((s) => ({ src: s.src, type: s.type ?? mimeOf(s.src) })) };
+  }
+  const s = String(src ?? '').trim();
+  if (!s) return null;
+  if (/\.(mp4|m4v|webm|ogv)(?:[?#].*)?$/i.test(s)) return { kind: 'file', sources: [{ src: s, type: mimeOf(s) }] };
+  if (/^[\w-]{11}$/.test(s) && !/^\d+$/.test(s)) return { kind: 'youtube', id: s };
+  if (/^\d+$/.test(s)) return { kind: 'vimeo', id: s };
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s.replace(/^\/\//, ''));
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^(www|m|music)\./, '');
+  const parts = url.pathname.split('/').filter(Boolean);
+  const ytId = (v: string | null | undefined) => (v && /^[\w-]{11}$/.test(v) ? v : null);
+  if (host === 'youtu.be') {
+    const id = ytId(parts[0]);
+    return id ? { kind: 'youtube', id } : null;
+  }
+  if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    const id = ytId(url.searchParams.get('v')) ?? (['embed', 'shorts', 'live', 'v'].includes(parts[0]) ? ytId(parts[1]) : null);
+    return id ? { kind: 'youtube', id } : null;
+  }
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    const i = parts.findIndex((p) => /^\d+$/.test(p));
+    if (i < 0) return null;
+    const next = parts[i + 1];
+    const hash = url.searchParams.get('h') ?? (next && /^[0-9a-f]{6,}$/i.test(next) ? next : undefined);
+    return hash ? { kind: 'vimeo', id: parts[i], hash } : { kind: 'vimeo', id: parts[i] };
+  }
+  return null;
+}
+
+/** The iframe's URL. Built at render time; the iframe itself is only created on play. */
+function embedUrl(p: Parsed, o: { autoplay?: boolean; muted?: boolean; loop?: boolean; start?: number } = {}): string | null {
+  const start = Math.max(0, Math.floor(o.start ?? 0));
+  if (p.kind === 'youtube') {
+    const q = new URLSearchParams({ autoplay: o.autoplay === false ? '0' : '1', rel: '0', playsinline: '1' });
+    if (o.muted) q.set('mute', '1');
+    if (o.loop) {
+      q.set('loop', '1');
+      q.set('playlist', p.id); // YouTube loops a single video only as a one-item playlist.
+    }
+    if (start) q.set('start', String(start));
+    return `https://www.youtube-nocookie.com/embed/${p.id}?${q}`;
+  }
+  if (p.kind === 'vimeo') {
+    const q = new URLSearchParams({ dnt: '1', autoplay: o.autoplay === false ? '0' : '1' });
+    if (p.hash) q.set('h', p.hash);
+    if (o.muted) q.set('muted', '1');
+    if (o.loop) q.set('loop', '1');
+    return `https://player.vimeo.com/video/${p.id}?${q}${start ? `#t=${start}s` : ''}`;
+  }
+  return null;
+}
+
+/** Where the video lives, for the no-JavaScript link. */
+function watchUrl(p: Parsed): string {
+  if (p.kind === 'youtube') return `https://www.youtube.com/watch?v=${p.id}`;
+  if (p.kind === 'vimeo') return `https://vimeo.com/${p.id}${p.hash ? '/' + p.hash : ''}`;
+  return p.sources[0].src;
+}
+
+function aspectRatio(a: number | string | undefined): number {
+  if (typeof a === 'number' && a > 0) return a;
+  const m = String(a ?? '').match(/^\s*([\d.]+)\s*(?:[/:]\s*([\d.]+))?\s*$/);
+  const r = m ? Number(m[1]) / Number(m[2] ?? 1) : NaN;
+  return Number.isFinite(r) && r > 0 ? r : 16 / 9;
+}
+// </video-gallery-parse>
+
+const {
+  videos,
+  mode = 'lightbox',
+  columns = 3,
+  filter,
+  counts = false,
+  allLabel = 'All',
+  filterLabel = 'Filter videos',
+  aspect = 16 / 9,
+  autoplay = true,
+  titleTag = 'h3',
+  playLabel = 'Play',
+  closeLabel = 'Close video',
+  playIcon,
+  class: className,
+} = Astro.props;
+
+if (!Array.isArray(videos) || !videos.length) throw new Error('VideoGallery: `videos` needs at least one { url, title }.');
+if (mode !== 'lightbox' && mode !== 'inline') throw new Error(`VideoGallery: mode "${mode}" is not 'lightbox' or 'inline'.`);
+if (!(Number.isInteger(columns) && columns >= 1 && columns <= 6)) throw new Error(`VideoGallery: columns must be a whole number from 1 to 6, not ${JSON.stringify(columns)}.`);
+
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'category';
+const HOST: Record<string, string> = { youtube: 'YouTube', vimeo: 'Vimeo' };
+
+const categories: { key: string; label: string; count: number }[] = [];
+const items = videos.map((v, i) => {
+  const title = String(v?.title ?? '').trim();
+  if (!title) throw new Error(`VideoGallery: video ${i + 1} has no \`title\`; it names the play button and the iframe.`);
+  const parsed = parseVideoSrc(v.url);
+  if (!parsed) throw new Error(`VideoGallery "${title}": cannot tell what \`url\` is (${JSON.stringify(v.url)}). Use a YouTube or Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }].`);
+  const tracks = v.tracks ?? [];
+  if (parsed.kind === 'file' && !tracks.some((t) => (t.kind ?? 'captions') === 'captions')) {
+    console.warn(`VideoGallery "${title}": self-hosted video without a captions track. If it has speech, add tracks: [{ src, srclang, label }].`);
+  }
+  const cats = (Array.isArray(v.category) ? v.category : v.category ? [v.category] : []).map((c) => String(c).trim()).filter(Boolean);
+  const keys: string[] = [];
+  for (const label of cats) {
+    const key = slug(label);
+    const known = categories.find((c) => c.key === key);
+    if (known) known.count++;
+    else categories.push({ key, label, count: 1 });
+    if (!keys.includes(key)) keys.push(key);
+  }
+  const host = HOST[parsed.kind];
+  // What the script needs on a click: kept short, as one JSON attribute on the button.
+  const play = {
+    k: parsed.kind,
+    t: title,
+    c: v.caption || undefined,
+    e: embedUrl(parsed, { autoplay }) || undefined,
+    s: parsed.kind === 'file' ? parsed.sources : undefined,
+    tr: parsed.kind === 'file' && tracks.length ? tracks.map((t) => ({ ...t, kind: t.kind ?? 'captions' })) : undefined,
+    p: parsed.kind === 'file' ? v.poster : undefined,
+  };
+  return {
+    title,
+    caption: v.caption,
+    poster: v.poster,
+    keys,
+    watch: watchUrl(parsed),
+    watchText: host ? `Watch “${title}” on ${host}` : `Watch “${title}”`,
+    play: JSON.stringify(play),
+  };
+});
+const showFilter = filter ?? categories.length >= 2;
+if (showFilter && !categories.length) throw new Error('VideoGallery: `filter` is on but no video has a `category`.');
+
+const lightbox = mode === 'lightbox';
+const ratio = Math.round(aspectRatio(aspect) * 1e4) / 1e4;
+const Title = titleTag;
+const icon =
+  playIcon ??
+  '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.04-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z"/></svg>';
+
+// The runtime goes out once per page; each gallery is mounted by the one-line script after it.
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__videoGalleryScript;
+locals.__videoGalleryScript = true;
+const n = ((locals.__videoGalleryCount as number) ?? 0) + 1;
+locals.__videoGalleryCount = n;
+const uid = `vg-${n}`;
+---
+
+{
+  firstOnPage && (
+    <script is:inline>
+      (() => {
+        if (window.__superheroVideoGallery) return;
+
+        // Scroll lock for the lightbox, as in video-player: keep the scrollbar's width.
+        let locked = 0;
+        let saved = null;
+        const lock = (on) => {
+          const html = document.documentElement;
+          if (on) {
+            if (locked++) return;
+            saved = [html.style.overflow, html.style.paddingRight];
+            const bar = window.innerWidth - html.clientWidth;
+            html.style.overflow = 'hidden';
+            if (bar > 0) html.style.paddingRight = bar + 'px';
+          } else if (locked && !--locked) {
+            [html.style.overflow, html.style.paddingRight] = saved;
+          }
+        };
+
+        const frameFor = (d) => {
+          const f = document.createElement('iframe');
+          f.src = d.e;
+          f.title = d.t;
+          f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen; web-share';
+          f.allowFullscreen = true;
+          // YouTube refuses to play embeds that send no referrer (error 153).
+          f.referrerPolicy = 'strict-origin-when-cross-origin';
+          return f;
+        };
+        const videoFor = (d) => {
+          const v = document.createElement('video');
+          v.controls = true;
+          v.playsInline = true;
+          v.preload = 'metadata';
+          if (d.p) v.poster = d.p;
+          v.setAttribute('aria-label', d.t);
+          for (const s of d.s || []) {
+            const el = document.createElement('source');
+            el.src = s.src;
+            if (s.type) el.type = s.type;
+            v.append(el);
+          }
+          for (const t of d.tr || []) {
+            const el = document.createElement('track');
+            el.kind = t.kind;
+            el.src = t.src;
+            el.srclang = t.srclang;
+            el.label = t.label;
+            if (t.default) el.default = true;
+            v.append(el);
+          }
+          return v;
+        };
+        const playerFor = (d) => (d.k === 'file' ? videoFor(d) : frameFor(d));
+        const start = (el, root) => {
+          if (el.tagName !== 'VIDEO' || root.dataset.vgAutoplay === 'false') return;
+          const p = el.play();
+          if (p) p.catch(() => {}); // Refused (e.g. Low Power Mode): the native controls remain.
+        };
+
+        const mount = (root) => {
+          if (!root || root.dataset.vgReady) return;
+          root.dataset.vgReady = '1';
+
+          // Links (the no-JavaScript render) become the buttons.
+          root.querySelectorAll('[data-vg-link]').forEach((a) => a.remove());
+          root.querySelectorAll('[data-vg-play]').forEach((b) => (b.hidden = false));
+
+          // Inline: one tile plays at a time; the others keep (or get back) their poster.
+          let current = null;
+          const restore = () => {
+            if (!current) return;
+            current.frame.replaceChildren(...current.nodes);
+            delete current.frame.dataset.vgPlaying;
+            current = null;
+          };
+
+          const bar = root.querySelector('[data-vg-filters]');
+          if (bar) {
+            bar.hidden = false;
+            const chips = [...bar.querySelectorAll('[data-vg-filter]')];
+            const tiles = [...root.querySelectorAll('[data-vg-item]')];
+            const status = root.querySelector('[data-vg-status]');
+            bar.addEventListener('click', (e) => {
+              const chip = e.target.closest('[data-vg-filter]');
+              if (!chip || chip.getAttribute('aria-pressed') === 'true') return;
+              const key = chip.dataset.vgFilter;
+              chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+              let shown = 0;
+              tiles.forEach((li) => {
+                const on = !key || li.dataset.vgCats.split(' ').includes(key);
+                li.hidden = !on;
+                if (on) shown++;
+                else if (current && li.contains(current.frame)) restore();
+              });
+              if (status) status.textContent = `${chip.dataset.vgName}: ${shown} ${shown === 1 ? 'video' : 'videos'}.`;
+            });
+          }
+
+          const dialog = root.querySelector('[data-vg-dialog]');
+          const stage = dialog && dialog.querySelector('[data-vg-stage]');
+          const dTitle = dialog && dialog.querySelector('[data-vg-dtitle]');
+          const dCaption = dialog && dialog.querySelector('[data-vg-dcaption]');
+          const closeBtn = dialog && dialog.querySelector('[data-vg-close]');
+          let opener = null;
+
+          root.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-vg-play]');
+            if (!btn) return;
+            let d;
+            try {
+              d = JSON.parse(btn.dataset.vgPlay);
+            } catch {
+              return;
+            }
+            const el = playerFor(d);
+            if (dialog) {
+              opener = btn;
+              dialog.setAttribute('aria-label', d.t);
+              dTitle.textContent = d.t;
+              dCaption.textContent = d.c || '';
+              dCaption.hidden = !d.c;
+              stage.replaceChildren(el);
+              dialog.showModal();
+              lock(true);
+              // Not into a cross-origin iframe: it would keep Escape. Tab moves on into it.
+              (d.k === 'file' ? el : closeBtn).focus();
+            } else {
+              restore();
+              const frame = btn.closest('[data-vg-frame]');
+              current = { frame, nodes: [...frame.childNodes] };
+              frame.replaceChildren(el);
+              frame.dataset.vgPlaying = '';
+              el.focus();
+            }
+            start(el, root);
+          });
+
+          if (dialog) {
+            closeBtn.addEventListener('click', () => dialog.close());
+            // The dialog fills the viewport; a press and release on it outside the box is the backdrop.
+            let downOnBackdrop = false;
+            dialog.addEventListener('pointerdown', (e) => (downOnBackdrop = e.target === dialog));
+            dialog.addEventListener('click', (e) => {
+              if (e.target === dialog && downOnBackdrop) dialog.close();
+              downOnBackdrop = false;
+            });
+            dialog.addEventListener('close', () => {
+              stage.replaceChildren(); // Unload: the only way to be sure the sound stops.
+              lock(false);
+              if (opener && opener.isConnected) opener.focus();
+              opener = null;
+            });
+          }
+        };
+
+        window.__superheroVideoGallery = { mount };
+      })();
+    </script>
+  )
+}
+<div
+  id={uid}
+  class:list={['vg', `vg--${mode}`, className]}
+  style={`--vg-ratio:${ratio};--vg-cols:${columns}`}
+  data-vg={mode}
+  data-vg-autoplay={autoplay ? undefined : 'false'}
+>
+  {
+    showFilter && (
+      <div class="vg__filters" role="group" aria-label={filterLabel} hidden data-vg-filters>
+        <button class="vg__chip" type="button" aria-pressed="true" data-vg-filter="" data-vg-name={allLabel}>
+          {allLabel}
+          {counts && <span class="vg__count">{` (${items.length})`}</span>}
+        </button>
+        {categories.map((c) => (
+          <button class="vg__chip" type="button" aria-pressed="false" data-vg-filter={c.key} data-vg-name={c.label}>
+            {c.label}
+            {counts && <span class="vg__count">{` (${c.count})`}</span>}
+          </button>
+        ))}
+      </div>
+    )
+  }
+  {showFilter && <p class="vg__sr" aria-live="polite" data-vg-status />}
+  <ul class="vg__grid" role="list">
+    {
+      items.map((v) => (
+        <li class="vg__item" data-vg-item data-vg-cats={v.keys.join(' ')}>
+          <div class="vg__frame" data-vg-frame>
+            {v.poster ? <img class="vg__poster" src={v.poster} alt="" loading="lazy" decoding="async" /> : <span class="vg__panel" aria-hidden="true" />}
+            <a class="vg__hit" href={v.watch} data-vg-link>
+              <span class="vg__icon" aria-hidden="true" set:html={icon} />
+              <span class="vg__sr">{v.watchText}</span>
+            </a>
+            <button
+              class="vg__hit"
+              type="button"
+              hidden
+              aria-label={`${playLabel}: ${v.title}`}
+              aria-haspopup={lightbox ? 'dialog' : undefined}
+              data-vg-play={v.play}
+            >
+              <span class="vg__icon" aria-hidden="true" set:html={icon} />
+            </button>
+          </div>
+          <Title class="vg__title">{v.title}</Title>
+          {v.caption && <p class="vg__caption">{v.caption}</p>}
+        </li>
+      ))
+    }
+  </ul>
+  {
+    lightbox && (
+      <dialog class="vg__dialog" aria-label="Video" data-vg-dialog>
+        <div class="vg__box">
+          <div class="vg__bar">
+            <p class="vg__dtitle" data-vg-dtitle />
+            <button class="vg__close" type="button" aria-label={closeLabel} data-vg-close>
+              <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+          <div class="vg__stage" data-vg-stage />
+          <p class="vg__dcaption" hidden data-vg-dcaption />
+        </div>
+      </dialog>
+    )
+  }
+</div>
+<script is:inline>window.__superheroVideoGallery.mount(document.currentScript.previousElementSibling);</script>
+
+<style>
+  .vg {
+    --vg-g: var(--vg-gap, 1.25rem);
+  }
+  .vg__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+  }
+  .vg__filters[hidden] {
+    display: none;
+  }
+  .vg__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    min-height: 2.75rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--vg-chip-border, #c9cedb);
+    border-radius: 999px;
+    background: var(--vg-chip-bg, #fff);
+    color: var(--vg-chip-fg, #1e283c);
+    font: inherit;
+    font-size: 0.95em;
+    cursor: pointer;
+  }
+  .vg__chip[aria-pressed='true'] {
+    border-color: var(--vg-chip-on-bg, #1e283c);
+    background: var(--vg-chip-on-bg, #1e283c);
+    color: var(--vg-chip-on-fg, #fff);
+  }
+  .vg__chip:focus-visible,
+  .vg__close:focus-visible {
+    outline: 3px solid var(--vg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .vg__count {
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+  }
+  .vg__grid {
+    display: grid;
+    /* At most `columns` per row, none narrower than --vg-min, one column when even that does not fit. */
+    grid-template-columns: var(
+      --vg-template,
+      repeat(auto-fill, minmax(min(100%, max(var(--vg-min, 14rem), (100% - (var(--vg-cols) - 1) * var(--vg-g)) / var(--vg-cols))), 1fr))
+    );
+    gap: var(--vg-g);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .vg__item {
+    min-width: 0;
+    margin: 0;
+  }
+  .vg__item[hidden] {
+    display: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    /* Runs whenever a tile is shown again by a filter. */
+    .vg__item {
+      animation: vg-in 0.25s ease-out;
+    }
+    .vg__icon {
+      transition: scale 0.18s ease;
+    }
+    .vg__hit:hover .vg__icon,
+    .vg__hit:focus-visible .vg__icon {
+      scale: 1.08;
+    }
+  }
+  @keyframes vg-in {
+    from {
+      opacity: 0;
+      translate: 0 0.4rem;
+    }
+  }
+  .vg__frame {
+    position: relative;
+    aspect-ratio: var(--vg-ratio, 16 / 9);
+    overflow: hidden;
+    border-radius: var(--vg-radius, 0.5rem);
+    background: var(--vg-bg, #000);
+  }
+  .vg__poster,
+  .vg__panel,
+  .vg__frame > :global(iframe),
+  .vg__frame > :global(video) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .vg__poster {
+    object-fit: cover;
+  }
+  .vg__panel {
+    background: var(--vg-panel, linear-gradient(135deg, #2c3656, #1e283c));
+  }
+  .vg__frame > :global(video) {
+    display: block;
+    object-fit: contain;
+    background: var(--vg-bg, #000);
+  }
+  .vg__hit {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: var(--vg-overlay, rgb(0 0 0 / 0.12));
+    color: var(--vg-play-fg, #fff);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .vg__hit[hidden] {
+    display: none;
+  }
+  .vg__hit:focus-visible {
+    outline: 3px solid var(--vg-focus, #5933d8);
+    outline-offset: -3px;
+  }
+  .vg__icon {
+    display: grid;
+    place-items: center;
+    width: var(--vg-play-size, 3.5rem);
+    height: var(--vg-play-size, 3.5rem);
+    border-radius: 50%;
+    background: var(--vg-play-bg, rgb(0 0 0 / 0.7));
+    font-size: calc(var(--vg-play-size, 3.5rem) * 0.45);
+    line-height: 0;
+    box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 0.3);
+  }
+  .vg__icon :global(svg) {
+    translate: 6% 0;
+  }
+  .vg__hit:focus-visible .vg__icon {
+    box-shadow:
+      0 0 0 3px #fff,
+      0 0 0 6px var(--vg-focus, #5933d8);
+  }
+  .vg__title {
+    margin: 0.6rem 0 0;
+    color: var(--vg-title, inherit);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .vg__caption {
+    margin: 0.25rem 0 0;
+    color: var(--vg-caption, inherit);
+    font-size: 0.9em;
+  }
+  .vg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Lightbox: the dialog is the backdrop and fills the viewport; the box is centred in it. */
+  .vg__dialog {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: clamp(0.75rem, 3vw, 2rem);
+    border: 0;
+    background: var(--vg-backdrop, rgb(0 0 0 / 0.88));
+    color: var(--vg-close-fg, #fff);
+    overscroll-behavior: contain;
+  }
+  .vg__dialog[open] {
+    display: grid;
+    place-items: center;
+  }
+  .vg__dialog::backdrop {
+    background: transparent;
+  }
+  .vg__box {
+    display: grid;
+    gap: 0.5rem;
+    /* As wide as fits, and no taller than the viewport minus the title row and caption. */
+    width: min(100%, calc((100dvh - 2 * clamp(0.75rem, 3vw, 2rem) - 5.5rem) * var(--vg-ratio, 1.7778)));
+  }
+  .vg__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .vg__dtitle {
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .vg__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--vg-close-bg, rgb(255 255 255 / 0.15));
+    color: var(--vg-close-fg, #fff);
+    cursor: pointer;
+  }
+  .vg__close:focus-visible {
+    outline-color: #fff;
+  }
+  .vg__stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--vg-ratio, 16 / 9);
+    background: var(--vg-bg, #000);
+  }
+  .vg__stage > :global(iframe),
+  .vg__stage > :global(video) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .vg__dcaption {
+    margin: 0;
+    font-size: 0.9em;
+    opacity: 0.85;
+  }
+  @media print {
+    .vg__dialog {
+      display: none !important;
+    }
+  }
+</style>

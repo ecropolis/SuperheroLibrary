@@ -1,0 +1,399 @@
+---
+/**
+ * LinkEffects — eleven hover-and-focus styles for links, in CSS only. UABB's "Creative Link",
+ * PowerPack's "Link Effects" and the underline-animation snippets people paste into a theme.
+ * Eight are the familiar ones; `peek`, `swash` and `tag` are ours.
+ *
+ *   lk-underline-slide    a line slides in under the text from the left and out to the right
+ *   lk-underline-grow     a thin underline at rest that thickens (the one for running text)
+ *   lk-brackets           [ brackets ] close in around the text
+ *   lk-highlight          a marker sweeps behind the text
+ *   lk-box                a frame draws itself around the text: top and bottom, then the sides
+ *   lk-strike-to-underline   a line strikes through the middle, then drops to become the underline
+ *   lk-arrow              → slides in after the text, into space kept for it
+ *   lk-circle             a hand-drawn ellipse rings the text
+ *   lk-peek               the link's `data-peek` words slide up in its place ("Pricing" → "$49/mo");
+ *                         both share one cell, so the link is as wide as the longer and nothing shifts
+ *   lk-swash              a hand-drawn underline (an inline SVG) draws itself, stroke-dashoffset 1 → 0
+ *   lk-tag                a pill that fills from the left, the text turning with the fill
+ *
+ * Use: put `<LinkEffects />` once in the layout (it emits the stylesheet), then either put the
+ * class on any <a> or use this same file as a wrapper, `import Link from './LinkEffects.astro'`:
+ *   <Link effect="underline-slide" href="/about/">About</Link>
+ *   <Link effect="peek" peek="$49/mo" href="/pricing/">Pricing</Link>
+ * The wrapper also emits the stylesheet (once per page, guarded through Astro.locals as the
+ * modal's runtime is), and adds the markup two effects need: `peek` wraps the words in
+ * <span class="lk__label">, `swash` appends its SVG. Without the wrapper, write those yourself:
+ *   <a class="lk-peek" data-peek="$49/mo" href="/pricing/"><span class="lk__label">Pricing</span></a>
+ *   <a class="lk-swash" href="/story/">Our story<svg class="lk__swash" …>…</svg></a>  (copy SWASH below)
+ *
+ * The rules every effect keeps:
+ *   - Hover and :focus-visible are one selector, `:is(:hover, :focus-visible)`, so a keyboard
+ *     user sees exactly what a mouse user sees. The browser's own focus ring is never removed.
+ *   - prefers-reduced-motion (or a browser that does not say): every transition lives inside
+ *     `@media (prefers-reduced-motion: no-preference)`, so otherwise the end state appears at
+ *     once. Nothing loops or plays by itself.
+ *   - Contrast never dips mid-animation: effects move decorations (lines, brackets, fills), not
+ *     the text colour. Two pin the text colour instead: `highlight` keeps --lk-ink over the page
+ *     and over the marker, at rest and when active (so a host's own hover colour cannot land on it), and `tag` paints its text and its fill as two layers of ONE
+ *     background that move together, so every pixel of text is --lk-ink over the page or
+ *     --lk-on-accent over the fill, never in between. No `color` is ever transitioned.
+ *     `npm run check` computes the fallback pairs: ink on page, ink on marker, on-accent on
+ *     accent, accent on page (the arrow and the peek words are accent-coloured text).
+ *   - Decorative glyphs are silent to screen readers (`content: "→" / ""`); the swash SVG is
+ *     aria-hidden. The peek words are part of the link's name ("Pricing $49/mo"), which is
+ *     the point of them.
+ *   - Without JavaScript: identical. There is none.
+ *
+ * `underline-slide`, `underline-grow` and `highlight` wrap across lines; the rest are
+ * inline-block and suit short links: navigation, a card's call to action, a footer.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --lk-accent       lines, brackets, frame, arrow, peek words, tag fill      (#5933d8)
+ *   --lk-ink          text colour where an effect pins it (highlight, tag)     (#1e283c)
+ *   --lk-on-accent    tag text over its fill                                   (#fff)
+ *   --lk-mark         the highlight marker                                     (#ffe38f)
+ *   --lk-bg           the page behind the link; tag's resting fill             (#fff)
+ *   --lk-thickness    line weight                                              (2px)
+ *   --lk-duration / --lk-ease   timing                                        (0.3s / cubic-bezier(0.2, 0.7, 0.2, 1))
+ */
+import type { HTMLAttributes } from 'astro/types';
+
+// <link-effects-list>
+const EFFECTS = ['underline-slide', 'underline-grow', 'brackets', 'highlight', 'box', 'strike-to-underline', 'arrow', 'circle', 'peek', 'swash', 'tag'] as const;
+// </link-effects-list>
+export type LinkEffect = (typeof EFFECTS)[number];
+
+interface Props extends Omit<HTMLAttributes<'a'>, 'class'> {
+  /** With `href`, render an <a class="lk-<effect>">. Without either, only emit the stylesheet. */
+  effect?: LinkEffect;
+  href?: string;
+  /** For effect="peek": the words that slide in. */
+  peek?: string;
+  class?: string;
+}
+
+const { effect, href, peek, class: className, ...rest } = Astro.props;
+if (effect !== undefined && !EFFECTS.includes(effect)) throw new Error(`LinkEffects: effect "${effect}" is not one of ${EFFECTS.join(', ')}.`);
+if (effect && !href) throw new Error(`LinkEffects: effect="${effect}" needs an \`href\`; the effects are for links.`);
+if (href && !effect) throw new Error('LinkEffects: an `href` needs an `effect`.');
+if (effect === 'peek' && !peek?.trim()) throw new Error('LinkEffects: effect="peek" needs `peek`, the words that slide in.');
+
+// The hand-drawn line for `swash`: a slightly rising stroke with a flick at the end.
+const SWASH =
+  '<svg class="lk__swash" viewBox="0 0 200 16" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M3 11.5C38 6.2 82 4.4 126 5.6c24 .6 47 2.4 71 .2" pathLength="1"/></svg>';
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__linkEffectsStyle;
+locals.__linkEffectsStyle = true;
+---
+
+{
+  firstOnPage && (
+    <style is:inline data-lk>
+      a.lk-underline-slide, a.lk-underline-grow, a.lk-brackets, a.lk-highlight, a.lk-box, a.lk-strike-to-underline,
+      a.lk-arrow, a.lk-circle, a.lk-peek, a.lk-swash, a.lk-tag {
+        text-decoration: none;
+        outline-offset: 0.3em;
+      }
+      a.lk-brackets, a.lk-box, a.lk-strike-to-underline, a.lk-arrow, a.lk-circle, a.lk-swash, a.lk-tag {
+        position: relative;
+        display: inline-block;
+      }
+
+      /* underline-slide: in from the left, out to the right (the position jumps, the size moves). */
+      a.lk-underline-slide {
+        background: linear-gradient(var(--lk-accent, #5933d8), var(--lk-accent, #5933d8)) 100% 100% / 0% var(--lk-thickness, 2px) no-repeat;
+        padding-bottom: 0.12em;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+      }
+      a.lk-underline-slide:is(:hover, :focus-visible) {
+        background-position: 0 100%;
+        background-size: 100% var(--lk-thickness, 2px);
+      }
+
+      /* underline-grow: always underlined, so it reads as a link in running text; thickens. */
+      a.lk-underline-grow {
+        background: linear-gradient(var(--lk-accent, #5933d8), var(--lk-accent, #5933d8)) 0 100% / 100% 1px no-repeat;
+        padding-bottom: 0.12em;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+      }
+      a.lk-underline-grow:is(:hover, :focus-visible) {
+        background-size: 100% calc(var(--lk-thickness, 2px) + 2px);
+      }
+
+      /* brackets: outside the text box, so nothing moves. Silent to screen readers. */
+      a.lk-brackets::before,
+      a.lk-brackets::after {
+        position: absolute;
+        top: 0;
+        color: var(--lk-accent, #5933d8);
+        opacity: 0;
+      }
+      a.lk-brackets::before {
+        content: '[';
+        content: '[' / '';
+        right: 100%;
+        margin-right: 0.15em;
+        translate: -0.3em 0;
+      }
+      a.lk-brackets::after {
+        content: ']';
+        content: ']' / '';
+        left: 100%;
+        margin-left: 0.15em;
+        translate: 0.3em 0;
+      }
+      a.lk-brackets:is(:hover, :focus-visible)::before,
+      a.lk-brackets:is(:hover, :focus-visible)::after {
+        opacity: 1;
+        translate: 0 0;
+      }
+
+      /* highlight: the text colour is pinned (--lk-ink) and passes over the page and the marker. */
+      a.lk-highlight {
+        color: var(--lk-ink, #1e283c);
+        background: linear-gradient(var(--lk-mark, #ffe38f), var(--lk-mark, #ffe38f)) 0 88% / 0% 0.6em no-repeat;
+        padding: 0 0.1em;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+      }
+      /* Pinned in the active state too, or a host's a:hover colour (same specificity, later
+         in the page) would put an unmeasured colour on the marker. */
+      a.lk-highlight:is(:hover, :focus-visible) {
+        color: var(--lk-ink, #1e283c);
+        background-size: 100% 0.6em;
+      }
+
+      /* box: top and bottom rules sweep out, then the sides rise. */
+      a.lk-box::before,
+      a.lk-box::after {
+        content: '';
+        position: absolute;
+        inset: -0.3em -0.5em;
+        pointer-events: none;
+      }
+      a.lk-box::before {
+        border-block: var(--lk-thickness, 2px) solid var(--lk-accent, #5933d8);
+        scale: 0 1;
+      }
+      a.lk-box::after {
+        border-inline: var(--lk-thickness, 2px) solid var(--lk-accent, #5933d8);
+        scale: 1 0;
+      }
+      a.lk-box:is(:hover, :focus-visible)::before,
+      a.lk-box:is(:hover, :focus-visible)::after {
+        scale: 1 1;
+      }
+
+      /* strike-to-underline: through the middle first, then down to the baseline. */
+      a.lk-strike-to-underline::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -0.05em;
+        height: var(--lk-thickness, 2px);
+        background: var(--lk-accent, #5933d8);
+        translate: 0 -0.5em;
+        scale: 0 1;
+      }
+      a.lk-strike-to-underline:is(:hover, :focus-visible)::after {
+        translate: 0 0;
+        scale: 1 1;
+      }
+
+      /* arrow: its room is kept at rest (padding), so the text never shifts. Silent to screen readers. */
+      a.lk-arrow {
+        padding-inline-end: 1.3em;
+      }
+      a.lk-arrow::after {
+        content: '→';
+        content: '→' / '';
+        position: absolute;
+        right: 0;
+        color: var(--lk-accent, #5933d8);
+        opacity: 0;
+        translate: -0.5em 0;
+      }
+      a.lk-arrow:is(:hover, :focus-visible)::after {
+        opacity: 1;
+        translate: 0 0;
+      }
+
+      /* circle: a slightly uneven ellipse, tilted, as if drawn with a pen. */
+      a.lk-circle {
+        padding: 0 0.15em;
+      }
+      a.lk-circle::after {
+        content: '';
+        position: absolute;
+        inset: -0.35em -0.55em;
+        border: var(--lk-thickness, 2px) solid var(--lk-accent, #5933d8);
+        border-radius: 55% 45% 52% 48% / 58% 48% 52% 42%;
+        rotate: -4deg;
+        opacity: 0;
+        scale: 0.75;
+        pointer-events: none;
+      }
+      a.lk-circle:is(:hover, :focus-visible)::after {
+        opacity: 1;
+        scale: 1;
+      }
+
+      /* peek: the words and the data-peek text share one grid cell, so the link keeps the wider width. */
+      a.lk-peek {
+        display: inline-grid;
+        overflow: hidden;
+        vertical-align: bottom;
+        background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat;
+      }
+      a.lk-peek > .lk__label,
+      a.lk-peek::after {
+        grid-area: 1 / 1;
+      }
+      a.lk-peek::after {
+        content: attr(data-peek);
+        color: var(--lk-accent, #5933d8);
+        font-weight: 600;
+        opacity: 0;
+        translate: 0 100%;
+      }
+      a.lk-peek:is(:hover, :focus-visible) > .lk__label {
+        opacity: 0;
+        translate: 0 -100%;
+      }
+      a.lk-peek:is(:hover, :focus-visible)::after {
+        opacity: 1;
+        translate: 0 0;
+      }
+
+      /* swash: the stroke is drawn by its dash offset, 1 (hidden) to 0 (whole). */
+      a.lk-swash {
+        padding-bottom: 0.3em;
+      }
+      a.lk-swash .lk__swash {
+        position: absolute;
+        left: -3%;
+        bottom: -0.1em;
+        width: 106%;
+        height: 0.5em;
+        overflow: visible;
+        fill: none;
+        stroke: var(--lk-accent, #5933d8);
+        stroke-width: 3.5;
+        stroke-linecap: round;
+        pointer-events: none;
+      }
+      a.lk-swash .lk__swash path {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+      }
+      a.lk-swash:is(:hover, :focus-visible) .lk__swash path {
+        stroke-dashoffset: 0;
+      }
+
+      /* tag: text colour and fill are two layers of one background, moved by one background-position,
+         so each pixel of text is --lk-ink on the page or --lk-on-accent on the fill, never between. */
+      a.lk-tag {
+        padding: 0.2em 0.85em;
+        border: 1.5px solid var(--lk-accent, #5933d8);
+        border-radius: 999px;
+        color: var(--lk-ink, #1e283c);
+        background-color: var(--lk-bg, #fff);
+      }
+      @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+        a.lk-tag {
+          background:
+            linear-gradient(90deg, var(--lk-on-accent, #fff) 50%, var(--lk-ink, #1e283c) 50%),
+            linear-gradient(90deg, var(--lk-accent, #5933d8) 50%, var(--lk-bg, #fff) 50%);
+          background-size: 200% 100%;
+          background-position: 100% 0;
+          background-repeat: no-repeat;
+          -webkit-background-clip: text, padding-box;
+          background-clip: text, padding-box;
+          -webkit-text-fill-color: transparent;
+        }
+        a.lk-tag:is(:hover, :focus-visible) {
+          background-position: 0 0;
+        }
+      }
+      @supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+        a.lk-tag:is(:hover, :focus-visible) {
+          background-color: var(--lk-accent, #5933d8);
+          color: var(--lk-on-accent, #fff);
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        a.lk-underline-slide, a.lk-underline-grow, a.lk-highlight {
+          transition: background-size var(--lk-duration, 0.3s) var(--lk-ease, cubic-bezier(0.2, 0.7, 0.2, 1));
+        }
+        a.lk-brackets::before, a.lk-brackets::after, a.lk-arrow::after, a.lk-circle::after,
+        a.lk-peek > .lk__label, a.lk-peek::after {
+          transition:
+            opacity var(--lk-duration, 0.3s) var(--lk-ease, cubic-bezier(0.2, 0.7, 0.2, 1)),
+            translate var(--lk-duration, 0.3s) var(--lk-ease, cubic-bezier(0.2, 0.7, 0.2, 1)),
+            scale var(--lk-duration, 0.3s) var(--lk-ease, cubic-bezier(0.2, 0.7, 0.2, 1));
+        }
+        a.lk-box::before {
+          transition: scale calc(var(--lk-duration, 0.3s) * 0.6) ease-out calc(var(--lk-duration, 0.3s) * 0.5);
+        }
+        a.lk-box::after {
+          transition: scale calc(var(--lk-duration, 0.3s) * 0.6) ease-out;
+        }
+        a.lk-box:is(:hover, :focus-visible)::before {
+          transition-delay: 0s;
+        }
+        a.lk-box:is(:hover, :focus-visible)::after {
+          transition-delay: calc(var(--lk-duration, 0.3s) * 0.5);
+        }
+        /* Out: rise to the middle, then shrink. In: grow in the middle, then drop. */
+        a.lk-strike-to-underline::after {
+          transition:
+            translate calc(var(--lk-duration, 0.3s) * 0.7) ease,
+            scale calc(var(--lk-duration, 0.3s) * 0.7) ease calc(var(--lk-duration, 0.3s) * 0.7);
+        }
+        a.lk-strike-to-underline:is(:hover, :focus-visible)::after {
+          transition:
+            scale calc(var(--lk-duration, 0.3s) * 0.7) ease,
+            translate calc(var(--lk-duration, 0.3s) * 0.7) ease calc(var(--lk-duration, 0.3s) * 0.7);
+        }
+        a.lk-swash .lk__swash path {
+          transition: stroke-dashoffset calc(var(--lk-duration, 0.3s) * 1.8) ease-in-out;
+        }
+        a.lk-tag {
+          transition: background-position var(--lk-duration, 0.3s) var(--lk-ease, cubic-bezier(0.2, 0.7, 0.2, 1));
+        }
+      }
+
+      /* Windows High Contrast and the like: system colours, no painted text. */
+      @media (forced-colors: active) {
+        a.lk-tag {
+          background: none;
+          -webkit-text-fill-color: currentColor;
+          color: LinkText;
+        }
+        a.lk-underline-slide, a.lk-underline-grow, a.lk-highlight, a.lk-peek {
+          text-decoration: underline;
+        }
+      }
+    </style>
+  )
+}
+{
+  href && (
+    <a class:list={[`lk-${effect}`, className]} href={href} data-peek={effect === 'peek' ? peek : undefined} {...rest}>
+      {effect === 'peek' ? (
+        <span class="lk__label">
+          <slot />
+        </span>
+      ) : (
+        <slot />
+      )}
+      {effect === 'swash' && <Fragment set:html={SWASH} />}
+    </a>
+  )
+}

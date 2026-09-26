@@ -1,0 +1,98 @@
+---
+/**
+ * Demo for `link-effects`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * All eleven effects, each with its class name, through the `<Link>` wrapper (the same file as
+ * `<LinkEffects>`). Hover one, or Tab to it: focus shows the same effect. The links point at
+ * this demo, so following one goes nowhere.
+ */
+import LinkEffects from '../../library/link-effects/LinkEffects.astro';
+import Link from '../../library/link-effects/LinkEffects.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const href = '#link-effects-demo';
+const effects = [
+  { effect: 'underline-slide', label: 'About us', note: 'In from the left, out to the right.' },
+  { effect: 'underline-grow', label: 'Read the guide', note: 'Underlined at rest, so it works in a paragraph.' },
+  { effect: 'brackets', label: 'Services', note: 'Brackets close in.' },
+  { effect: 'highlight', label: 'Book a visit', note: 'A marker sweeps behind the words.' },
+  { effect: 'box', label: 'Contact', note: 'A frame draws itself.' },
+  { effect: 'strike-to-underline', label: 'Old menu', note: 'Strikes through, then drops to an underline.' },
+  { effect: 'arrow', label: 'Next step', note: 'The arrow’s room is kept, so nothing moves.' },
+  { effect: 'circle', label: 'Sale', note: 'Ringed by hand.' },
+  { effect: 'peek', label: 'Pricing', peek: '$49/mo', note: 'Ours: the answer peeks in. data-peek="$49/mo".' },
+  { effect: 'swash', label: 'Our story', note: 'Ours: a hand-drawn line draws itself.' },
+  { effect: 'tag', label: 'New season', note: 'Ours: a pill fills, the text turning with it.' },
+] as const;
+---
+<LinkEffects />
+<div class="demo-lk" id="link-effects-demo">
+  <ul class="demo-lk__grid" role="list">
+    {
+      effects.map((e) => (
+        <li class="demo-lk__cell">
+          <p class="demo-lk__link">
+            {e.effect === 'peek' ? (
+              <Link effect="peek" peek={e.peek} href={href}>
+                {e.label}
+              </Link>
+            ) : (
+              <Link effect={e.effect} href={href}>
+                {e.label}
+              </Link>
+            )}
+          </p>
+          <code class="demo-lk__class">lk-{e.effect}</code>
+          <p class="demo-lk__note">{e.note}</p>
+        </li>
+      ))
+    }
+  </ul>
+  <p class="demo-lk__prose">
+    In running text, keep an underline at rest: this sentence links to <Link effect="underline-grow" href={href}>the
+    planting guide</Link>, which thickens on hover and on focus and wraps across lines like any other link.
+  </p>
+</div>
+<style>
+  .demo-lk {
+    --lk-accent: var(--purple, #5933d8);
+    --lk-ink: var(--ink, #1e283c);
+    --lk-bg: var(--white, #fff);
+  }
+  .demo-lk__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .demo-lk__cell {
+    min-width: 0;
+    padding: 1.4rem 1.25rem 1rem;
+    border: 1px solid var(--line, #d5dae6);
+    border-radius: var(--radius, 14px);
+    background: var(--white, #fff);
+  }
+  .demo-lk__link {
+    margin: 0 0 1rem;
+    color: var(--ink, #1e283c);
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .demo-lk__class {
+    font-size: 0.85rem;
+  }
+  .demo-lk__note {
+    margin: 0.4rem 0 0;
+    font-size: 0.9rem;
+  }
+  .demo-lk__prose {
+    max-width: 38rem;
+    margin: 1.5rem 0 0;
+    color: var(--ink, #1e283c);
+  }
+</style>

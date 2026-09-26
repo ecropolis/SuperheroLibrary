@@ -1846,6 +1846,216 @@ import { analytics } from '../data/site';
     file: 'src/library/off-canvas/OffCanvas.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'video-gallery',
+    name: 'Video gallery',
+    aka: ['UABB Video Gallery', 'PowerPack Video Gallery', 'Elementor Video Playlist', 'YouTube gallery', 'Vimeo gallery', 'video grid', 'filterable video gallery'],
+    summary:
+      'A grid of YouTube, Vimeo or self-hosted videos, each behind your own poster and a play button, with optional category filter chips. A click plays the video in one lightbox dialog or in the tile itself. Nothing is requested from YouTube or Vimeo until a tile is pressed.',
+    pitch: 'All your videos on one page, sorted by topic, with your own thumbnails, and nothing loads from YouTube until someone picks one.',
+    // SE Ranking US, 2026-09-26: video gallery 590/mo, difficulty 20; youtube gallery 210/8;
+    // video gallery wordpress 50/28; video gallery website 40/13 (the round-3 note's first
+    // guess, which "video gallery" beats on volume at a similar difficulty). video grid 390/34
+    // is a stock-footage and editing query, left unclaimed.
+    search: { query: 'video gallery', alsoRanks: ['youtube gallery', 'video gallery website', 'video gallery wordpress'] },
+    replaces: ['UABB / PowerPack “Video Gallery” modules (Beaver Builder)', 'Elementor Pro Video Playlist', 'YouTube gallery plugins', 'a page of pasted YouTube iframes'],
+    goodFor: 'A page of several videos: testimonials, a how-to library, event recordings, a portfolio of films. Categories when there are enough to be worth sorting.',
+    notFor:
+      'One video on its own (that is video-player), an ambient loop behind a hero (video-background), and a whole channel kept in sync by itself: the list is written into the page, so a new upload means an edit. Galleries of photos are not this either.',
+    props: [
+      { name: 'videos', type: '{ url, title, caption?, poster?, category?, tracks? }[]', note: 'Required. `url` takes what video-player’s `src` takes: a YouTube URL or id (watch, youtu.be, shorts, embed), a Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }]. Anything else fails the build. `title` is required. `category` is one string or several.' },
+      { name: 'mode', type: "'lightbox' | 'inline'", default: "'lightbox'", note: 'Lightbox plays in one <dialog> over the page. Inline replaces the tile’s poster with the player; pressing another tile puts it back.' },
+      { name: 'columns', type: 'number (1–6)', default: '3', note: 'The most tiles per row. Fewer when a tile would be narrower than --vg-min; one on a phone. Set --vg-template instead for the host’s own grid.' },
+      { name: 'filter', type: 'boolean', default: 'two or more categories', note: 'Category chips above the grid, “All” first.' },
+      { name: 'counts', type: 'boolean', default: 'false', note: 'Show how many videos each chip holds.' },
+      { name: 'allLabel / filterLabel', type: 'string', default: '“All” / “Filter videos”', note: 'The first chip, and the accessible name of the chip group.' },
+      { name: 'aspect', type: 'number | string', default: '16/9', note: 'Frame ratio of every tile and of the lightbox: 1.7778, "16/9", "4 / 3".' },
+      { name: 'autoplay', type: 'boolean', default: 'true', note: 'Start playing on the click. False shows the player and waits for a second press.' },
+      { name: 'titleTag', type: "'h2' | 'h3' | 'h4' | 'p'", default: "'h3'", note: 'Element for each tile’s title, to fit the page’s heading outline.' },
+      { name: 'playLabel / closeLabel', type: 'string', default: '“Play” / “Close video”', note: 'Words, for a non-English site. playLabel prefixes each title in the button’s name.' },
+      { name: 'playIcon', type: 'string', note: 'Inline SVG markup for the play icon. Use currentColor and 1em.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--vg-min', fallback: '14rem', note: 'No tile narrower than this; below it the row drops a column.' },
+      { name: '--vg-gap', fallback: '1.25rem', note: 'Gap between tiles.' },
+      { name: '--vg-template', fallback: '(unset)', note: 'The whole grid-template-columns, when the host wants its own grid: `repeat(4, 1fr)`.' },
+      { name: '--vg-radius', fallback: '0.5rem', note: 'Corner radius of each frame.' },
+      { name: '--vg-bg', fallback: '#000', note: 'Frame colour behind the poster and the player.' },
+      { name: '--vg-panel', fallback: 'linear-gradient(135deg, #2c3656, #1e283c)', note: 'A tile without a poster.' },
+      { name: '--vg-overlay', fallback: 'rgb(0 0 0 / 0.12)', note: 'Tint over the poster.' },
+      { name: '--vg-play-bg', fallback: 'rgb(0 0 0 / 0.7)', note: 'Play button circle. Keep 3:1 against the posters.' },
+      { name: '--vg-play-fg', fallback: '#fff', note: 'Play icon.' },
+      { name: '--vg-play-size', fallback: '3.5rem', note: 'Diameter of the circle.' },
+      { name: '--vg-focus', fallback: '#5933d8', note: 'Focus ring on tiles and chips.' },
+      { name: '--vg-title', fallback: 'inherit', note: 'Tile title colour.' },
+      { name: '--vg-caption', fallback: 'inherit', note: 'Caption colour.' },
+      { name: '--vg-chip-bg', fallback: '#fff', note: 'Chip fill.' },
+      { name: '--vg-chip-fg', fallback: '#1e283c', note: 'Chip text (14.75:1 on the fallback fill).' },
+      { name: '--vg-chip-border', fallback: '#c9cedb', note: 'Chip outline.' },
+      { name: '--vg-chip-on-bg', fallback: '#1e283c', note: 'The pressed chip’s fill.' },
+      { name: '--vg-chip-on-fg', fallback: '#fff', note: 'The pressed chip’s text.' },
+      { name: '--vg-backdrop', fallback: 'rgb(0 0 0 / 0.88)', note: 'Lightbox backdrop.' },
+      { name: '--vg-close-bg', fallback: 'rgb(255 255 255 / 0.15)', note: 'Lightbox close button fill.' },
+      { name: '--vg-close-fg', fallback: '#fff', note: 'Lightbox close icon and title.' },
+    ],
+    a11y: [
+      'Each tile’s play control is a real <button> named “Play: <title>”, over the whole poster, with a visible focus ring. The title is also printed under the tile as a heading (titleTag).',
+      'Filter chips are a labelled group of <button aria-pressed>, “All” first and pressed. Choosing one hides the other tiles and a polite live region says how many are shown (“Open films: 3 videos.”).',
+      'Lightbox: one native modal <dialog>, named by the video’s title: focus trapped, Escape and a backdrop click close it, the close button is labelled. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing empties the dialog so the sound stops, returns focus to the tile and releases the scroll lock.',
+      'Inline: focus moves into the player (the titled iframe, or the <video>). One tile plays at a time.',
+      'Self-hosted files keep the browser’s native controls with a captions menu. A captions track is expected (WCAG 1.2.2); the build warns without one.',
+      'prefers-reduced-motion: tiles shown by a filter appear at once instead of fading in, and the play button does not grow on hover. Nothing plays until asked.',
+      'Without JavaScript every tile is a link to the video’s own page (“Watch “<title>” on YouTube”), or to the file, and every video is listed: the chips are not shown.',
+    ],
+    usage: `<VideoGallery
+  videos={[
+    { url: 'https://www.youtube.com/watch?v=VIDEO_ID', title: 'Planting garlic', poster: '/images/garlic.webp', category: 'How-to' },
+    { url: 'https://vimeo.com/123456789', title: 'Spring open day', poster: '/images/open-day.webp', category: 'Events' },
+    { url: '/video/tour.mp4', title: 'A tour of the farm', poster: '/video/tour.webp',
+      tracks: [{ src: '/video/tour.en.vtt', srclang: 'en', label: 'English' }], category: 'Events' },
+  ]}
+  counts
+/>
+<!-- .videos { --vg-play-bg: var(--brand); --vg-radius: var(--radius); --vg-chip-on-bg: var(--brand); } -->`,
+    license:
+      'The videos stay yours, or their owners’: the gallery plays them from YouTube, Vimeo or your own site, under those services’ terms, and adds nothing of its own. The films in our demo are the Blender Foundation’s open films Big Buck Bunny and Sintel, CC BY 3.0, credited under each one as that licence asks.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/video-gallery/ (demo)' }],
+    file: 'src/library/video-gallery/VideoGallery.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'map',
+    name: 'Map and directions',
+    aka: ['UABB Google Map', 'PowerPack Google Map', 'Elementor Google Maps', 'WP Google Maps', 'Google Maps embed', 'store locator', 'location card', 'get directions button'],
+    summary:
+      'A card per location with the address, phone and an optional hours line, “Open in Google Maps” and “Directions” links, and an optional map that loads from Google only when someone presses “Show the map”. No API key, and nothing from Google at page load.',
+    pitch: 'Show people where you are and get them there in one tap, without a Google script on every page.',
+    // SE Ranking US, 2026-09-26: google map embed code for website 170/mo, difficulty 35;
+    // google maps embed 590/41; google maps directions link 390/34; google maps link 320/20.
+    // The round-3 note's "map embed without api key" (and "google map embed without api key")
+    // have no data. "store locator" 2,400/65 is a different product (search by distance) and
+    // stays an aka.
+    search: { query: 'google map embed code for website', alsoRanks: ['google maps embed', 'google maps directions link', 'google maps link'] },
+    replaces: ['UABB / PowerPack “Google Map” modules (Beaver Builder)', 'Elementor’s Google Maps widget', 'WP Google Maps and similar plugins', 'a Google Maps <iframe> pasted into the footer'],
+    goodFor: 'A contact or visit page, a footer with the address, several branches each with its own card. Anywhere the question is “where is it and how do I get there”.',
+    notFor:
+      'A styled, branded or interactive map: custom colours, your own markers, clustering, a store locator that searches by distance. That needs the Google Maps JavaScript API, which needs an API key and a billing account, loads Google’s script on every visit, and adds Google’s map origins to the site’s CSP and consent policy; quote it as its own piece of work. Full opening hours are business-hours, which also owns the LocalBusiness structured data.',
+    props: [
+      { name: 'locations', type: '{ name, address, phone?, hours?, query?, photo?, embed? }[]', note: 'Required. `address` is its lines, as on an envelope. `query` is what Google searches for, by default the address; give “Business name, address” when Google knows the business, so its place card opens. `photo` is the facade image for the embed. `embed` overrides the element’s for this card.' },
+      { name: 'embed', type: 'boolean', default: 'false', note: 'Offer the click-to-load map on each card. Off, the cards are links only.' },
+      { name: 'zoom', type: 'number (1–21)', default: 'Google’s choice', note: 'Zoom of the embedded map: 15 is a neighbourhood, 18 a street.' },
+      { name: 'layout', type: "'stack' | 'split'", default: "'stack'", note: 'Stack: the map above the details, cards in a grid. Split: the map beside the details when there is room, one card per row.' },
+      { name: 'titleTag', type: "'h2' | 'h3' | 'h4'", default: "'h3'", note: 'Element for each card’s name.' },
+      { name: 'openLabel / directionsLabel / showLabel / notice', type: 'string', default: '“Open in Google Maps” / “Directions” / “Show the map” / “Loads a map from Google.”', note: 'Words, for a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--map-min', fallback: '18rem', note: 'Narrowest card before the list drops a column.' },
+      { name: '--map-gap', fallback: '1.25rem', note: 'Gap between cards.' },
+      { name: '--map-surface', fallback: '#fff', note: 'Card background, and the “Show the map” pill.' },
+      { name: '--map-text', fallback: '#1e283c', note: 'Card text (14.75:1 on the fallback surface).' },
+      { name: '--map-border', fallback: '#d5dae6', note: 'Card outline.' },
+      { name: '--map-radius', fallback: '0.75rem', note: 'Corners of cards and buttons.' },
+      { name: '--map-accent', fallback: '#5933d8', note: '“Open in Google Maps” button fill.' },
+      { name: '--map-on-accent', fallback: '#fff', note: 'Its text. Keep 4.5:1 against --map-accent (the fallbacks are 7.27:1; `npm run check` computes them).' },
+      { name: '--map-link', fallback: '#4a2bb8', note: '“Directions” and the phone number.' },
+      { name: '--map-aspect', fallback: '16 / 10', note: 'The map’s width / height.' },
+      { name: '--map-panel', fallback: '#e9ecf3', note: 'The neutral facade (no photo).' },
+      { name: '--map-panel-line', fallback: '#d3d8e4', note: 'Its street lines.' },
+      { name: '--map-pin', fallback: '#5933d8', note: 'The pin on the neutral facade.' },
+      { name: '--map-focus', fallback: '#5933d8', note: 'Focus rings.' },
+      { name: '--map-notice', fallback: '#4b5468', note: 'The “Loads a map from Google.” line.' },
+    ],
+    a11y: [
+      'Each address is an <address> under the location’s heading; the phone number is a tel: link.',
+      'The links name their place for a screen reader (“Open in Google Maps: Navy Pier”, “Directions to Navy Pier”), so a list of links still makes sense. Both are at least 44px tall.',
+      'The facade is a real <button> named “Show the map of <name>”, described by the visible notice “Loads a map from Google.”, so nobody loads a third party without being told. Pressed, it becomes an <iframe> titled “Map of <name>” and focus moves into it.',
+      'Nothing moves except the button’s pill growing slightly on hover, which prefers-reduced-motion removes.',
+      'Without JavaScript the cards and their links are all there, and the facade is not shown: a button that could not work is not rendered.',
+    ],
+    usage: `---
+import LocationMap from '../components/LocationMap.astro';   // not "Map": that would shadow JavaScript's Map
+---
+<LocationMap
+  embed
+  locations={[{
+    name: 'The Garden Shop',
+    address: ['123 Main St', 'Springfield, IL 62701'],
+    phone: '(217) 555-0100',
+    hours: 'Open daily, 8 AM to 6 PM',
+    query: 'The Garden Shop, 123 Main St, Springfield, IL 62701',
+    photo: '/images/storefront.webp',
+  }]}
+  layout="split"
+/>
+<!-- _headers: the embed needs frame-src https://www.google.com in the site's CSP; the links need nothing. -->`,
+    license:
+      'No API key and no Google account are involved. The links are Google’s public Maps URLs, and the map you choose to load is Google’s own embed, shown under Google’s terms with its attribution inside the frame. The pin on the plain facade is Font Awesome Free (CC BY 4.0).',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/map/ (demo)' }],
+    file: 'src/library/map/LocationMap.astro',
+    added: '2026-09-26',
+  },
+  {
+    id: 'link-effects',
+    name: 'Link effects',
+    aka: ['UABB Creative Link', 'PowerPack Link Effects', 'creative link', 'underline animation', 'link hover effects', 'animated underline', 'text hover effects'],
+    summary:
+      'Eleven hover-and-focus styles for links, CSS only: underline-slide, underline-grow, brackets, highlight, box, strike-to-underline, arrow, circle, and three of ours, peek, swash and tag. A class on any <a>, or the <Link effect> wrapper. Focus shows what hover shows, reduced motion shows the end state at once, and the text never drops below 4.5:1 mid-animation.',
+    pitch: 'Links that answer back when you point at them, and never leave a keyboard user or a slow eye behind.',
+    // SE Ranking US, 2026-09-26: underline animation css 590/mo, difficulty 20; css link hover
+    // effects 110/26; link hover effects 90/30; css text hover effects 90/27. The round-3 note's
+    // "link hover effects" is the closest name but a sixth of the volume at a higher difficulty;
+    // five of the eleven effects are underlines, so the page leads with them. "css hover
+    // effects" 480/31 covers buttons and images too and stays unclaimed.
+    search: { query: 'underline animation css', alsoRanks: ['css link hover effects', 'link hover effects', 'css text hover effects'] },
+    replaces: ['UABB “Creative Link” (Beaver Builder)', 'PowerPack “Link Effects”', 'hover.css and underline snippets pasted into a theme'],
+    goodFor:
+      'Navigation, a card’s call to action, footer links, a “Read more”: short links that should feel alive. underline-grow also suits links in running text, because it is underlined at rest. peek suits a link whose destination has a one-word answer: “Pricing” → “$49/mo”, “Hours” → “Open now”.',
+    notFor:
+      'Links in a paragraph with any effect that has no underline at rest (all but underline-grow and peek): a link must look like a link before anyone points at it, and colour alone does not say so. Buttons, which are not links. More than one or two effects on a site: pick one for navigation and one for calls to action, and keep them.',
+    props: [
+      { name: 'effect', type: "'underline-slide' | 'underline-grow' | 'brackets' | 'highlight' | 'box' | 'strike-to-underline' | 'arrow' | 'circle' | 'peek' | 'swash' | 'tag'", note: 'With `href`, renders <a class="lk-<effect>">. Leave both out (<LinkEffects />) to emit only the stylesheet, once, e.g. in the layout.' },
+      { name: 'href', type: 'string', note: 'The link. Required with `effect`.' },
+      { name: 'peek', type: 'string', note: 'For effect="peek": the words that slide in, set as data-peek. Part of the link’s accessible name.' },
+      { name: 'class', type: 'string', note: 'More classes on the <a>.' },
+      { name: '…rest', type: '<a> attributes', note: 'Passed through: target, rel, aria-current, download.' },
+    ],
+    theming: [
+      { name: '--lk-accent', fallback: '#5933d8', note: 'Lines, brackets, frame, ring, swash, arrow and peek words, tag fill. Keep 4.5:1 against --lk-bg, since the arrow and peek words are text (the fallbacks are 7.27:1).' },
+      { name: '--lk-ink', fallback: '#1e283c', note: 'The text colour highlight and tag pin: 14.75:1 on --lk-bg and 11.68:1 on --lk-mark.' },
+      { name: '--lk-on-accent', fallback: '#fff', note: 'Tag text over its fill: 7.27:1 on --lk-accent.' },
+      { name: '--lk-mark', fallback: '#ffe38f', note: 'The highlight marker.' },
+      { name: '--lk-bg', fallback: '#fff', note: 'The page behind the links, and the tag’s resting fill. Set it to the section’s background so the check’s arithmetic matches.' },
+      { name: '--lk-thickness', fallback: '2px', note: 'Line weight.' },
+      { name: '--lk-duration', fallback: '0.3s', note: 'Length of each effect (swash takes 1.8×).' },
+      { name: '--lk-ease', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Easing.' },
+    ],
+    a11y: [
+      'Every effect fires on :focus-visible exactly as on :hover (one selector, `:is(:hover, :focus-visible)`), and the browser’s own focus ring stays.',
+      'prefers-reduced-motion: every transition sits inside `(prefers-reduced-motion: no-preference)`, so otherwise the end state appears at once. Nothing plays by itself.',
+      'The text never drops below 4.5:1 mid-animation. Effects move decorations, not the text colour; highlight pins the text to --lk-ink, which passes on the page and on the marker; tag paints its text and fill as two layers of one background moving together, so each pixel of text is one passing pair or the other. `npm run check` computes the fallback pairs.',
+      'Decorative glyphs (the brackets, the arrow) are silent to screen readers, and the swash SVG is aria-hidden. The peek words are read as part of the link’s name (“Pricing $49/mo”).',
+      'Windows High Contrast (forced colours): system link colours, and the underline-based effects keep a real underline.',
+      'No JavaScript at all, so the render without it is the same.',
+    ],
+    usage: `---
+import LinkEffects from '../components/LinkEffects.astro';
+import Link from '../components/LinkEffects.astro';   // the same file, as a wrapper
+---
+<head> … <LinkEffects /> </head>                    <!-- the stylesheet, once -->
+
+<nav>
+  <Link effect="underline-slide" href="/about/" aria-current="page">About</Link>
+  <Link effect="peek" peek="$49/mo" href="/pricing/">Pricing</Link>
+</nav>
+<a class="lk-arrow" href="/book/">Book a visit</a>   <!-- or just the class -->
+<!-- .site { --lk-accent: var(--brand); --lk-bg: var(--page); } -->`,
+    license: 'Our own CSS and our own drawings (the swash and the ring). Nothing licensed from anyone else: no font, no icon set, no script.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/link-effects/ (demo)' }],
+    file: 'src/library/link-effects/LinkEffects.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

@@ -1,0 +1,80 @@
+---
+/**
+ * Demo for `map`. The website renders this too (see README, "Consumed by superherotech.ai"),
+ * so assets go through `asset()` and every host token has a fallback.
+ *
+ * The places are public landmarks in Chicago, not anyone's business, so the map has something
+ * real to show. The one phone number is a 555-01xx number, a range reserved for fiction; the
+ * hours are the park's own. Nothing is fetched from Google until a "Show the map" button is
+ * pressed; the links only navigate.
+ */
+import LocationMap from '../../library/map/LocationMap.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+---
+<div class="demo-map">
+  <p class="demo-map__label">One location, map beside the details</p>
+  <LocationMap
+    layout="split"
+    embed
+    zoom={15}
+    locations={[
+      {
+        name: 'Millennium Park',
+        address: ['201 E Randolph St', 'Chicago, IL 60602'],
+        hours: 'Open daily, 6 AM to 11 PM',
+        query: 'Millennium Park, 201 E Randolph St, Chicago, IL 60602',
+      },
+    ]}
+  />
+
+  <p class="demo-map__label">Several locations, one card each</p>
+  <LocationMap
+    embed
+    locations={[
+      {
+        name: 'Navy Pier',
+        address: ['600 E Grand Ave', 'Chicago, IL 60611'],
+        phone: '(312) 555-0142',
+        photo: asset('hills.svg'),
+      },
+      {
+        name: 'Garfield Park Conservatory',
+        address: ['300 N Central Park Ave', 'Chicago, IL 60624'],
+        embed: false,
+      },
+    ]}
+  />
+  <p class="demo-map__note">
+    The second card has no map, just the links. The phone number is a 555 number, reserved for
+    fiction.
+  </p>
+</div>
+<style>
+  .demo-map {
+    --map-accent: var(--purple, #5933d8);
+    --map-focus: var(--purple, #5933d8);
+    --map-pin: var(--purple, #5933d8);
+    --map-link: var(--purple-dark, #4a2bb8);
+    --map-text: var(--ink, #1e283c);
+    --map-border: var(--line, #d5dae6);
+    --map-radius: var(--radius, 14px);
+    display: grid;
+    gap: 0.75rem;
+  }
+  .demo-map__label {
+    margin: 0.5rem 0 0;
+    font-weight: 700;
+  }
+  .demo-map__label:not(:first-child) {
+    margin-top: 2rem;
+  }
+  .demo-map__note {
+    margin: 0;
+    font-size: 0.9em;
+  }
+</style>
