@@ -1565,6 +1565,75 @@ import { analytics } from '../data/site';
     file: 'src/library/content-toggle/ContentToggle.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'off-canvas',
+    name: 'Off-canvas panel',
+    aka: ['UABB Off-Canvas', 'Elementor Off-Canvas', 'slide-out panel', 'side drawer', 'push menu', 'offcanvas', 'flyout panel', 'slide-in cart'],
+    summary:
+      'A native <dialog> that slides in from the left, right, top or bottom when any data-offcanvas-open trigger asks. Modal by default (backdrop, focus kept in, Escape, scroll lock keeping the scrollbar width), or push: non-modal, publishing --ofc-push for the host to move its page over. Focus returns to the opener. Without JavaScript the panel renders inline where it sits, and its #<id> link jumps to it.',
+    pitch: 'Keep the cart, the filters or the account menu one tap away, sliding in from the edge instead of crowding the page.',
+    // SE Ranking US, 2026-09-26: off canvas 140/mo, difficulty 35; push menu 110/13; off canvas
+    // menu 70/24; slide out panel 70/6. "side drawer" 480/7 and "slide out drawer" 590/19 are
+    // furniture and hardware; "flyout menu" 210/14 is main navigation, mega-menu's ground.
+    search: { query: 'off canvas', alsoRanks: ['off canvas menu', 'slide out panel', 'push menu'] },
+    replaces: ['UABB “Off-Canvas” module (Beaver Builder)', 'Elementor Pro Off-Canvas widget', 'slide-out cart and side-cart plugins', 'push-menu and slide-panel jQuery plugins'],
+    goodFor:
+      'Things that belong beside the page and are wanted now and then: a cart, product filters, an account or secondary menu, a short form (a callback request), a notice, a table of contents on a long page. Push mode suits a panel people keep open while they read, such as notes or a contents list.',
+    notFor:
+      'The site’s main navigation. mega-menu already folds its own links behind a Menu button below its breakpoint, in the header, keeping the nav landmark, aria-current on the page you are on, arrow-key movement and a no-JavaScript fallback; use that for the main menu on every screen size. Use off-canvas for what sits beside that menu (the cart, filters, an account menu), or for a secondary nav on a site whose main menu is plain header links. Also not for a message that must interrupt (that is modal) or content everyone needs (that belongs on the page).',
+    props: [
+      { name: 'id', type: 'string', note: 'Required. Any element with data-offcanvas-open="<id>" opens it; a link to #<id> reaches it without JavaScript.' },
+      { name: 'title', type: 'string', note: 'Required. The panel’s heading and accessible name (aria-labelledby).' },
+      { name: 'hideTitle', type: 'boolean', default: 'false', note: 'Hide the heading visually; it still names the panel.' },
+      { name: 'side', type: "'left' | 'right' | 'top' | 'bottom'", default: "'left'", note: 'The edge it slides from. Left and right take the full height; top and bottom the full width.' },
+      { name: 'mode', type: "'modal' | 'push'", default: "'modal'", note: 'modal: backdrop, page inert, scroll locked. push: non-modal, no backdrop; publishes --ofc-push (its size) and data-ofc-push (its side) on <html> while open.' },
+      { name: 'closeLabel', type: 'string', default: '“Close”', note: 'Name of the 44px close button.' },
+      { name: 'closeOnBackdrop', type: 'boolean', default: 'true', note: 'Close on a click on the backdrop (modal). A text selection dragged out of the panel never closes it.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '2', note: 'Level of the title’s heading.' },
+      { name: 'slot (default)', type: 'slot', note: 'The content: a <nav>, a form, a cart, a promo. A <form method="dialog"> inside closes it on submit.' },
+      { name: 'class', type: 'string', note: 'Class on the <dialog>, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--ofc-size', fallback: 'min(22rem, 88vw) · auto', note: 'Width of a left or right panel; height of a top or bottom one (at most 85dvh).' },
+      { name: '--ofc-bg', fallback: '#fff', note: 'The panel (14.75:1 with its text).' },
+      { name: '--ofc-fg', fallback: '#1e283c', note: 'Text in the panel.' },
+      { name: '--ofc-backdrop', fallback: 'rgb(15 20 35 / 0.55)', note: 'Behind a modal panel.' },
+      { name: '--ofc-shadow', fallback: '0 0 3rem rgb(0 0 0 / 0.25)', note: 'The panel’s shadow.' },
+      { name: '--ofc-padding', fallback: 'clamp(1rem, 4vw, 1.5rem)', note: 'Inside the panel.' },
+      { name: '--ofc-close-bg', fallback: 'transparent', note: 'Close button fill (a faint grey on hover).' },
+      { name: '--ofc-close-fg', fallback: 'currentColor', note: 'Close icon.' },
+      { name: '--ofc-focus', fallback: 'currentColor', note: 'Focus ring inside the panel.' },
+      { name: '--ofc-z', fallback: '110', note: 'Stacking of a push panel, below the cookie-consent bar (120). A modal panel is in the browser’s top layer, like every modal dialog.' },
+      { name: '--ofc-duration', fallback: '0.28s', note: 'Slide time; none under reduced motion.' },
+      { name: '--ofc-border', fallback: '#dfe3ea', note: 'Border of the inline panel without JavaScript.' },
+      { name: '--ofc-push', fallback: '(published)', note: 'Set BY the element on <html> in push mode: the panel’s width (or height), 0px when closed. The host moves its page: html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }' },
+    ],
+    a11y: [
+      'A native <dialog> named by its title (aria-labelledby). Modal mode uses showModal(): the page is inert, Tab stays in the panel, Escape closes it, and the page does not scroll underneath, with the scrollbar’s width kept so nothing shifts.',
+      'Push mode is non-modal (show()): the page stays usable beside it, and Escape closes it while focus is in the panel or on its trigger.',
+      'Triggers get aria-controls and aria-expanded (and aria-haspopup="dialog" in modal mode). A trigger that is not a link or button gets role="button" and tabindex="0" and opens on Enter or Space.',
+      'Focus moves into the panel on open and returns to the opener on close. The close button is a real 44px <button> named by closeLabel. A backdrop click closes a modal panel; a text selection dragged out of it does not.',
+      'Without JavaScript the panel renders inline, visible, under its heading, at its place in the page; a link trigger to #<id> jumps to it; the close button, which could not work, is not shown.',
+      'prefers-reduced-motion: the panel appears and goes at once, with no slide and no backdrop fade.',
+    ],
+    usage: `<!-- A link keeps working without JavaScript: it jumps to the panel, which then reads inline. -->
+<a href="#cart" data-offcanvas-open="cart">Cart (2)</a>
+<OffCanvas id="cart" title="Your cart" side="right">
+  <CartSummary />
+</OffCanvas>
+
+<!-- Push: the page moves over by the panel's width. -->
+<button type="button" data-offcanvas-open="contents">Contents</button>
+<OffCanvas id="contents" title="On this page" mode="push">…</OffCanvas>
+<!-- global.css:
+  .ofc { --ofc-bg: var(--white); --ofc-fg: var(--ink); }
+  .site { transition: translate 0.28s; }
+  html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }
+  @media (prefers-reduced-motion: reduce) { .site { transition: none; } } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/off-canvas/ (demo)' }],
+    file: 'src/library/off-canvas/OffCanvas.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

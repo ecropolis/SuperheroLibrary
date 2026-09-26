@@ -32,6 +32,7 @@ import ModalDemo from './ModalDemo.astro';
 import AnnouncementBarDemo from './AnnouncementBarDemo.astro';
 import CountdownDemo from './CountdownDemo.astro';
 import ContentToggleDemo from './ContentToggleDemo.astro';
+import OffCanvasDemo from './OffCanvasDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,4 +63,5 @@ export const demos: Record<string, AstroComponent> = {
   'announcement-bar': AnnouncementBarDemo,
   countdown: CountdownDemo,
   'content-toggle': ContentToggleDemo,
+  'off-canvas': OffCanvasDemo,
 };

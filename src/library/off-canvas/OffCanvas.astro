@@ -1,0 +1,458 @@
+---
+/**
+ * OffCanvas — a panel that slides in from an edge of the screen when asked for: a cart, filters,
+ * a secondary or account menu, a form, a promo. UABB's Off-Canvas module, Elementor's Off-Canvas
+ * widget and the slide-out / push-menu plugins.
+ *
+ * A native <dialog> from `side` left | right | top | bottom, in one of two modes:
+ *   - mode="modal" (default): showModal(). A backdrop, the rest of the page inert, focus kept
+ *     in the panel by the browser, Escape closes it, and the page does not scroll underneath
+ *     (the scrollbar's width is kept, so nothing shifts). A click on the backdrop closes it
+ *     (`closeOnBackdrop`); a text selection dragged out of the panel does not.
+ *   - mode="push": show(), non-modal. No backdrop and no scroll lock; the page stays usable. While
+ *     it is open the element publishes the panel's size on <html> as --ofc-push (0px when closed)
+ *     and the side as data-ofc-push="left|right|top|bottom", for the host to move its own page
+ *     over: `html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }`. Escape
+ *     closes it while focus is in the panel or on its trigger.
+ *
+ * Any element with `data-offcanvas-open="<id>"` opens it (and closes it again, when the page is
+ * still reachable in push mode). Triggers get aria-controls and aria-expanded, and aria-haspopup
+ * "dialog" in modal mode; an <img> or <div> trigger gets role="button" and tabindex="0". The
+ * close button is a real 44px <button> named by `closeLabel`. Focus moves into the panel on open
+ * (to the close button, or an `autofocus` field) and returns to the opener on close. Opening one
+ * panel closes any other.
+ *
+ * Without JavaScript nothing is off canvas: the panel renders inline, visible, at its place in
+ * the page, under its title, and the close button (which could not work) is not shown. A trigger
+ * that is a link to `#<id>` then jumps to it, so write triggers as `<a href="#<id>"
+ * data-offcanvas-open="<id>">` and place the panel where its content reads sensibly inline (a
+ * cart at the foot of the page, filters above the results). The inline script placed right after
+ * the panel takes it off the page before the first paint.
+ *
+ * Not the site's main mobile navigation: mega-menu folds its own links behind a Menu button below
+ * its breakpoint and keeps the nav landmark, the current page and a no-JS fallback. See the
+ * catalogue's notFor for when to use which.
+ *
+ * Stacking: a modal panel is in the browser's top layer, above everything, like every modal
+ * dialog. A push panel is in the page at --ofc-z (110), below the cookie-consent bar (120).
+ *
+ * prefers-reduced-motion: the panel and backdrop appear and go at once, no slide or fade.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --ofc-size          width (left/right) or height (top/bottom)   (min(22rem, 88vw) / auto, at most 85dvh)
+ *   --ofc-bg / --ofc-fg panel and its text                          (#fff / #1e283c, 14.75:1)
+ *   --ofc-backdrop      behind a modal panel                        (rgb(15 20 35 / 0.55))
+ *   --ofc-shadow        the panel's shadow                          (0 0 3rem rgb(0 0 0 / 0.25))
+ *   --ofc-padding       inside the panel                            (clamp(1rem, 4vw, 1.5rem))
+ *   --ofc-close-bg / --ofc-close-fg   the close button              (transparent / currentColor)
+ *   --ofc-focus         focus ring                                  (currentColor)
+ *   --ofc-z             stacking of a push panel                    (110; the consent bar is 120)
+ *   --ofc-duration      slide time                                  (0.28s)
+ *   --ofc-border        the inline panel's border without JavaScript (#dfe3ea)
+ */
+interface Props {
+  /** The dialog's id: `data-offcanvas-open="<id>"` opens it; `#<id>` reaches it without JavaScript. Required. */
+  id: string;
+  /** The panel's accessible name and heading. Required, even when hidden. */
+  title: string;
+  /** Hide the heading visually; it still names the panel. */
+  hideTitle?: boolean;
+  /** The edge it comes from. Default left. */
+  side?: 'left' | 'right' | 'top' | 'bottom';
+  /** modal (default): backdrop, focus kept in, scroll lock. push: non-modal, publishes --ofc-push. */
+  mode?: 'modal' | 'push';
+  /** Name of the close button. Default "Close". */
+  closeLabel?: string;
+  /** Close on a click on the backdrop (modal). Default true. */
+  closeOnBackdrop?: boolean;
+  /** Level of the heading. Default 2. */
+  headingLevel?: 2 | 3 | 4;
+  class?: string;
+}
+
+const {
+  id,
+  title,
+  hideTitle = false,
+  side = 'left',
+  mode = 'modal',
+  closeLabel = 'Close',
+  closeOnBackdrop = true,
+  headingLevel = 2,
+  class: className,
+} = Astro.props;
+
+if (!id || !/^[A-Za-z][\w-]*$/.test(id)) throw new Error(`OffCanvas: \`id\` "${id}" must start with a letter and hold only letters, digits, - and _ (it is used in #<id> links).`);
+if (!title || !String(title).trim()) throw new Error(`OffCanvas "${id}": \`title\` is required; it is the panel's accessible name (hide it with hideTitle).`);
+if (!['left', 'right', 'top', 'bottom'].includes(side)) throw new Error(`OffCanvas "${id}": side "${side}" is not left, right, top or bottom.`);
+if (!['modal', 'push'].includes(mode)) throw new Error(`OffCanvas "${id}": mode "${mode}" is not modal or push.`);
+
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const titleId = `${id}-title`;
+const config = JSON.stringify({ side, mode, backdrop: closeOnBackdrop });
+
+/** The browser side, serialised into the inline script once per page. */
+function offCanvasClient() {
+  interface Cfg {
+    side: 'left' | 'right' | 'top' | 'bottom';
+    mode: 'modal' | 'push';
+    backdrop: boolean;
+  }
+  interface State {
+    d: HTMLDialogElement;
+    cfg: Cfg;
+    returnTo: HTMLElement | null;
+    ro: ResizeObserver | null;
+  }
+  const panels = new Map<string, State>();
+  const html = document.documentElement;
+
+  // ---- scroll lock, as in modal: keep the scrollbar's width so nothing shifts.
+  let locked = 0;
+  let saved: [string, string] = ['', ''];
+  const lock = (on: boolean) => {
+    if (on) {
+      if (locked++) return;
+      saved = [html.style.overflow, html.style.paddingRight];
+      const bar = window.innerWidth - html.clientWidth;
+      html.style.overflow = 'hidden';
+      if (bar > 0) html.style.paddingRight = bar + 'px';
+    } else if (locked && !--locked) {
+      [html.style.overflow, html.style.paddingRight] = saved;
+    }
+  };
+
+  const triggers = (id: string) => document.querySelectorAll<HTMLElement>(`[data-offcanvas-open="${CSS.escape(id)}"]`);
+  const upgrade = (t: HTMLElement) => {
+    const s = panels.get(t.getAttribute('data-offcanvas-open') || '');
+    if (!s || t.hasAttribute('data-ofc-trigger')) return;
+    t.setAttribute('data-ofc-trigger', '');
+    t.setAttribute('aria-controls', s.d.id);
+    t.setAttribute('aria-expanded', String(s.d.open));
+    if (s.cfg.mode === 'modal' && !t.hasAttribute('aria-haspopup')) t.setAttribute('aria-haspopup', 'dialog');
+    // An <img> or <div> trigger: make it reachable and operable from the keyboard.
+    if (!t.matches('a[href], button, input, select, textarea, summary, [tabindex]')) {
+      t.setAttribute('role', 'button');
+      t.setAttribute('tabindex', '0');
+      t.setAttribute('data-ofc-upgraded', '');
+    }
+  };
+  const sync = (s: State) => triggers(s.d.id).forEach((t) => t.setAttribute('aria-expanded', String(s.d.open)));
+  const size = (s: State) => (s.cfg.side === 'left' || s.cfg.side === 'right' ? s.d.offsetWidth : s.d.offsetHeight);
+  const publish = (s: State) => {
+    if (s.cfg.mode !== 'push') return;
+    if (s.d.open) {
+      html.style.setProperty('--ofc-push', `${Math.round(size(s))}px`);
+      html.setAttribute('data-ofc-push', s.cfg.side);
+    } else if (html.getAttribute('data-ofc-push') === s.cfg.side) {
+      html.style.setProperty('--ofc-push', '0px');
+      html.removeAttribute('data-ofc-push');
+    }
+  };
+
+  const open = (s: State, opener: HTMLElement | null) => {
+    if (s.d.open) return;
+    panels.forEach((o) => o !== s && o.d.open && o.d.close());
+    const active = document.activeElement as HTMLElement | null;
+    s.returnTo = opener || (active && active !== document.body ? active : null);
+    if (s.cfg.mode === 'modal') {
+      s.d.showModal();
+      lock(true);
+    } else {
+      s.d.show();
+      publish(s);
+      if ('ResizeObserver' in window) {
+        s.ro = new ResizeObserver(() => publish(s));
+        s.ro.observe(s.d);
+      }
+    }
+    sync(s);
+  };
+
+  const mount = (d: HTMLDialogElement | null) => {
+    if (!d || panels.has(d.id)) return;
+    let cfg: Cfg;
+    try {
+      cfg = JSON.parse(d.dataset.ofc || '{}');
+    } catch {
+      return;
+    }
+    const s: State = { d, cfg, returnTo: null, ro: null };
+    panels.set(d.id, s);
+    d.setAttribute('data-ofc-ready', '');
+    const btn = d.querySelector<HTMLButtonElement>('[data-ofc-close]');
+    if (btn) {
+      btn.hidden = false;
+      btn.addEventListener('click', () => d.close());
+    }
+    // Backdrop: a press AND release outside the panel's box. (A text selection dragged out of the
+    // panel ends outside it too; checking where the press began keeps that from closing it.)
+    const outside = (e: MouseEvent) => {
+      const r = d.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
+    let downOutside = false;
+    d.addEventListener('pointerdown', (e) => {
+      downOutside = e.target === d && outside(e);
+    });
+    d.addEventListener('click', (e) => {
+      if (cfg.mode === 'modal' && cfg.backdrop && e.target === d && downOutside && outside(e)) d.close();
+      downOutside = false;
+    });
+    d.addEventListener('close', () => {
+      if (cfg.mode === 'modal') lock(false);
+      s.ro?.disconnect();
+      s.ro = null;
+      publish(s);
+      sync(s);
+      const back = s.returnTo;
+      s.returnTo = null;
+      // Return focus unless the visitor has already moved it elsewhere on the page (push mode).
+      const now = document.activeElement;
+      if (back && back.isConnected && (!now || now === document.body || d.contains(now))) back.focus();
+    });
+    document.querySelectorAll<HTMLElement>('[data-offcanvas-open]').forEach(upgrade);
+  };
+
+  // ---- triggers shared by every panel.
+  document.addEventListener('click', (e) => {
+    const t = (e.target as Element).closest?.('[data-offcanvas-open]') as HTMLElement | null;
+    if (!t) return;
+    const s = panels.get(t.getAttribute('data-offcanvas-open') || '');
+    if (!s) return; // Unknown id: let a link be a link.
+    e.preventDefault();
+    if (s.d.open) s.d.close();
+    else open(s, t);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // A push panel is non-modal, so the browser does not close it on Escape; do it here.
+      panels.forEach((s) => {
+        if (s.cfg.mode !== 'push' || !s.d.open) return;
+        const f = document.activeElement;
+        if (f && (s.d.contains(f) || f.getAttribute('data-offcanvas-open') === s.d.id)) {
+          e.preventDefault();
+          s.d.close();
+        }
+      });
+      return;
+    }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = (e.target as Element).closest?.('[data-offcanvas-open][data-ofc-upgraded]') as HTMLElement | null;
+    if (!t) return;
+    e.preventDefault();
+    t.click();
+  });
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-offcanvas-open]').forEach(upgrade);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+
+  return {
+    mount,
+    /** Open a panel by id, as a trigger would. */
+    open: (id: string) => {
+      const s = panels.get(id);
+      if (s) open(s, null);
+    },
+    /** Close a panel by id. */
+    close: (id: string) => panels.get(id)?.d.close(),
+  };
+}
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__ofcScript;
+locals.__ofcScript = true;
+const define = `window.__superheroOffCanvas=window.__superheroOffCanvas||(${offCanvasClient.toString()})();`;
+const mountScript = `${firstOnPage ? define : ''}window.__superheroOffCanvas.mount(document.currentScript.previousElementSibling);`;
+---
+
+<dialog id={id} class:list={['ofc', `ofc--${side}`, `ofc--${mode}`, className]} aria-labelledby={titleId} data-ofc={config}>
+  <div class="ofc__head">
+    <H id={titleId} class:list={['ofc__title', { ofc__sr: hideTitle }]}>{title}</H>
+    <button class="ofc__close" type="button" aria-label={closeLabel} data-ofc-close hidden>
+      <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+    </button>
+  </div>
+  <div class="ofc__body">
+    <slot />
+  </div>
+</dialog>
+<script is:inline set:html={mountScript} />
+
+<style>
+  /* ---- without JavaScript: an ordinary block at its place in the page, visible. */
+  .ofc:not([data-ofc-ready]) {
+    position: static;
+    display: block;
+    box-sizing: border-box;
+    width: auto;
+    max-width: none;
+    height: auto;
+    margin: 1.5rem 0;
+    padding: 0;
+    border: 1px solid var(--ofc-border, #dfe3ea);
+    border-radius: 12px;
+    background: var(--ofc-bg, #fff);
+    color: var(--ofc-fg, #1e283c);
+  }
+  .ofc [hidden] {
+    display: none !important;
+  }
+
+  /* ---- with JavaScript: fixed to its edge, off screen until open. */
+  .ofc[data-ofc-ready] {
+    --_ofc-off: -100% 0;
+    position: fixed;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    flex-direction: column;
+    background: var(--ofc-bg, #fff);
+    color: var(--ofc-fg, #1e283c);
+    box-shadow: var(--ofc-shadow, 0 0 3rem rgb(0 0 0 / 0.25));
+    z-index: var(--ofc-z, 110);
+    overscroll-behavior: contain;
+    translate: var(--_ofc-off);
+  }
+  .ofc[data-ofc-ready][open] {
+    display: flex;
+    translate: none;
+  }
+  .ofc--left[data-ofc-ready],
+  .ofc--right[data-ofc-ready] {
+    top: 0;
+    bottom: 0;
+    width: var(--ofc-size, min(22rem, 88vw));
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: none;
+  }
+  .ofc--left[data-ofc-ready] {
+    left: 0;
+    right: auto;
+  }
+  .ofc--right[data-ofc-ready] {
+    --_ofc-off: 100% 0;
+    right: 0;
+    left: auto;
+  }
+  .ofc--top[data-ofc-ready],
+  .ofc--bottom[data-ofc-ready] {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    height: var(--ofc-size, auto);
+    max-height: 85dvh;
+  }
+  .ofc--top[data-ofc-ready] {
+    --_ofc-off: 0 -100%;
+    top: 0;
+    bottom: auto;
+  }
+  .ofc--bottom[data-ofc-ready] {
+    --_ofc-off: 0 100%;
+    bottom: 0;
+    top: auto;
+  }
+  .ofc::backdrop {
+    background: var(--ofc-backdrop, rgb(15 20 35 / 0.55));
+  }
+
+  .ofc__head {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: calc(var(--ofc-padding, clamp(1rem, 4vw, 1.5rem)) - 0.5rem) calc(var(--ofc-padding, clamp(1rem, 4vw, 1.5rem)) - 0.5rem) 0
+      var(--ofc-padding, clamp(1rem, 4vw, 1.5rem));
+  }
+  .ofc:not([data-ofc-ready]) .ofc__head {
+    padding-top: var(--ofc-padding, clamp(1rem, 4vw, 1.5rem));
+  }
+  .ofc__title {
+    margin: 0.5rem 0 0;
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  /* Hidden visually, still the panel's name. */
+  .ofc__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .ofc__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ofc-close-bg, transparent);
+    color: var(--ofc-close-fg, currentColor);
+    cursor: pointer;
+  }
+  .ofc__close:hover {
+    background: var(--ofc-close-bg, rgb(0 0 0 / 0.06));
+  }
+  .ofc :focus-visible {
+    outline: 3px solid var(--ofc-focus, currentColor);
+    outline-offset: 2px;
+  }
+  .ofc__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem var(--ofc-padding, clamp(1rem, 4vw, 1.5rem)) var(--ofc-padding, clamp(1rem, 4vw, 1.5rem));
+  }
+  .ofc__body > :global(:first-child) {
+    margin-top: 0;
+  }
+  .ofc__body > :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  /* Slide in, and out: display and overlay are held for the length of the slide on close. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ofc[data-ofc-ready] {
+      transition:
+        translate var(--ofc-duration, 0.28s) cubic-bezier(0.2, 0.8, 0.2, 1),
+        display var(--ofc-duration, 0.28s) allow-discrete,
+        overlay var(--ofc-duration, 0.28s) allow-discrete;
+    }
+    .ofc[data-ofc-ready]::backdrop {
+      transition:
+        opacity var(--ofc-duration, 0.28s) ease,
+        display var(--ofc-duration, 0.28s) allow-discrete,
+        overlay var(--ofc-duration, 0.28s) allow-discrete;
+    }
+    .ofc[data-ofc-ready]:not([open])::backdrop {
+      opacity: 0;
+    }
+    @starting-style {
+      .ofc[data-ofc-ready][open] {
+        translate: var(--_ofc-off);
+      }
+      .ofc[data-ofc-ready][open]::backdrop {
+        opacity: 0;
+      }
+    }
+  }
+  @media print {
+    .ofc[data-ofc-ready] {
+      display: none !important;
+    }
+  }
+</style>

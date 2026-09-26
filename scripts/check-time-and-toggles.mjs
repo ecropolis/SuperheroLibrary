@@ -31,6 +31,17 @@
  *   source  motion gated; the remembered choice in sessionStorage only; the pressed-button and
  *           badge fallbacks at 4.5:1, the switch track at 3:1 against white.
  *
+ * off-canvas
+ *   page    each <dialog data-ofc>: an id, not rendered `open`, named by a heading with text
+ *           inside it, a type="button" close button with an aria-label and `hidden` until the
+ *           script runs, side and mode valid, the mounting script straight after, the runtime
+ *           once per page; on the demo, every panel has a trigger and every link trigger goes
+ *           to #<id> (the no-JS path), with both modes and three or more sides shown.
+ *   source  the no-JS rule puts the panel back in the flow, visible; showModal() + scroll lock
+ *           for modal, show() + --ofc-push for push; the lock keeps the scrollbar width; the
+ *           backdrop close checks where the press began; focus returns; motion gated; --ofc-z
+ *           under the consent bar (120); a 44px close button; the panel pair at 4.5:1.
+ *
  * Exits 1 with one line per failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -466,5 +477,128 @@ const ctMutants =
   ));
 finish('content-toggle mutation tests');
 counts.push(`content-toggle: ${roots(ctDemo, 'div', 'data-ct').length} demo toggles, ${ctMutants} mutants caught`);
+
+// =========================================================================== off-canvas
+const ofcFile = 'src/library/off-canvas/OffCanvas.astro';
+const ofcSrc = readFileSync(join(root, ofcFile), 'utf8');
+
+/** The built page: every panel's no-JS render, its name, its close button and its triggers. */
+function offCanvasPageFailures(html, { demo = false } = {}) {
+  const out = [];
+  const els = roots(html, 'dialog', 'data-ofc');
+  if (demo && els.length !== 4) out.push(`expected the demo's 4 panels, found ${els.length}.`);
+  const sides = new Set();
+  const modes = new Set();
+  els.forEach((el, i) => {
+    const id = attr(el.open, 'id');
+    const where = `panel ${i + 1} (#${id})`;
+    if (!id) out.push(`${where}: the <dialog> has no id, so nothing can open it.`);
+    if (attr(el.open, 'open') !== undefined) out.push(`${where}: rendered with \`open\`; the no-JS render is the inline panel, and a scripted page must start closed.`);
+    if (/\son[a-z]+=/i.test(el.open)) out.push(`${where}: inline event handler on the <dialog>.`);
+    let cfg = {};
+    try {
+      cfg = JSON.parse(decode(attr(el.open, 'data-ofc')));
+    } catch {
+      out.push(`${where}: data-ofc is not JSON.`);
+    }
+    if (!['left', 'right', 'top', 'bottom'].includes(cfg.side)) out.push(`${where}: side "${cfg.side}".`);
+    if (!['modal', 'push'].includes(cfg.mode)) out.push(`${where}: mode "${cfg.mode}".`);
+    sides.add(cfg.side);
+    modes.add(cfg.mode);
+    if (!new RegExp(`\\bofc--${cfg.side}\\b`).test(attr(el.open, 'class') || '')) out.push(`${where}: the class does not carry its side.`);
+    const by = attr(el.open, 'aria-labelledby');
+    if (!by) out.push(`${where}: no aria-labelledby; the title must name the panel.`);
+    else {
+      const t = el.html.match(new RegExp(`<(h[2-6])\\b[^>]*\\sid="${by}"[^>]*>([\\s\\S]*?)</\\1>`));
+      if (!t || !text(t[2])) out.push(`${where}: aria-labelledby="${by}" is not a heading with text inside the panel (without JavaScript the title heads the inline panel).`);
+    }
+    const close = el.html.match(/<button\b[^>]*\sdata-ofc-close[^>]*>/);
+    if (!close) out.push(`${where}: no close button.`);
+    else {
+      if (attr(close[0], 'type') !== 'button') out.push(`${where}: the close button needs type="button".`);
+      if (!attr(close[0], 'aria-label')) out.push(`${where}: the close button has no aria-label.`);
+      if (attr(close[0], 'hidden') === undefined) out.push(`${where}: the close button shows without JavaScript, where it cannot close anything.`);
+    }
+    if (/<noscript\b/i.test(el.html)) out.push(`${where}: a <noscript> inside the panel.`);
+    const after = html.slice(el.index + el.html.length).match(/^\s*<script\b[^>]*>([\s\S]*?)<\/script>/);
+    if (!after || !after[1].includes('__superheroOffCanvas.mount(document.currentScript.previousElementSibling)')) out.push(`${where}: the mounting script must come straight after the panel, or it shows inline until the page has loaded.`);
+    if (demo && id) {
+      const trig = [...html.matchAll(new RegExp(`<[a-z]+\\b[^>]*\\sdata-offcanvas-open="${id}"[^>]*>`, 'g'))].map((m) => m[0]);
+      if (!trig.length) out.push(`${where}: no trigger on the page.`);
+      for (const t of trig) if (t.startsWith('<a') && attr(t, 'href') !== `#${id}`) out.push(`${where}: a link trigger goes to "${attr(t, 'href')}", not #${id}; without JavaScript it must reach the inline panel.`);
+    }
+  });
+  if (demo && sides.size < 3) out.push(`the demo shows ${sides.size} sides; show at least three.`);
+  if (demo && modes.size !== 2) out.push('the demo must show both modal and push.');
+  const defs = (html.match(/window\.__superheroOffCanvas=window\.__superheroOffCanvas\|\|/g) || []).length;
+  if (els.length && defs !== 1) out.push(`the off-canvas runtime is defined ${defs} times; it must be once per page.`);
+  return out;
+}
+
+/** The source: the no-JS rule, the modal and push contracts, motion, stacking, contrast. */
+function offCanvasSourceFailures(src) {
+  const out = [];
+  const css = styleOf(src);
+  const nojs = css.match(/\.ofc:not\(\[data-ofc-ready\]\) \{([^}]*)\}/);
+  if (!nojs) out.push('no `.ofc:not([data-ofc-ready])` rule: without JavaScript the <dialog> would stay display: none.');
+  else {
+    if (!/position:\s*static/.test(nojs[1])) out.push('the no-JS rule does not put the panel back in the flow (position: static).');
+    if (!/display:\s*block/.test(nojs[1])) out.push('the no-JS rule does not show the panel (display: block).');
+  }
+  for (const m of motionOutsideGate(css)) out.push(`motion outside prefers-reduced-motion: no-preference (${m}).`);
+  const z = css.match(/z-index:\s*var\(--ofc-z,\s*(\d+)\)/);
+  if (!z) out.push('no `z-index: var(--ofc-z, <n>)` on the panel.');
+  else if (+z[1] >= 120) out.push(`--ofc-z falls back to ${z[1]}; it must stay below the cookie-consent bar (120).`);
+  if (!/\.ofc__close \{[^}]*width: 2\.75rem;[^}]*height: 2\.75rem;/.test(css)) out.push('the close button is not 44px (2.75rem) square.');
+  const surf = css.match(/background: var\(--ofc-bg, (#[0-9a-f]{3,6})\);\s*color: var\(--ofc-fg, (#[0-9a-f]{3,6})\);/i);
+  if (!surf) out.push('no panel fallback pair to measure.');
+  else if (ratio(surf[1], surf[2]) < 4.5) out.push(`panel: ${surf[2]} on ${surf[1]} is ${ratio(surf[1], surf[2]).toFixed(2)}:1, under 4.5:1.`);
+  if (!/cfg\.mode === 'modal'\) \{\s*s\.d\.showModal\(\);\s*lock\(true\);/.test(src)) out.push('modal mode must open with showModal() and lock the scroll.');
+  if (!/s\.d\.show\(\);\s*publish\(s\);/.test(src)) out.push('push mode must open with show() (non-modal) and publish --ofc-push.');
+  if (!/html\.style\.paddingRight = bar \+ 'px'/.test(src)) out.push('the scroll lock does not keep the scrollbar width.');
+  if (!/downOutside = e\.target === d && outside\(e\)/.test(src)) out.push('the backdrop close does not check where the press began (a dragged selection would close it).');
+  if (!/back\.focus\(\)/.test(src)) out.push('focus is not returned to the opener on close.');
+  return out;
+}
+
+report(offCanvasSourceFailures(ofcSrc), ofcFile);
+const ofcDemo = read('dist/off-canvas/index.html');
+if (ofcDemo) report(offCanvasPageFailures(ofcDemo, { demo: true }), 'dist/off-canvas/index.html');
+if (home) report(offCanvasPageFailures(home), 'dist/index.html (off-canvas)');
+finish('off-canvas');
+
+const ofcMutants =
+  (await mutants(
+    'off-canvas',
+    [
+      ['a panel rendered open', (h) => h.replace('<dialog id="demo-ofc-menu"', '<dialog open id="demo-ofc-menu"')],
+      ['the close button shown without JavaScript', (h) => h.replace('data-ofc-close hidden', 'data-ofc-close')],
+      ['the close button unnamed', (h) => h.replace('aria-label="Close" data-ofc-close', 'data-ofc-close')],
+      ['the panel unnamed', (h) => h.replace(' aria-labelledby="demo-ofc-menu-title"', '')],
+      ['a link trigger to the wrong anchor', (h) => h.replace('href="#demo-ofc-filters" data-offcanvas-open', 'href="#elsewhere" data-offcanvas-open')],
+      ['a panel without a trigger', (h) => h.replaceAll('data-offcanvas-open="demo-ofc-notice"', 'data-x="demo-ofc-notice"')],
+      ['the mount script moved away', (h) => h.replace(/(<\/dialog>)(<script>window\.__superheroOffCanvas\.mount)/, '$1<p></p>$2')],
+      ['the runtime defined twice', (h) => h.replace('window.__superheroOffCanvas=window.__superheroOffCanvas||', 'window.__superheroOffCanvas=window.__superheroOffCanvas||0;window.__superheroOffCanvas=window.__superheroOffCanvas||')],
+    ],
+    pageMutant(ofcDemo, offCanvasPageFailures, { demo: true }),
+  )) +
+  (await mutants(
+    'off-canvas',
+    [
+      ['no inline render without JavaScript', (s) => s.replace('.ofc:not([data-ofc-ready]) {\n    position: static;\n    display: block;', '.ofc:not([data-ofc-ready]) {\n    position: static;')],
+      ['the slide outside the reduced-motion gate', (s) => s.replace('.ofc[data-ofc-ready][open] {\n    display: flex;', '.ofc[data-ofc-ready][open] {\n    transition: translate 0.3s;\n    display: flex;')],
+      ['a push panel above the consent bar', (s) => s.replace('z-index: var(--ofc-z, 110);', 'z-index: var(--ofc-z, 130);')],
+      ['a modal panel opened non-modal', (s) => s.replace('s.d.showModal();\n      lock(true);', 's.d.show();\n      lock(true);')],
+      ['the scrollbar width not kept', (s) => s.replace("if (bar > 0) html.style.paddingRight = bar + 'px';", '')],
+      ['a dragged selection closes it', (s) => s.replace('downOutside = e.target === d && outside(e);', 'downOutside = true;')],
+      ['a 32px close button', (s) => s.replace('width: 2.75rem;\n    height: 2.75rem;\n    margin-left: auto;', 'width: 2rem;\n    height: 2rem;\n    margin-left: auto;')],
+    ],
+    (mutate) => {
+      const m = mutate(ofcSrc);
+      return m === ofcSrc ? 'unchanged' : offCanvasSourceFailures(m);
+    },
+  ));
+finish('off-canvas mutation tests');
+counts.push(`off-canvas: ${roots(ofcDemo, 'dialog', 'data-ofc').length} demo panels, ${ofcMutants} mutants caught`);
 
 console.log(`check-time-and-toggles ok: ${counts.join('; ')}.`);
