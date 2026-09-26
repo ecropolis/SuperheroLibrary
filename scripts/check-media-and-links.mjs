@@ -36,6 +36,19 @@
  * 6. The fallback colours pass 4.5:1 (text, links, notice on the card; the button's text on
  *    its fill); motion only under no-preference.
  *
+ * link-effects
+ * 7. The stylesheet (the `<style is:inline data-lk>` in the component): every one of the eleven
+ *    effects has an `a.lk-<effect>:is(:hover, :focus-visible)` rule and no `:hover` stands
+ *    without `:focus-visible`; no transition or animation outside no-preference; no
+ *    transition of `color` or `-webkit-text-fill-color`; the focus ring is never removed;
+ *    decorative `content` has an empty alternative (`/ ''`); highlight pins its text colour;
+ *    tag paints text and fill as two layers of one background (the sweep that keeps contrast).
+ * 8. Contrast, from the fallbacks: ink on the page and on the marker, on-accent on the accent,
+ *    the accent on the page (the arrow and peek words are text). All 4.5:1 or more.
+ * 9. Built pages: the stylesheet once per page; the demo shows all eleven with their class
+ *    names; swash's SVG is aria-hidden with pathLength="1"; peek has data-peek and its label
+ *    span; no script anywhere in the demo (CSS only, so the no-JS render is the render).
+ *
  * Mutation tests: each element's checks are also run against deliberately broken copies of its
  * input (an iframe injected, a name removed, a colour darkened, …). A mutation the checks do
  * not catch fails the run: a check that cannot fail is not a check.
@@ -466,4 +479,109 @@ checkMapStyle(mapSrc, fail, mapContrast);
 }
 finish('map');
 
-console.log(`check-media-and-links ok: ${pages.length} built pages load nothing from Google, YouTube or Vimeo; video-gallery parser is video-player's, its no-JS render and ARIA hold on 2 pages; map URLs, facades and links hold on 2 pages, contrast ${mapContrast.join(', ')}; ${mutations} mutations caught.`);
+// ------------------------------------------------------------- link-effects
+const LK = 'src/library/link-effects/LinkEffects.astro';
+const lkSrc = src(LK);
+const lkList = block(lkSrc, 'link-effects-list');
+const EFFECTS = lkList ? [...lkList.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]) : [];
+if (EFFECTS.length !== 11) fail(`${LK}: expected the eleven effects in the \`<link-effects-list>\` block, found ${EFFECTS.length}.`);
+finish('link-effects list');
+const lkContrast = [];
+const checkLinkCss = (component, fail, report) => {
+  const css = (component.match(/<style is:inline data-lk>([\s\S]*?)<\/style>/) || [])[1]?.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (!css) {
+    fail(`${LK}: no \`<style is:inline data-lk>\` stylesheet.`);
+    return;
+  }
+  const sel = (e) => `a.lk-${e}:is(:hover, :focus-visible)`;
+  for (const e of EFFECTS) if (!css.includes(sel(e))) fail(`${LK}: no \`${sel(e)}\` rule; every effect must fire on focus exactly as on hover.`);
+  const bare = css.replace(/:is\(:hover, :focus-visible\)/g, '');
+  if (/:hover/.test(bare)) fail(`${LK}: a :hover without :focus-visible; keyboard users would not see it.`);
+  if (/outline(?:-style)?\s*:\s*(?:none|0)\b/.test(css)) fail(`${LK}: removes the focus ring.`);
+  const rest = outsideNoPreference(css);
+  if (/\b(?:animation|transition)(?:-[a-z]+)?\s*:/.test(rest.replace(/transition-delay\s*:[^;]*;/g, ''))) fail(`${LK}: a transition or animation outside @media (prefers-reduced-motion: no-preference); reduced motion must show the end state at once.`);
+  for (const [, v] of css.matchAll(/transition(?:-property)?\s*:([^;]*);/g)) {
+    if (/(?<![-\w])color\b|text-fill-color/.test(v)) fail(`${LK}: transitions a text colour (${v.trim().slice(0, 60)}); animate decorations, not the text.`);
+  }
+  for (const m of css.matchAll(/content:\s*'([^']+)';(?!\s*content:\s*'\1'\s*\/\s*'')/g)) fail(`${LK}: decorative content '${m[1]}' has no empty alternative (\`content: '${m[1]}' / ''\`), so a screen reader reads it.`);
+  if (!/a\.lk-highlight \{\s*color: var\(--lk-ink, #[0-9a-f]+\);/i.test(css) || !/a\.lk-highlight:is\(:hover, :focus-visible\) \{\s*color: var\(--lk-ink, #[0-9a-f]+\);/i.test(css)) {
+    fail(`${LK}: highlight must pin its text colour to --lk-ink at rest and when active (a host's a:hover must not recolour it over the marker).`);
+  }
+  const tag = css.match(/@supports \(\(background-clip: text\)[^{]*\{\s*a\.lk-tag \{([\s\S]*?)\}\s*a\.lk-tag:is\(:hover, :focus-visible\) \{([\s\S]*?)\}/);
+  if (!tag) fail(`${LK}: the tag sweep (text and fill as two layers of one background) is missing.`);
+  else {
+    const [, base, hover] = tag;
+    const grads = [...base.matchAll(/linear-gradient\(90deg, var\((--lk-[\w-]+), #[0-9a-f]+\) 50%, var\((--lk-[\w-]+), #[0-9a-f]+\) 50%\)/gi)];
+    if (grads.length !== 2 || grads[0][1] !== '--lk-on-accent' || grads[0][2] !== '--lk-ink' || grads[1][1] !== '--lk-accent' || grads[1][2] !== '--lk-bg') fail(`${LK}: tag must layer (on-accent | ink) over (accent | bg), split at 50% in both.`);
+    if (!/background-clip: text, padding-box;/.test(base)) fail(`${LK}: tag's text layer must be clipped to the text and the fill to the padding box.`);
+    if (hover.replace(/\s/g, '') !== 'background-position:00;') fail(`${LK}: tag's hover may move only background-position, so text and fill stay in step.`);
+  }
+  const t = fallbacks(css, LK, fail);
+  pairs(
+    t,
+    [
+      ['--lk-ink', '--lk-bg', 4.5, 'ink on page'],
+      ['--lk-ink', '--lk-mark', 4.5, 'ink on marker'],
+      ['--lk-on-accent', '--lk-accent', 4.5, 'tag text on fill'],
+      ['--lk-accent', '--lk-bg', 4.5, 'accent text on page'],
+    ],
+    LK,
+    fail,
+    report,
+  );
+};
+checkLinkCss(lkSrc, fail, lkContrast);
+const checkLinkPage = ({ rel, html, demo }, fail) => {
+  const sheets = (html.match(/<style\b[^>]*\sdata-lk[\s>]/g) || []).length;
+  const links = [...html.matchAll(/<a\b[^>]*class="lk-([a-z-]+)[^"]*"[^>]*>([\s\S]*?)<\/a>/g)];
+  if (links.length && sheets !== 1) fail(`${rel}: the link-effects stylesheet is on the page ${sheets} times; it must be once.`);
+  for (const [tag, effect, inner] of links) {
+    if (!EFFECTS.includes(effect)) fail(`${rel}: a link with unknown effect lk-${effect}.`);
+    if (!attr(tag, 'href')) fail(`${rel}: an lk-${effect} link without href.`);
+    if (effect === 'peek') {
+      if (!decode(attr(tag, 'data-peek'))) fail(`${rel}: an lk-peek link without data-peek.`);
+      if (!/<span class="lk__label"/.test(inner)) fail(`${rel}: an lk-peek link without its <span class="lk__label">.`);
+    }
+    if (effect === 'swash') {
+      const svg = inner.match(/<svg\b[^>]*class="lk__swash"[^>]*>/);
+      if (!svg || attr(svg[0], 'aria-hidden') !== 'true' || attr(svg[0], 'focusable') !== 'false') fail(`${rel}: the swash SVG must be aria-hidden="true" focusable="false".`);
+      if (!/<path\b[^>]*pathLength="1"/.test(inner)) fail(`${rel}: the swash path needs pathLength="1" for its dash offset to draw it.`);
+    }
+  }
+  if (demo) {
+    const start = html.indexOf('id="link-effects-demo"');
+    const region = html.slice(start, html.indexOf('</div>', html.indexOf('demo-lk__prose', start)));
+    for (const e of EFFECTS) {
+      if (!new RegExp(`<a\\b[^>]*class="lk-${e}[" ]`).test(region)) fail(`${rel}: the demo does not show lk-${e}.`);
+      if (!new RegExp(`<code\\b[^>]*>lk-${e}</code>`).test(region)) fail(`${rel}: the demo does not show the class name lk-${e}.`);
+    }
+    if (/<script\b/.test(region)) fail(`${rel}: a script in the link-effects demo; the element is CSS only.`);
+  }
+};
+const lkPages = [
+  { rel: 'dist/link-effects/index.html', html: built('dist/link-effects/index.html'), demo: true },
+  { rel: 'dist/index.html', html: built('dist/index.html'), demo: false },
+];
+for (const p of lkPages) for (const m of run(checkLinkPage, p)) fail(m);
+{
+  const css = (f) => (x) => f(x);
+  const check = (s, f) => checkLinkCss(s, f);
+  mutate('circle loses :focus-visible', check, lkSrc, css((s) => s.replace('a.lk-circle:is(:hover, :focus-visible)::after', 'a.lk-circle:hover::after')));
+  mutate('a dark marker', check, lkSrc, css((s) => s.replaceAll('var(--lk-mark, #ffe38f)', 'var(--lk-mark, #6b5a1e)')));
+  mutate('a pale accent', check, lkSrc, css((s) => s.replaceAll('var(--lk-accent, #5933d8)', 'var(--lk-accent, #b7a6f2)')));
+  mutate('the text colour transitions', check, lkSrc, css((s) => s.replace('a.lk-tag {\n          transition: background-position', 'a.lk-tag {\n          transition: color 0.3s, background-position')));
+  mutate('a transition outside reduced motion', check, lkSrc, css((s) => s.replace('a.lk-circle {\n        padding: 0 0.15em;', 'a.lk-circle {\n        transition: scale 0.3s;\n        padding: 0 0.15em;')));
+  mutate('the focus ring removed', check, lkSrc, css((s) => s.replace('outline-offset: 0.3em;', 'outline: none;')));
+  mutate('the arrow is read aloud', check, lkSrc, css((s) => s.replace("content: '→' / '';", '')));
+  mutate('tag hover changes the text colour', check, lkSrc, css((s) => s.replace('a.lk-tag:is(:hover, :focus-visible) {\n          background-position: 0 0;', 'a.lk-tag:is(:hover, :focus-visible) {\n          background-position: 0 0;\n          color: #fff;')));
+  mutate('highlight lets a host recolour it on hover', check, lkSrc, css((s) => s.replace('a.lk-highlight:is(:hover, :focus-visible) {\n        color: var(--lk-ink, #1e283c);', 'a.lk-highlight:is(:hover, :focus-visible) {')));
+  const demo = lkPages[0];
+  const re = (a, b) => (x) => ({ ...x, html: x.html.replace(a, b) });
+  mutate('the swash SVG is announced', checkLinkPage, demo, re(/(class="lk__swash"[^>]*) aria-hidden="true"/, '$1'));
+  mutate('the stylesheet twice', checkLinkPage, demo, re('</body>', '<style data-lk>a{}</style></body>'));
+  mutate('the demo drops an effect', checkLinkPage, demo, re(/<code\b([^>]*)>lk-tag<\/code>/, '<code$1>tag</code>'));
+  mutate('peek without its words', checkLinkPage, demo, re(/ data-peek="[^"]*"/, ''));
+}
+finish('link-effects');
+
+console.log(`check-media-and-links ok: ${pages.length} built pages load nothing from Google, YouTube or Vimeo; video-gallery parser is video-player's, its no-JS render and ARIA hold on 2 pages; map URLs, facades and links hold on 2 pages, contrast ${mapContrast.join(', ')}; link-effects: ${EFFECTS.length} effects on hover and focus, contrast ${lkContrast.join(', ')}; ${mutations} mutations caught.`);

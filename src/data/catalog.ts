@@ -1578,6 +1578,66 @@ import LocationMap from '../components/LocationMap.astro';   // not "Map": that 
     file: 'src/library/map/LocationMap.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'link-effects',
+    name: 'Link effects',
+    aka: ['UABB Creative Link', 'PowerPack Link Effects', 'creative link', 'underline animation', 'link hover effects', 'animated underline', 'text hover effects'],
+    summary:
+      'Eleven hover-and-focus styles for links, CSS only: underline-slide, underline-grow, brackets, highlight, box, strike-to-underline, arrow, circle, and three of ours, peek, swash and tag. A class on any <a>, or the <Link effect> wrapper. Focus shows what hover shows, reduced motion shows the end state at once, and the text never drops below 4.5:1 mid-animation.',
+    pitch: 'Links that answer back when you point at them, and never leave a keyboard user or a slow eye behind.',
+    // SE Ranking US, 2026-09-26: underline animation css 590/mo, difficulty 20; css link hover
+    // effects 110/26; link hover effects 90/30; css text hover effects 90/27. The round-3 note's
+    // "link hover effects" is the closest name but a sixth of the volume at a higher difficulty;
+    // five of the eleven effects are underlines, so the page leads with them. "css hover
+    // effects" 480/31 covers buttons and images too and stays unclaimed.
+    search: { query: 'underline animation css', alsoRanks: ['css link hover effects', 'link hover effects', 'css text hover effects'] },
+    replaces: ['UABB “Creative Link” (Beaver Builder)', 'PowerPack “Link Effects”', 'hover.css and underline snippets pasted into a theme'],
+    goodFor:
+      'Navigation, a card’s call to action, footer links, a “Read more”: short links that should feel alive. underline-grow also suits links in running text, because it is underlined at rest. peek suits a link whose destination has a one-word answer: “Pricing” → “$49/mo”, “Hours” → “Open now”.',
+    notFor:
+      'Links in a paragraph with any effect that has no underline at rest (all but underline-grow and peek): a link must look like a link before anyone points at it, and colour alone does not say so. Buttons, which are not links. More than one or two effects on a site: pick one for navigation and one for calls to action, and keep them.',
+    props: [
+      { name: 'effect', type: "'underline-slide' | 'underline-grow' | 'brackets' | 'highlight' | 'box' | 'strike-to-underline' | 'arrow' | 'circle' | 'peek' | 'swash' | 'tag'", note: 'With `href`, renders <a class="lk-<effect>">. Leave both out (<LinkEffects />) to emit only the stylesheet, once, e.g. in the layout.' },
+      { name: 'href', type: 'string', note: 'The link. Required with `effect`.' },
+      { name: 'peek', type: 'string', note: 'For effect="peek": the words that slide in, set as data-peek. Part of the link’s accessible name.' },
+      { name: 'class', type: 'string', note: 'More classes on the <a>.' },
+      { name: '…rest', type: '<a> attributes', note: 'Passed through: target, rel, aria-current, download.' },
+    ],
+    theming: [
+      { name: '--lk-accent', fallback: '#5933d8', note: 'Lines, brackets, frame, ring, swash, arrow and peek words, tag fill. Keep 4.5:1 against --lk-bg, since the arrow and peek words are text (the fallbacks are 7.27:1).' },
+      { name: '--lk-ink', fallback: '#1e283c', note: 'The text colour highlight and tag pin: 14.75:1 on --lk-bg and 11.68:1 on --lk-mark.' },
+      { name: '--lk-on-accent', fallback: '#fff', note: 'Tag text over its fill: 7.27:1 on --lk-accent.' },
+      { name: '--lk-mark', fallback: '#ffe38f', note: 'The highlight marker.' },
+      { name: '--lk-bg', fallback: '#fff', note: 'The page behind the links, and the tag’s resting fill. Set it to the section’s background so the check’s arithmetic matches.' },
+      { name: '--lk-thickness', fallback: '2px', note: 'Line weight.' },
+      { name: '--lk-duration', fallback: '0.3s', note: 'Length of each effect (swash takes 1.8×).' },
+      { name: '--lk-ease', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Easing.' },
+    ],
+    a11y: [
+      'Every effect fires on :focus-visible exactly as on :hover (one selector, `:is(:hover, :focus-visible)`), and the browser’s own focus ring stays.',
+      'prefers-reduced-motion: every transition sits inside `(prefers-reduced-motion: no-preference)`, so otherwise the end state appears at once. Nothing plays by itself.',
+      'The text never drops below 4.5:1 mid-animation. Effects move decorations, not the text colour; highlight pins the text to --lk-ink, which passes on the page and on the marker; tag paints its text and fill as two layers of one background moving together, so each pixel of text is one passing pair or the other. `npm run check` computes the fallback pairs.',
+      'Decorative glyphs (the brackets, the arrow) are silent to screen readers, and the swash SVG is aria-hidden. The peek words are read as part of the link’s name (“Pricing $49/mo”).',
+      'Windows High Contrast (forced colours): system link colours, and the underline-based effects keep a real underline.',
+      'No JavaScript at all, so the render without it is the same.',
+    ],
+    usage: `---
+import LinkEffects from '../components/LinkEffects.astro';
+import Link from '../components/LinkEffects.astro';   // the same file, as a wrapper
+---
+<head> … <LinkEffects /> </head>                    <!-- the stylesheet, once -->
+
+<nav>
+  <Link effect="underline-slide" href="/about/" aria-current="page">About</Link>
+  <Link effect="peek" peek="$49/mo" href="/pricing/">Pricing</Link>
+</nav>
+<a class="lk-arrow" href="/book/">Book a visit</a>   <!-- or just the class -->
+<!-- .site { --lk-accent: var(--brand); --lk-bg: var(--page); } -->`,
+    license: 'Our own CSS and our own drawings (the swash and the ring). Nothing licensed from anyone else: no font, no icon set, no script.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/link-effects/ (demo)' }],
+    file: 'src/library/link-effects/LinkEffects.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
