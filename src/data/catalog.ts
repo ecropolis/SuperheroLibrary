@@ -1428,6 +1428,68 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'tags',
+    name: 'Tags',
+    aka: ['chips', 'tag chips', 'pills', 'badges list', 'filter chips', 'removable tags', 'post tags', 'tag cloud'],
+    summary:
+      'A wrapping list of small labels in three modes: static chips, links, or removable chips whose real “Remove <tag>” buttons dispatch a data-removed event with the value and can be remembered for the tab. An optional max shows “+N more”. Without JavaScript every chip shows and the removal buttons stay hidden.',
+    pitch: 'Show the topics, features or filters that belong to something, and let visitors clear a filter with one tap.',
+    // SE Ranking US, 2026-09-26: tags ui 170/mo, difficulty 6; tag ui design 70/6; removable
+    // tags 20/6. The pre-assigned "tag chips ui" has no data. "chip component" 320/22 and
+    // "filter chips" 260/30 are developer queries for form controls, left unclaimed.
+    search: { query: 'tags ui', alsoRanks: ['tag ui design', 'removable tags'] },
+    replaces: ['WordPress post tags and tag-cloud widgets', 'page-builder “badge” and “label” modules', 'WooCommerce active-filter chips'],
+    goodFor:
+      'A few short labels that belong to something: the topics of a post, the features of a product, the filters a visitor has applied to a list. Removable chips when the visitor can take one off and the page should follow.',
+    notFor:
+      'Navigation (a menu is a menu), a choice the visitor is making (that is a set of checkboxes or a radio-group in a form), or a single badge on a card or photo (that is sticker). And not a tag cloud of fifty words: past a dozen, use `max` or a list page.',
+    props: [
+      { name: 'items', type: '(string | { text, href?, value? })[]', note: 'The tags. `value` (default: the text) is what data-removed reports and `remember` stores. Required.' },
+      { name: 'mode', type: "'static' | 'links' | 'removable'", default: "'static'", note: 'links needs an href on every item (the build fails without); removable needs unique values.' },
+      { name: 'label', type: 'string', note: 'Accessible name of the list: “Topics”, “Applied filters”. Set it whenever the list has no visible heading right before it.' },
+      { name: 'max', type: 'number', note: 'Show the first `max` tags and a “+N more” button that shows the rest (and then reads “Show fewer”).' },
+      { name: 'remember', type: 'string', note: 'removable: keep removals for this tab in sessionStorage under tags:<remember>, so they stay removed on the next page.' },
+      { name: 'moreLabel / lessLabel', type: 'string', default: '“+{n} more” / “Show fewer”', note: 'The expander’s two texts; {n} is the number hidden.' },
+      { name: 'removeLabel / removedLabel', type: 'string', default: '“Remove {tag}” / “Removed {tag}”', note: 'Each removal button’s name, and what the status line says after a removal. Translate on a non-English site.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it or listen on it.' },
+    ],
+    theming: [
+      { name: '--tg-bg', fallback: '#eef0f4', note: 'Chip background.' },
+      { name: '--tg-fg', fallback: '#1d2433', note: 'Chip text (13.61:1 on the fallback background; keep 4.5:1).' },
+      { name: '--tg-hover-bg', fallback: '#dfe3ec', note: 'A link chip under the pointer (12.08:1).' },
+      { name: '--tg-border', fallback: 'transparent', note: 'Chip border; in forced-colours mode it draws the chip.' },
+      { name: '--tg-radius', fallback: '999px', note: 'Chip corners.' },
+      { name: '--tg-gap', fallback: '0.5rem', note: 'Space between chips and between rows.' },
+      { name: '--tg-font-size', fallback: '0.875rem', note: 'Text size.' },
+      { name: '--tg-weight', fallback: '600', note: 'Text weight.' },
+      { name: '--tg-remove-hover-bg', fallback: 'rgb(0 0 0 / 0.1)', note: 'The removal button under the pointer.' },
+      { name: '--tg-more-fg', fallback: '#5933d8', note: '“+N more”, on the page background (7.27:1 on white).' },
+      { name: '--tg-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+    ],
+    a11y: [
+      'A real <ul> with role="list" (VoiceOver drops list semantics on list-style: none without it), named by `label`. Links are links; static chips are text.',
+      'Each removable chip has a real <button> named “Remove <tag>”. After a removal, focus moves to the next chip’s button (or the previous one, or the list when none are left) and a polite status line says “Removed <tag>”.',
+      'On a touch screen (pointer: coarse) each removal button and “+N more” is a 44 by 44 px target; the chip keeps its height, so rows do not spread apart.',
+      '“+N more” is a button with aria-expanded and aria-controls naming the list; after it, focus stays on it, now reading “Show fewer”.',
+      'No motion. Colours clear 4.5:1 with their fallbacks; `npm run check` computes them.',
+      'Without JavaScript every tag shows and the removal and “+N more” buttons stay hidden rather than doing nothing. With it, a collapsed list and remembered removals are settled by the script right after the list, before the first paint, so nothing jumps.',
+    ],
+    usage: `<!-- Topics on a post -->
+<Tags mode="links" label="Topics" items={post.tags.map((t) => ({ text: t.name, href: \`/topics/\${t.slug}/\` }))} />
+
+<!-- Applied filters: the host listens for data-removed and drops the filter -->
+<Tags class="filters" mode="removable" label="Applied filters" remember="shop" max={6}
+  items={[{ text: 'Under $50', value: 'price-50' }, { text: 'Blue', value: 'blue' }]} />
+<script>
+  document.querySelector('.filters').addEventListener('data-removed', (e) => removeFilter(e.detail.value));
+</script>
+<!-- global.css: .tg { --tg-bg: var(--tint); --tg-focus: var(--brand); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/tags/ (demo)' }],
+    file: 'src/library/tags/Tags.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

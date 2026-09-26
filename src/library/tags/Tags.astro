@@ -1,0 +1,367 @@
+---
+/**
+ * Tags — a short list of small labels: topics on a post, features on a product, the filters a
+ * visitor has applied. Three modes:
+ *
+ * - `static`    plain chips (text only).
+ * - `links`     each chip is a link (a topic page, a filtered list).
+ * - `removable` each chip carries a real <button aria-label="Remove <tag>">. Pressing it takes
+ *               the chip out, says "Removed <tag>" in a polite status line, moves focus to the
+ *               next chip's button (or the previous one, or the list when none are left), and
+ *               dispatches a `data-removed` CustomEvent from the root with
+ *               `detail: { value, text }`, so the host can drop the filter. With `remember`, the
+ *               removed values are kept in sessionStorage under `tags:<remember>`, so they stay
+ *               removed on the next page of the same tab.
+ *
+ * `max` shows the first N chips and a "+N more" button (aria-expanded, aria-controls → the
+ * list) that shows the rest and then reads "Show fewer". Chips wrap onto as many lines as
+ * they need; nothing scrolls. On a touch screen (pointer: coarse) each removal button is a
+ * 44 by 44 px target, and so is "+N more".
+ *
+ * Without JavaScript every chip shows, the removal buttons and "+N more" stay hidden (a button
+ * that does nothing is worse than none), and links are links. When a script is needed (removable
+ * or `max`), it is defined once per page and each list mounts itself from the script straight
+ * after it, while the parser is still there: a collapsed list or a remembered removal is
+ * settled before the first paint, so nothing jumps.
+ *
+ * `window.__superheroTags.restore(root)` puts every removed chip back and forgets the memory
+ * (the demo's "Put them back"; a host's "Reset filters" can call it too).
+ *
+ * Theming (each has a fallback):
+ *   --tg-bg          #eef0f4   chip background        --tg-fg        #1d2433   chip text (13.61:1)
+ *   --tg-hover-bg    #dfe3ec   link chip under the pointer (12.08:1 with --tg-fg)
+ *   --tg-border      transparent (shows in forced-colours mode)
+ *   --tg-radius      999px     --tg-gap  0.5rem     --tg-font-size 0.875rem   --tg-weight 600
+ *   --tg-remove-hover-bg  rgb(0 0 0 / 0.1)
+ *   --tg-more-fg     #5933d8   "+N more" on the page background (7.27:1 on white)
+ *   --tg-focus       #5933d8   focus ring
+ *
+ * Behaviour and accessibility intent from Rocketbelt's tags pattern (Pier 1 Imports, 2020,
+ * MIT); reimplemented, no code copied.
+ */
+interface Item {
+  text: string;
+  href?: string;
+  /** What `data-removed` reports and `remember` stores. Default: `text`. */
+  value?: string;
+}
+interface Props {
+  items: (string | Item)[];
+  mode?: 'static' | 'links' | 'removable';
+  /** Accessible name of the list ("Topics", "Applied filters"). */
+  label?: string;
+  /** Show the first `max` chips and a "+N more" button. */
+  max?: number;
+  /** "+N more" button text; `{n}` is the number hidden. */
+  moreLabel?: string;
+  lessLabel?: string;
+  /** Name of each removal button; `{tag}` is the chip's text. */
+  removeLabel?: string;
+  /** Said in the status line after a removal; `{tag}` is the chip's text. */
+  removedLabel?: string;
+  /** removable: keep removals for this tab in sessionStorage under `tags:<remember>`. */
+  remember?: string;
+  class?: string;
+}
+const {
+  items,
+  mode = 'static',
+  label,
+  max,
+  moreLabel = '+{n} more',
+  lessLabel = 'Show fewer',
+  removeLabel = 'Remove {tag}',
+  removedLabel = 'Removed {tag}',
+  remember,
+  class: className,
+} = Astro.props;
+
+if (!['static', 'links', 'removable'].includes(mode)) throw new Error(`Tags: mode "${mode}" is not static, links or removable.`);
+if (!Array.isArray(items) || !items.length) throw new Error('Tags: `items` is empty.');
+const list = items.map((it) => (typeof it === 'string' ? { text: it } : it)).map((it) => ({ ...it, value: it.value ?? it.text }));
+for (const it of list) if (!it.text || !String(it.text).trim()) throw new Error('Tags: an item has no text.');
+if (mode === 'links') {
+  const bare = list.filter((it) => !it.href);
+  if (bare.length) throw new Error(`Tags: mode "links" needs an href on every item; "${bare[0].text}" has none.`);
+}
+if (mode === 'removable') {
+  const seen = new Set<string>();
+  for (const it of list) {
+    if (seen.has(it.value)) throw new Error(`Tags: two items share the value "${it.value}"; removal and \`remember\` go by value.`);
+    seen.add(it.value);
+  }
+}
+if (max !== undefined && !(Number.isInteger(max) && max >= 1)) throw new Error(`Tags: max ${max} is not a whole number of at least 1.`);
+if (remember !== undefined && mode !== 'removable') console.warn('Tags: `remember` only applies to mode "removable".');
+
+const fill = (tpl: string, map: Record<string, string | number>) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in map ? String(map[k]) : m));
+const hidden = max !== undefined ? Math.max(0, list.length - max) : 0;
+const needsScript = mode === 'removable' || hidden > 0;
+
+/** The browser half. Self-contained: it is emitted with toString(). */
+function tagsClient() {
+  const read = (key: string) => {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(key) || '[]');
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (key: string, values: string[]) => {
+    try {
+      if (values.length) sessionStorage.setItem(key, JSON.stringify(values));
+      else sessionStorage.removeItem(key);
+    } catch {
+      /* storage blocked: the removal still happens on this page */
+    }
+  };
+  const fill = (tpl: string, map: Record<string, string | number>) => tpl.replace(/\{(\w+)\}/g, (m, k) => (k in map ? String(map[k]) : m));
+
+  const mount = (root: any) => {
+    if (!root || root.__tg) return;
+    let cfg: any = {};
+    try {
+      cfg = JSON.parse(root.getAttribute('data-tg') || '{}');
+    } catch {
+      return;
+    }
+    const list = root.querySelector('[data-tg-list]');
+    const more = root.querySelector('[data-tg-more]');
+    const status = root.querySelector('[data-tg-status]');
+    if (!list) return;
+    const all: any[] = [...list.children];
+    const removed = new Set<any>();
+    const key = cfg.remember ? 'tags:' + cfg.remember : '';
+    let open = false;
+    const value = (li: any) => li.getAttribute('data-tg-value') || '';
+    const present = () => all.filter((li) => !removed.has(li));
+    const layout = () => {
+      const items = present();
+      const cap = cfg.max > 0 ? cfg.max : Infinity;
+      const extra = Math.max(0, items.length - cap);
+      items.forEach((li, i) => (li.hidden = !open && i >= cap));
+      if (more) {
+        more.hidden = extra === 0;
+        more.setAttribute('aria-expanded', String(open));
+        more.textContent = open ? cfg.less : fill(cfg.more, { n: extra });
+      }
+    };
+    const take = (li: any) => {
+      removed.add(li);
+      li.remove();
+    };
+    const save = () => key && write(key, [...removed].map(value));
+
+    // Show the removal buttons before taking out remembered chips, so a restored chip has one.
+    root.querySelectorAll('[data-tg-remove]').forEach((b: any) => (b.hidden = false));
+    if (key) {
+      const gone = new Set(read(key));
+      all.forEach((li) => gone.has(value(li)) && take(li));
+    }
+    root.setAttribute('data-ready', '');
+
+    list.addEventListener('click', (e: any) => {
+      const btn = e.target.closest && e.target.closest('[data-tg-remove]');
+      if (!btn || !list.contains(btn)) return;
+      const li = btn.closest('li');
+      const before = present().filter((x) => !x.hidden);
+      const at = before.indexOf(li);
+      const text = (li.querySelector('[data-tg-text]')?.textContent || '').trim();
+      take(li);
+      save();
+      layout();
+      const after = present().filter((x) => !x.hidden);
+      const next = after[at] || after[at - 1];
+      const target = next && next.querySelector('[data-tg-remove]');
+      if (target) target.focus();
+      else {
+        list.tabIndex = -1;
+        list.focus();
+      }
+      if (status) status.textContent = fill(cfg.removed, { tag: text });
+      root.dispatchEvent(new CustomEvent('data-removed', { bubbles: true, detail: { value: value(li), text } }));
+    });
+    if (more)
+      more.addEventListener('click', () => {
+        open = !open;
+        layout();
+      });
+
+    root.__tg = {
+      restore() {
+        all.forEach((li) => list.append(li));
+        removed.clear();
+        save();
+        if (status) status.textContent = '';
+        layout();
+      },
+    };
+    layout();
+  };
+  return { mount, restore: (root: any) => root && root.__tg && root.__tg.restore() };
+}
+
+const locals = Astro.locals as Record<string, unknown>;
+const n = ((locals.__tgCount as number) || 0) + 1;
+locals.__tgCount = n;
+const uid = `tg-${n}`;
+const firstScript = needsScript && !locals.__tgDefined;
+if (needsScript) locals.__tgDefined = true;
+const define = `window.__superheroTags=window.__superheroTags||(${tagsClient.toString()})();`;
+const mountScript = `${firstScript ? define : ''}window.__superheroTags.mount(document.currentScript.previousElementSibling);`;
+const config = JSON.stringify({ max: max ?? 0, more: moreLabel, less: lessLabel, removed: removedLabel, remember: mode === 'removable' ? (remember ?? '') : '' });
+---
+
+<div class:list={['tg', `tg--${mode}`, className]} data-tg={config}>
+  <ul class="tg__list" role="list" id={`${uid}-list`} aria-label={label} data-tg-list>
+    {
+      list.map((it) => (
+        <li class="tg__item" data-tg-value={it.value}>
+          {mode === 'links' ? (
+            <a class="tg__tag" href={it.href} data-tg-text>
+              {it.text}
+            </a>
+          ) : mode === 'removable' ? (
+            <span class="tg__tag">
+              <span data-tg-text>{it.text}</span>
+              <button class="tg__remove" type="button" aria-label={fill(removeLabel, { tag: it.text })} data-tg-remove hidden>
+                <svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false">
+                  <path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" />
+                </svg>
+              </button>
+            </span>
+          ) : (
+            <span class="tg__tag" data-tg-text>
+              {it.text}
+            </span>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+  {
+    hidden > 0 && (
+      <button class="tg__more" type="button" aria-expanded="false" aria-controls={`${uid}-list`} data-tg-more hidden>
+        {fill(moreLabel, { n: hidden })}
+      </button>
+    )
+  }
+  {mode === 'removable' && <span class="tg__sr" role="status" data-tg-status />}
+</div>
+{needsScript && <script is:inline set:html={mountScript} />}
+
+<style>
+  .tg {
+    margin-block-end: calc(-1 * var(--tg-gap, 0.5rem));
+    font-size: var(--tg-font-size, 0.875rem);
+    line-height: 1.25;
+  }
+  .tg [hidden] {
+    display: none !important;
+  }
+  /* Inline, so "+N more" flows on the same line as the chips. role="list" keeps the list a
+     list for VoiceOver, which drops it on list-style: none. */
+  .tg__list {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tg__list:focus {
+    outline: none;
+  }
+  .tg__item {
+    display: inline-flex;
+    vertical-align: middle;
+    margin: 0;
+    margin-inline-end: var(--tg-gap, 0.5rem);
+    margin-block-end: var(--tg-gap, 0.5rem);
+  }
+  .tg__tag {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--tg-border, transparent);
+    border-radius: var(--tg-radius, 999px);
+    background: var(--tg-bg, #eef0f4);
+    color: var(--tg-fg, #1d2433);
+    font-weight: var(--tg-weight, 600);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  a.tg__tag:hover {
+    background: var(--tg-hover-bg, #dfe3ec);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  .tg[data-ready] .tg__tag:has(> .tg__remove) {
+    padding-inline-end: 0.25rem;
+  }
+  .tg__remove {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-block: -0.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .tg__remove:hover {
+    background: var(--tg-remove-hover-bg, rgb(0 0 0 / 0.1));
+  }
+  .tg__more {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    min-height: 2rem;
+    margin: 0 0 var(--tg-gap, 0.5rem);
+    padding: 0.25rem 0.375rem;
+    border: 0;
+    background: none;
+    color: var(--tg-more-fg, #5933d8);
+    font: inherit;
+    font-weight: var(--tg-weight, 600);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    cursor: pointer;
+  }
+  /* A finger needs 44 by 44 px (WCAG 2.5.5). The negative block margins keep the chip's own
+     height, so the rows do not spread apart; the target overlaps only the gap. */
+  @media (pointer: coarse) {
+    .tg__remove {
+      width: 2.75rem;
+      height: 2.75rem;
+      margin-block: -0.625rem;
+      margin-inline-end: -0.25rem;
+    }
+    .tg__more {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+      margin-block: -0.375rem calc(var(--tg-gap, 0.5rem) - 0.375rem);
+    }
+  }
+  .tg__tag:focus-visible,
+  .tg__remove:focus-visible,
+  .tg__more:focus-visible {
+    outline: 3px solid var(--tg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .tg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
