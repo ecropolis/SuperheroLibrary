@@ -1428,6 +1428,78 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'menu-button',
+    name: 'Menu button',
+    aka: ['dropdown button', 'action menu', 'kebab menu', 'three-dot menu', 'more options menu', 'Bootstrap dropdown'],
+    summary:
+      'The WAI-ARIA menu button: a <button aria-haspopup="menu"> that opens a role="menu" of links or actions (or a radio menu for a setting), with arrow keys, Home/End, type-ahead, Escape back to the button, click-outside to close, and a flip upward when there is no room below. Without JavaScript it is a <details> holding the same links.',
+    pitch: 'Tuck a handful of actions — share, export, edit, delete — behind one tidy button that works the same with a mouse, a keyboard or a screen reader.',
+    // SE Ranking US, 2026-09-26: menu button 720/mo, difficulty 23; dropdown button 190/27;
+    // action menu 170/6; dropdown menu button 10/60 (the phrase the round-4 brief pre-assigned;
+    // kept as a variant). "dropdown menu" 2,400/68 is out of reach and mostly means navigation.
+    search: { query: 'menu button', alsoRanks: ['dropdown button', 'action menu', 'dropdown menu button'] },
+    replaces: ['Bootstrap’s dropdown component', 'page-builder “dropdown button” modules', 'hand-rolled hover dropdowns that a keyboard cannot open'],
+    goodFor: 'A few actions that do not each deserve a button: Share, Export, Download as…, the ⋮ on a card or a table row, a Sort by or View as setting on a listing.',
+    notFor:
+      'Site navigation: a header of pages is a list of links, and role="menu" makes a screen reader expect application keys; use mega-menu (or plain header links). Choosing a value in a form: that is a native <select>, or radio-group when the options deserve to be seen. And more than about ten items, which is a page, not a menu.',
+    props: [
+      { name: 'label', type: 'string', note: 'The button’s text, or its accessible name when `iconOnly`. Required.' },
+      { name: 'items', type: 'MenuItem[]', note: '`{ label, href?, value?, disabled?, checked? }`. With `href` the item is a link; without it, a button that only acts through the `data-selected` event, so give an item an href when it must work without JavaScript.' },
+      { name: 'mode', type: "'actions' | 'radio'", default: "'actions'", note: 'Radio makes the items menuitemradio with aria-checked and a check mark, for a setting such as Sort by. At most one item `checked`.' },
+      { name: 'iconOnly', type: 'boolean', default: 'false', note: 'A 44px ⋮ button (Font Awesome Free ellipsis-vertical); `label` becomes its aria-label, so write it in full: “More options for Spring newsletter”.' },
+      { name: 'align', type: "'start' | 'end'", default: "'start'", note: 'Which edge of the button the menu lines up with. It moves to the other edge by itself if it would leave the viewport.' },
+      { name: 'id', type: 'string', default: '“menu-button-<n>”', note: 'Base id: the button is <id>-button, the menu <id>-menu. Also `event.target.id` for a host listening on a parent.' },
+      { name: 'data-selected', type: 'event', note: 'Dispatched on the root when an item is activated: bubbles, cancelable, `detail: { value, label, href }`. preventDefault() on a link item keeps the browser from following it.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--mb-bg', fallback: '#fff', note: 'Button fill.' },
+      { name: '--mb-fg', fallback: '#1e283c', note: 'Button text (14.75:1 on the fallback fill).' },
+      { name: '--mb-border', fallback: '#c9ccd8', note: 'Button and menu border.' },
+      { name: '--mb-radius', fallback: '8px', note: 'Button and menu corners.' },
+      { name: '--mb-menu-bg', fallback: '#fff', note: 'Menu fill.' },
+      { name: '--mb-menu-fg', fallback: '#1e283c', note: 'Menu text.' },
+      { name: '--mb-hover', fallback: '#eef0f7', note: 'Focused and hovered item (menu text stays above 4.5:1 on it).' },
+      { name: '--mb-accent', fallback: '#5933d8', note: 'Check mark in a radio menu.' },
+      { name: '--mb-muted', fallback: '#6b6f80', note: 'Disabled items.' },
+      { name: '--mb-focus', fallback: '#5933d8', note: 'Keyboard focus ring.' },
+      { name: '--mb-shadow', fallback: '0 12px 32px rgb(0 0 0 / 0.16)', note: 'Menu shadow.' },
+      { name: '--mb-z', fallback: '30', note: 'Menu stacking level.' },
+      { name: '--mb-min-width / --mb-max-height', fallback: '12rem / 20rem', note: 'Menu size; past the height it scrolls.' },
+    ],
+    a11y: [
+      'The WAI-ARIA Authoring Practices menu button: the button has aria-haspopup="menu", aria-expanded and aria-controls; the menu is role="menu", labelled by the button, and its items are role="menuitem" (or "menuitemradio" with aria-checked) with tabindex="-1", so the menu is one Tab stop.',
+      'On the button, Enter, Space and ↓ open the menu on the first item (the checked one in a radio menu) and ↑ opens it on the last. In the menu, ↓ ↑ move and wrap, Home and End jump, a letter moves to the next item starting with it, Enter and Space activate, Escape closes and returns focus to the button, Tab closes and moves on.',
+      'A click outside or focus leaving the element closes the menu. A disabled item is aria-disabled: reachable and announced, not activatable.',
+      'The menu opens below the button, or above it when the room below is short and there is more above, measured each time it opens; it never runs off the side of the viewport.',
+      'Buttons and items are at least 44px tall; the icon-only button is 44px square with its full label as aria-label.',
+      'prefers-reduced-motion: the menu appears without its 120 ms fade.',
+      'Without JavaScript it is a <details>: the summary shows the same label and opens the same list, and link items work. No menu roles are rendered until the script can honour them.',
+    ],
+    usage: `<MenuButton label="Share" items={[
+  { label: 'Copy link', value: 'copy' },
+  { label: 'Email this page', href: 'mailto:?subject=…' },
+]} />
+
+<!-- A setting: links keep it working without JavaScript. -->
+<MenuButton label="Sort by" mode="radio" items={[
+  { label: 'Newest first', href: '?sort=newest', checked: true },
+  { label: 'Price, low to high', href: '?sort=price-asc' },
+]} />
+
+<!-- ⋮ on a card -->
+<MenuButton label="More options for {post.title}" iconOnly align="end" items={actions} />
+
+<script>
+  document.addEventListener('data-selected', (e) => { if (e.detail.value === 'copy') navigator.clipboard.writeText(location.href); });
+</script>
+<!-- .toolbar { --mb-accent: var(--brand); --mb-focus: var(--brand); --mb-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/menu-button/ (demo)' }],
+    file: 'src/library/menu-button/MenuButton.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

@@ -1,0 +1,119 @@
+---
+/**
+ * Demo for `menu-button`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"); it has no assets, and every host token has a fallback.
+ *
+ * Three menus in the places they usually live:
+ *   - "Share": actions (two buttons) and a mailto link.
+ *   - "Sort by": a radio menu whose items are links to ?sort=…, so it works without JavaScript;
+ *     with it, the demo cancels `data-selected` and re-sorts in place.
+ *   - ⋮ on a card: icon-only, lined up with the button's end edge, with a disabled item.
+ * One line under them reports what the host received, which is the whole integration.
+ */
+import MenuButton from '../../library/menu-button/MenuButton.astro';
+interface Props {
+  /** Where public/demo/ is served (unused here: the demo has no assets). */
+  assetBase?: string;
+}
+---
+<div class="demo-mb">
+  <div class="demo-mb__bar">
+    <MenuButton
+      label="Share"
+      id="demo-mb-share"
+      items={[
+        { label: 'Copy link', value: 'copy' },
+        { label: 'Print this page', value: 'print' },
+        { label: 'Email this page', href: 'mailto:?subject=A%20page%20worth%20reading', value: 'email' },
+      ]}
+    />
+    <MenuButton
+      label="Sort by"
+      id="demo-mb-sort"
+      mode="radio"
+      items={[
+        { label: 'Newest first', href: '?sort=newest', value: 'newest', checked: true },
+        { label: 'Price, low to high', href: '?sort=price-asc', value: 'price-asc' },
+        { label: 'Price, high to low', href: '?sort=price-desc', value: 'price-desc' },
+        { label: 'Most popular', href: '?sort=popular', value: 'popular' },
+      ]}
+    />
+  </div>
+
+  <article class="demo-mb__card">
+    <div>
+      <h3 class="demo-mb__title">Spring newsletter</h3>
+      <p class="demo-mb__meta">Draft · edited 2 days ago</p>
+    </div>
+    <MenuButton
+      label="More options for Spring newsletter"
+      id="demo-mb-more"
+      iconOnly
+      align="end"
+      items={[
+        { label: 'Edit', value: 'edit' },
+        { label: 'Duplicate', value: 'duplicate' },
+        { label: 'Archive', value: 'archive', disabled: true },
+        { label: 'Delete', value: 'delete' },
+      ]}
+    />
+  </article>
+
+  <p class="demo-mb__out" aria-live="polite" data-demo-mb-out>Choose something from a menu.</p>
+</div>
+
+<script is:inline>
+  (() => {
+    const box = document.currentScript.previousElementSibling;
+    const out = box.querySelector('[data-demo-mb-out]');
+    box.addEventListener('data-selected', (e) => {
+      const { label, href } = e.detail;
+      const menu = e.target.id;
+      // The sort links work without JavaScript; here the page re-sorts in place instead.
+      if (menu === 'demo-mb-sort') e.preventDefault();
+      if (href && href.startsWith('mailto:')) return;
+      out.textContent = menu === 'demo-mb-sort' ? `Sorted by: ${label}.` : `The host received “${label}”.`;
+    });
+  })();
+</script>
+
+<style>
+  .demo-mb {
+    display: grid;
+    gap: 1.5rem;
+    color: var(--ink, #16192a);
+    --mb-accent: var(--purple, #5933d8);
+    --mb-focus: var(--purple, #5933d8);
+    --mb-border: var(--line, #d9dae6);
+    --mb-radius: var(--radius, 8px);
+  }
+  .demo-mb__bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .demo-mb__card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 26rem;
+    padding: 1rem 1rem 1rem 1.25rem;
+    border: 1px solid var(--line, #d9dae6);
+    border-radius: var(--radius, 8px);
+    background: var(--white, #fff);
+  }
+  .demo-mb__title {
+    margin: 0.35rem 0 0.25rem;
+    font-size: 1.05rem;
+  }
+  .demo-mb__meta {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #585c6e;
+  }
+  .demo-mb__out {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+</style>
