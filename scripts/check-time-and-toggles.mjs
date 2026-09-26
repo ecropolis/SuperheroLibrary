@@ -21,6 +21,16 @@
  *   source  motion only under prefers-reduced-motion: no-preference; evergreen in localStorage,
  *           never a cookie; the square fallback pair at 4.5:1 or more.
  *
+ * content-toggle
+ *   page    no-JS: the control bar hidden, panels a and b both rendered and visible, each under
+ *           its label as a heading. style="switch": one <button type="button" role="switch">
+ *           whose aria-checked matches `default`, named by label b, described by what exists.
+ *           style="buttons": a named role="group" with two type="button" buttons, exactly one
+ *           aria-pressed="true". aria-controls names real panels; no tab roles; the mounting
+ *           script straight after; the runtime once per page.
+ *   source  motion gated; the remembered choice in sessionStorage only; the pressed-button and
+ *           badge fallbacks at 4.5:1, the switch track at 3:1 against white.
+ *
  * Exits 1 with one line per failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
@@ -317,5 +327,144 @@ const cdMutants = await mutants(
 );
 finish('countdown mutation tests');
 counts.push(`countdown: time goldens, ${roots(cdDemo, 'div', 'data-cd').length} demo countdowns, ${cdMutants} mutants caught`);
+
+// ======================================================================= content-toggle
+const ctFile = 'src/library/content-toggle/ContentToggle.astro';
+const ctSrc = readFileSync(join(root, ctFile), 'utf8');
+
+/** The built page: every toggle's no-JS render and ARIA contract. */
+function contentTogglePageFailures(html, { demo = false } = {}) {
+  const out = [];
+  const els = roots(html, 'div', 'data-ct');
+  if (demo && els.length !== 2) out.push(`expected the demo's 2 toggles, found ${els.length}.`);
+  if (demo && !els.some((e) => /ct--switch/.test(e.open))) out.push('the demo has no switch toggle.');
+  if (demo && !els.some((e) => /ct--buttons/.test(e.open))) out.push('the demo has no buttons toggle.');
+  els.forEach((el, i) => {
+    const where = `toggle ${i + 1}`;
+    let cfg = {};
+    try {
+      cfg = JSON.parse(decode(attr(el.open, 'data-ct')));
+    } catch {
+      out.push(`${where}: data-ct is not JSON.`);
+    }
+    const labels = cfg.labels || [];
+    if (labels.length !== 2) out.push(`${where}: the config does not carry two labels.`);
+    const bar = el.html.match(/<div\b[^>]*\sdata-ct-bar[^>]*>/);
+    if (!bar) out.push(`${where}: no control bar.`);
+    else if (attr(bar[0], 'hidden') === undefined) out.push(`${where}: the switch is shown without JavaScript, where it cannot work.`);
+    // Both panels, visible, each under its label as a heading.
+    const panels = roots(el.html, 'div', 'data-ct-panel');
+    const ids = new Set(panels.map((p) => attr(p.open, 'id')));
+    if (panels.map((p) => attr(p.open, 'data-ct-panel')).join() !== 'a,b') out.push(`${where}: expected panels a then b, found ${panels.map((p) => attr(p.open, 'data-ct-panel')).join() || 'none'}.`);
+    panels.forEach((p, k) => {
+      if (attr(p.open, 'hidden') !== undefined) out.push(`${where}, panel ${'ab'[k]}: hidden without JavaScript; both panels must render.`);
+      const h = p.html.match(/<(h[2-6])\b[^>]*>([\s\S]*?)<\/\1>/);
+      if (!h) out.push(`${where}, panel ${'ab'[k]}: no heading.`);
+      else if (text(h[2]) !== labels[k]) out.push(`${where}, panel ${'ab'[k]}: heading "${text(h[2])}", expected its label "${labels[k]}".`);
+    });
+    const controls = [...el.html.matchAll(/\saria-controls="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/));
+    for (const c of controls) if (!ids.has(c)) out.push(`${where}: aria-controls names "${c}", which is not a panel.`);
+    const bodyOf = (id) => {
+      const m = el.html.match(new RegExp(`<([a-z0-9]+)\\b[^>]*\\sid="${id}"[^>]*>([\\s\\S]*?)</\\1>`));
+      return m ? text(m[2]) : '';
+    };
+    if (/ct--switch/.test(el.open)) {
+      const sws = [...el.html.matchAll(/<button\b[^>]*\srole="switch"[^>]*>/g)].map((m) => m[0]);
+      if (sws.length !== 1) out.push(`${where}: expected one role="switch" button, found ${sws.length}.`);
+      for (const sw of sws) {
+        if (attr(sw, 'type') !== 'button') out.push(`${where}: the switch needs type="button".`);
+        const checked = attr(sw, 'aria-checked');
+        if (!['true', 'false'].includes(checked)) out.push(`${where}: the switch has aria-checked="${checked}".`);
+        else if ((checked === 'true') !== (cfg.initial === 'b')) out.push(`${where}: aria-checked="${checked}" does not match default "${cfg.initial}".`);
+        const by = attr(sw, 'aria-labelledby');
+        if (!by || !bodyOf(by)) out.push(`${where}: the switch is not named by a label with text.`);
+        else if (bodyOf(by) !== labels[1]) out.push(`${where}: the switch is named "${bodyOf(by)}", expected label b "${labels[1]}" (checked = b shown).`);
+        const desc = attr(sw, 'aria-describedby');
+        for (const d of desc ? desc.split(/\s+/) : []) if (!bodyOf(d)) out.push(`${where}: aria-describedby "${d}" points at nothing with text.`);
+      }
+      if (/aria-pressed=/.test(el.html)) out.push(`${where}: a switch toggle with aria-pressed buttons as well.`);
+    } else if (/ct--buttons/.test(el.open)) {
+      const group = el.html.match(/<div\b[^>]*\srole="group"[^>]*>/);
+      if (!group || !attr(group[0], 'aria-label')) out.push(`${where}: the buttons are not in a named role="group".`);
+      const btns = [...el.html.matchAll(/<button\b[^>]*\sdata-ct-pick[^>]*>/g)].map((m) => m[0]);
+      if (btns.length !== 2) out.push(`${where}: expected two buttons, found ${btns.length}.`);
+      if (btns.some((b) => attr(b, 'type') !== 'button')) out.push(`${where}: each button needs type="button".`);
+      const pressed = btns.map((b) => attr(b, 'aria-pressed'));
+      if (pressed.filter((p) => p === 'true').length !== 1 || pressed.some((p) => !['true', 'false'].includes(p))) out.push(`${where}: exactly one button must be aria-pressed="true", found ${JSON.stringify(pressed)}.`);
+      if (/role="switch"/.test(el.html)) out.push(`${where}: a buttons toggle with a switch as well.`);
+    } else out.push(`${where}: neither ct--switch nor ct--buttons.`);
+    if (/role="tab(?:list|panel)?"/.test(el.html)) out.push(`${where}: tab roles; a toggle is not tabs.`);
+    const after = html.slice(el.index + el.html.length).match(/^\s*<script\b[^>]*>([\s\S]*?)<\/script>/);
+    if (!after || !after[1].includes('__superheroContentToggle.mount(document.currentScript.previousElementSibling)')) out.push(`${where}: the mounting script must come straight after the element, or the other panel disappears after the first paint.`);
+  });
+  const defs = (html.match(/window\.__superheroContentToggle=window\.__superheroContentToggle\|\|/g) || []).length;
+  if (els.length && defs !== 1) out.push(`the toggle runtime is defined ${defs} times; it must be once per page.`);
+  return out;
+}
+
+/** The source: motion gate, storage, contrast. */
+function contentToggleSourceFailures(src) {
+  const out = [];
+  const css = styleOf(src);
+  for (const m of motionOutsideGate(css)) out.push(`motion outside prefers-reduced-motion: no-preference (${m}).`);
+  if (/document\.cookie|localStorage/.test(src)) out.push('`remember` is for this session: sessionStorage only, no localStorage or cookie.');
+  if (!/sessionStorage\.setItem\(/.test(src)) out.push('the choice is not written to sessionStorage.');
+  const pairs = [
+    ['pressed button', /\.ct__btn\[aria-pressed='true'\] \{\s*background: var\(--ct-pressed-bg, (#[0-9a-f]{3,6})\);\s*color: var\(--ct-pressed-fg, (#[0-9a-f]{3,6})\);/i, 4.5],
+    ['badge', /background: var\(--ct-badge-bg, (#[0-9a-f]{3,6})\);\s*color: var\(--ct-badge-fg, (#[0-9a-f]{3,6})\);/i, 4.5],
+  ];
+  for (const [name, re, min] of pairs) {
+    const m = css.match(re);
+    if (!m) out.push(`no fallback pair to measure for the ${name}.`);
+    else if (ratio(m[1], m[2]) < min) out.push(`${name}: ${m[2]} on ${m[1]} is ${ratio(m[1], m[2]).toFixed(2)}:1, under ${min}:1.`);
+  }
+  const track = css.match(/background: var\(--ct-track, (#[0-9a-f]{3,6})\);/i);
+  if (!track) out.push('no switch track fallback to measure.');
+  else if (ratio(track[1], '#ffffff') < 3) out.push(`switch track ${track[1]} is under 3:1 against white (a control needs 3:1).`);
+  return out;
+}
+
+report(contentToggleSourceFailures(ctSrc), ctFile);
+const ctDemo = read('dist/content-toggle/index.html');
+if (ctDemo) report(contentTogglePageFailures(ctDemo, { demo: true }), 'dist/content-toggle/index.html');
+if (home) report(contentTogglePageFailures(home), 'dist/index.html (content-toggle)');
+finish('content-toggle');
+
+const pageMutant = (html, fn, opts) => (mutate) => {
+  const m = mutate(html);
+  return m === html ? 'unchanged' : fn(m, opts);
+};
+const ctMutants =
+  (await mutants(
+    'content-toggle',
+    [
+      ['the switch loses role="switch"', (h) => h.replace(' role="switch"', '')],
+      ['the switch loses aria-checked', (h) => h.replace(/ aria-checked="(?:true|false)"/, '')],
+      ['the switch named by label a', (h) => h.replace('aria-labelledby="ct-1-b-name"', 'aria-labelledby="ct-1-a"')],
+      ['the bar shown without JavaScript', (h) => h.replace('data-ct-bar hidden', 'data-ct-bar')],
+      ['panel b hidden without JavaScript', (h) => h.replace('data-ct-panel="b"', 'data-ct-panel="b" hidden')],
+      ['a panel without its heading', (h) => h.replace(/<h3 class="ct__heading"[^>]*>Annual<\/h3>/, '')],
+      ['both buttons pressed', (h) => h.replace('aria-pressed="false"', 'aria-pressed="true"')],
+      ['the buttons group unnamed', (h) => h.replace(/(role="group") aria-label="[^"]*"/, '$1')],
+      ['tabs roles instead', (h) => h.replace('role="group"', 'role="tablist"')],
+      ['aria-controls to nowhere', (h) => h.replace('aria-controls="ct-1-pa ct-1-pb"', 'aria-controls="ct-1-pa ct-9-pb"')],
+      ['the mount script moved away', (h) => h.replace(/(<\/div>)(<script>window\.__superheroContentToggle\.mount)/, '$1<p></p>$2')],
+    ],
+    pageMutant(ctDemo, contentTogglePageFailures, { demo: true }),
+  )) +
+  (await mutants(
+    'content-toggle',
+    [
+      ['the knob slides outside the reduced-motion gate', (s) => s.replace('.ct__switch[aria-checked', '.ct__knob { transition: translate 0.2s; }\n  .ct__switch[aria-checked')],
+      ['remembered in localStorage', (s) => s.replace('sessionStorage.setItem(k, v);', 'localStorage.setItem(k, v);')],
+      ['a pressed button under 4.5:1', (s) => s.replace('var(--ct-pressed-bg, #5933d8)', 'var(--ct-pressed-bg, #b9a8f0)')],
+    ],
+    (mutate) => {
+      const m = mutate(ctSrc);
+      return m === ctSrc ? 'unchanged' : contentToggleSourceFailures(m);
+    },
+  ));
+finish('content-toggle mutation tests');
+counts.push(`content-toggle: ${roots(ctDemo, 'div', 'data-ct').length} demo toggles, ${ctMutants} mutants caught`);
 
 console.log(`check-time-and-toggles ok: ${counts.join('; ')}.`);

@@ -1498,6 +1498,73 @@ import { analytics } from '../data/site';
     file: 'src/library/countdown/Countdown.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'content-toggle',
+    name: 'Content toggle',
+    aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch'],
+    summary:
+      'Two labelled versions of one thing, a switch (role="switch") or two pressed buttons between them, and two panels in slots a and b. Optional badge on one label, a choice remembered for the session, and ?<param>= to preselect. Without JavaScript both panels show under their labels as headings.',
+    pitch: 'Let visitors flip between two versions of the same thing — monthly or annual prices, homes or businesses — without leaving the page.',
+    // SE Ranking US, 2026-09-26: toggle content 110/mo, difficulty 27; content switcher 90/18;
+    // css toggle switch 170/16; html toggle switch 90/9. "content toggle" and "pricing toggle"
+    // have no US volume; "toggle switch" 22,400/64 is out of reach and mostly hardware.
+    search: { query: 'toggle content', alsoRanks: ['content switcher', 'css toggle switch', 'html toggle switch'] },
+    replaces: ['UABB “Content Toggle” module (Beaver Builder)', 'PowerPack Content Toggle', 'the monthly/annual toggle of pricing-table plugins'],
+    goodFor:
+      'The pricing page’s monthly or annual switch, and any two versions of the same content a visitor picks between: homes or businesses, metric or imperial, before or during a project. One line of label each side.',
+    notFor:
+      'Tabs. A toggle is two versions of ONE thing switched in place, so the panels share a shape (the same plans, two prices). Three or more views, or two different topics (Features and Reviews), are tabs, which name each panel as a tab and scale past two. Also not for hiding content people need; both panels are one click apart, and without JavaScript both show.',
+    props: [
+      { name: 'labels', type: '[string, string]', note: 'Required. The two states, [a, b]: “Monthly”, “Annual”. They label the switch and head the panels.' },
+      { name: 'slot a / slot b', type: 'slots', note: 'Required. The two panels: `<div slot="a">…</div>` and `<div slot="b">…</div>`.' },
+      { name: 'style', type: "'switch' | 'buttons'", default: "'switch'", note: 'A switch between the two labels, or two pressed buttons for labels too long to sit either side of one.' },
+      { name: 'default', type: "'a' | 'b'", default: "'a'", note: 'Which panel shows first when the URL and the session say nothing.' },
+      { name: 'badge', type: 'string', note: 'A short note on one label: “Save 20%”. The switch is described by it, so it is heard too.' },
+      { name: 'badgeOn', type: "'a' | 'b'", default: "'b'", note: 'Which label carries the badge.' },
+      { name: 'remember', type: 'boolean', default: 'false', note: 'Keep the visitor’s choice for this browser session (sessionStorage).' },
+      { name: 'key', type: 'string', default: '“content-toggle:<param or hash>”', note: 'The sessionStorage key. Toggles sharing a key share the remembered choice.' },
+      { name: 'param', type: 'string', note: 'A URL parameter that preselects: `param="billing"` and a link to `?billing=b` or `?billing=annual` opens on annual. Beats the remembered choice.' },
+      { name: 'label', type: 'string', default: '“<a> or <b>”', note: 'Accessible name of the button group (style="buttons").' },
+      { name: 'headingLevel', type: '2 | 3 | 4 | 5', default: '3', note: 'Level of each panel’s heading: visible without JavaScript, for screen readers with it.' },
+      { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and place it.' },
+    ],
+    theming: [
+      { name: '--ct-track', fallback: '#5933d8', note: 'Switch track, the same in both states (neither is “off”). 7.27:1 against white.' },
+      { name: '--ct-knob', fallback: '#fff', note: 'Switch knob.' },
+      { name: '--ct-label', fallback: 'currentColor at 75%', note: 'The label not shown. Keep 4.5:1 if you set it.' },
+      { name: '--ct-active', fallback: 'inherit', note: 'The label that is shown (also bold).' },
+      { name: '--ct-pressed-bg', fallback: '#5933d8', note: 'style="buttons": the pressed button (7.27:1 with its text).' },
+      { name: '--ct-pressed-fg', fallback: '#fff', note: 'style="buttons": the pressed button’s text.' },
+      { name: '--ct-border', fallback: '#5933d8', note: 'style="buttons": the outline round both.' },
+      { name: '--ct-badge-bg', fallback: '#dff5e8', note: 'Badge ground (8.19:1 with its text).' },
+      { name: '--ct-badge-fg', fallback: '#0f5132', note: 'Badge text.' },
+      { name: '--ct-focus', fallback: 'currentColor', note: 'Keyboard focus ring.' },
+      { name: '--ct-gap', fallback: '1.25rem', note: 'Space between the switch and the panel.' },
+      { name: '--ct-align', fallback: 'center', note: 'Where the switch sits: flex-start for the left.' },
+    ],
+    a11y: [
+      'style="switch": a native <button role="switch"> named by label b, with aria-checked saying whether b is shown (“Annual, switch, on”) and aria-controls naming both panels. Space and Enter toggle it; clicking either visible label sets it too.',
+      'style="buttons": two <button aria-pressed> in a group named by `label`; exactly one is pressed.',
+      'The badge describes the switch (aria-describedby), so “Save 20%” is heard as well as seen.',
+      'The shown panel keeps its label as a heading for screen readers only, so it is clear which version is on the page; the other panel is hidden, not just covered.',
+      'Without JavaScript both panels render, each under its label as a heading, and the switch (which could not work) is not shown.',
+      'No layout shift: the script right after the element settles it before the first paint. prefers-reduced-motion: the knob jumps instead of sliding and the panel does not fade. In forced-colours mode the track and knob are drawn with system colours.',
+    ],
+    usage: `<ContentToggle labels={['Monthly', 'Annual']} badge="Save 20%" param="billing" remember>
+  <PricingTable slot="a" period="month" />
+  <PricingTable slot="b" period="year" />
+</ContentToggle>
+<!-- A link to /pricing/?billing=annual opens on annual prices. -->
+
+<ContentToggle labels={['For homeowners', 'For businesses and landlords']} style="buttons" label="Who it is for">
+  <div slot="a">…</div>
+  <div slot="b">…</div>
+</ContentToggle>
+<!-- .ct { --ct-track: var(--brand); --ct-pressed-bg: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/content-toggle/ (demo)' }],
+    file: 'src/library/content-toggle/ContentToggle.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
