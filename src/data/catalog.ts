@@ -1428,6 +1428,64 @@ import { analytics } from '../data/site';
     file: 'src/library/announcement-bar/AnnouncementBar.astro',
     added: '2026-09-24',
   },
+  {
+    id: 'notice',
+    name: 'Notice',
+    aka: ['alert box', 'info box', 'callout box', 'Bootstrap alert', 'message box', 'UABB Info Box', 'Elementor Alert widget', 'inline message'],
+    summary:
+      'A message in the page, in one of four kinds (info, success, warning, danger), each with its colours and a Font Awesome Free icon, an optional title and an optional close button remembered for the visit. role="status" for info and success, role="alert" for warning and danger; the kind is also said in words.',
+    pitch: 'Say what just happened, or what needs attention, right where it applies, in a colour that says how much it matters.',
+    // SE Ranking US, 2026-09-26: inline alert 260/mo, difficulty 13; alert banner 210/12;
+    // css alert box 260/38; callout box 330/17. The pre-assigned "alert banner component" has
+    // no US volume, so the page targets "inline alert", which is also what this is (the banner
+    // across the top of a site is announcement-bar).
+    search: { query: 'inline alert', alsoRanks: ['alert banner', 'css alert box', 'callout box'] },
+    replaces: ['Bootstrap alerts', 'page-builder alert / info box / notice modules', 'hand-built callout boxes with a coloured border'],
+    goodFor:
+      'The state of the page or of a form after an action (“Your changes were saved”, “We could not take the payment”), a condition people need before they act (“Only 3 places left”), a note that holds for a while (“Classes resume on Monday”). One notice near what it is about.',
+    notFor:
+      'A message across the top of the whole site (that is announcement-bar), a confirmation that should vanish on its own (toast), or form-field errors, which belong beside their field with aria-describedby. And not several on one screen: when everything is a warning, nothing is.',
+    props: [
+      { name: 'kind', type: "'info' | 'success' | 'warning' | 'danger'", default: "'info'", note: 'Colours, icon, role and the word read before the message.' },
+      { name: 'title', type: 'string', note: 'A short bold line above the text.' },
+      { name: 'text', type: 'string', note: 'The message, when not given as the default slot. The slot takes links and paragraphs.' },
+      { name: 'icon', type: 'string | false', note: 'A Font Awesome Free solid icon name in place of the kind’s own (circle-info, circle-check, triangle-exclamation, circle-exclamation), or false for none. An unknown name fails the build.' },
+      { name: 'dismissible', type: 'boolean', default: 'false', note: 'A close button; the dismissal is kept in sessionStorage for the rest of the visit.' },
+      { name: 'key', type: 'string', default: 'from a hash of the content', note: 'sessionStorage key of the dismissal. Give a stable one when the notice’s words change often.' },
+      { name: 'version', type: 'string', default: 'a hash of the content', note: 'Change it to show the notice again to people who closed it; new words do that by themselves.' },
+      { name: 'dismissLabel', type: 'string', default: '“Dismiss”', note: 'Name of the close button.' },
+      { name: 'kindLabel', type: 'string', default: '“Information” / “Success” / “Warning” / “Error”', note: 'The kind in words, read (not shown) before the message.' },
+      { name: 'class', type: 'string', note: 'Class on the notice.' },
+    ],
+    theming: [
+      { name: '--nt-info-bg / -fg / -accent', fallback: '#edf4fc / #12385f / #1c5fa8', note: 'kind="info": ground, text (10.79:1), edge and icon (5.83:1).' },
+      { name: '--nt-success-bg / -fg / -accent', fallback: '#ebf6ee / #14502b / #1d7a3b', note: 'kind="success": text 8.57:1, accent 4.86:1.' },
+      { name: '--nt-warning-bg / -fg / -accent', fallback: '#fdf4de / #553800 / #9a5b00', note: 'kind="warning": text 9.82:1, accent 4.95:1.' },
+      { name: '--nt-danger-bg / -fg / -accent', fallback: '#fcecec / #7a1717 / #b42318', note: 'kind="danger": text 9.35:1, accent 5.74:1.' },
+      { name: '--nt-radius', fallback: '8px', note: 'Corners.' },
+      { name: '--nt-padding', fallback: '0.875rem 1rem', note: 'Inside the notice.' },
+      { name: '--nt-font-size', fallback: '1rem', note: 'Text size.' },
+      { name: '--nt-focus', fallback: 'currentColor', note: 'Focus ring on links and the close button.' },
+    ],
+    a11y: [
+      'role="status" for info and success, role="alert" for warning and danger. A screen reader announces a live region when its content arrives or changes: a notice the host inserts after an action is announced, one rendered with the page is read in place.',
+      'The kind is said in words as well as colour and icon: a visually hidden “Warning:” (or `kindLabel`) leads the title or the text. The icon is aria-hidden.',
+      'The close button is a real 44px <button> named “Dismiss”. After a dismiss, focus moves to the next focusable thing on the page.',
+      'Every kind’s fallback text is at least 4.5:1 on its ground and its accent at least 3:1; `npm run check` computes all eight. In forced-colours mode the edge and icon take the system text colour.',
+      'No motion.',
+      'Without JavaScript the notice shows and cannot be closed: the close button stays hidden rather than doing nothing.',
+    ],
+    usage: `<Notice kind="success" text="Your changes were saved." />
+
+<Notice kind="warning" title="Only 3 places left" dismissible key="june-course">
+  The June course is nearly full. <a href="/book/">Book a place</a>
+</Notice>
+<!-- global.css: .nt { --nt-info-accent: var(--brand); --nt-radius: var(--radius); } -->`,
+    license: 'MIT. Pattern from Rocketbelt (Pier 1 Imports, 2020, MIT); reimplemented, no code copied.',
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/notice/ (demo)' }],
+    file: 'src/library/notice/Notice.astro',
+    added: '2026-09-26',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);
