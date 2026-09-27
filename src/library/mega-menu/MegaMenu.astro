@@ -23,6 +23,14 @@
  * `position: relative` and set `--mm-anchor: static` on the nav. Nothing above it may clip it
  * (`overflow: hidden` on the header cuts the panel off), and it stacks at `--mm-z`.
  *
+ * Height: an open panel is no taller than the viewport left below where it starts, and scrolls
+ * inside itself beyond that. Hosts usually make the header sticky, and then the page cannot
+ * scroll a tall panel into view: its last links would be out of reach. The script measures where
+ * the panel starts when it opens, and again on scroll and resize while it is open (a header that
+ * shrinks on scroll moves it). Without JavaScript the cap assumes the panel starts 5rem down.
+ * `--mm-panel-max` replaces the cap, e.g. `70vh`, or `none` to turn it off. The collapsed list
+ * behind the Menu button scrolls as a whole instead.
+ *
  * Promo: give an item `promo: 'promo-products'` and pass `<div slot="promo-products">…</div>`.
  *
  * End: `<a slot="end" …>` is placed after the top items, at the right end of the bar and at
@@ -37,6 +45,7 @@
  *   --mm-muted / --mm-border       link notes and headings / panel rules
  *   --mm-focus / --mm-shadow       focus ring / panel shadow
  *   --mm-z / --mm-max / --mm-anchor  stacking, panel content width, what the panel spans
+ *   --mm-panel-max                 open panel's height cap (default: the room below it)
  */
 interface Link {
   label: string;
@@ -160,6 +169,16 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     const HOVER_OPEN = 150;
     const HOVER_CLOSE = 300;
 
+    // <mm-fit>
+    // Where an open panel starts, in viewport pixels. Read from layout offsets, not the panel's
+    // own box: the opening animation translates the panel, and offsets ignore that.
+    const panelTop = (panel) => {
+      const parent = panel.offsetParent;
+      if (!parent || parent === document.body) return panel.offsetTop - window.scrollY;
+      return parent.getBoundingClientRect().top + parent.clientTop + panel.offsetTop;
+    };
+    // </mm-fit>
+
     const init = (nav) => {
       if (nav.dataset.ready) return;
       nav.dataset.ready = '1';
@@ -184,6 +203,19 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
       let openBtn = null;
       let byHover = false;
       let timer = 0;
+      let fitFrame = 0;
+      // The stylesheet caps the open panel at the viewport left below --mm-panel-top.
+      const fit = () => {
+        fitFrame = 0;
+        if (!openBtn || compact()) return;
+        const panel = panelOf(openBtn);
+        panel.style.setProperty('--mm-panel-top', `${Math.ceil(panelTop(panel))}px`);
+      };
+      const refit = () => {
+        if (openBtn && !fitFrame) fitFrame = requestAnimationFrame(fit);
+      };
+      addEventListener('scroll', refit, { passive: true });
+      addEventListener('resize', refit);
       const close = (btn, refocus) => {
         btn.setAttribute('aria-expanded', 'false');
         if (openBtn === btn) { openBtn = null; byHover = false; }
@@ -194,6 +226,7 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
         btn.setAttribute('aria-expanded', 'true');
         openBtn = btn;
         byHover = hover;
+        fit();
       };
       const setMenu = (on) => {
         toggle.setAttribute('aria-expanded', String(on));
@@ -353,6 +386,13 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     color: var(--mm-panel-fg, #1b1c22);
     border-top: 1px solid var(--mm-border, #e2e3ea);
     box-shadow: var(--mm-shadow, 0 18px 40px rgb(0 0 0 / 0.14));
+    /* In a sticky header the page cannot scroll a tall panel into view, so the panel scrolls.
+       The script sets --mm-panel-top to where the panel starts; 5rem stands in without it.
+       Border-box, so the top rule counts toward the cap and the bottom edge stays on screen. */
+    box-sizing: border-box;
+    max-height: var(--mm-panel-max, calc(100dvh - var(--mm-panel-top, 5rem)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   /* JavaScript off: hover or focus inside shows it, so every link is reachable. */
   .mm:not(.mm--js) .mm__item:is(:hover, :focus-within) > .mm__panel,
@@ -482,6 +522,9 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
   .mm--compact .mm__panel,
   .mm--compact .mm__top[aria-expanded='true'] + .mm__panel {
     position: static;
+    /* The list scrolls as a whole; a panel scrolling inside it would trap the wheel. */
+    max-height: none;
+    overflow: visible;
     border: 0;
     box-shadow: none;
     animation: none;

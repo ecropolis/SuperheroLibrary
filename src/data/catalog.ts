@@ -170,6 +170,7 @@ export const catalog: Element[] = [
       { name: '--mm-z', fallback: '50', note: 'Stacking level of the panel and mobile list.' },
       { name: '--mm-max', fallback: '72rem', note: 'Width of the panel’s content inside the full-width panel.' },
       { name: '--mm-anchor', fallback: 'relative', note: 'Position of the nav. Set `static` so the panel spans the header (which then needs `position: relative`) instead of the nav.' },
+      { name: '--mm-panel-max', fallback: 'calc(100dvh - <panel top>)', note: 'Height cap of an open panel on wide screens: past it the panel scrolls inside itself, so a tall panel in a sticky header keeps its last links reachable. The script measures the panel top when it opens and on scroll and resize; without JavaScript it is taken as 5rem. Set a length such as `70vh`, or `none` to lift the cap.' },
     ],
     a11y: [
       'Click is the contract, not hover: a top item with a panel is a button with `aria-expanded` and `aria-controls`, toggled by click, Enter or Space. Hover opens it after 150 ms as a courtesy, and a click on a hover-opened panel keeps it open.',
@@ -178,6 +179,7 @@ export const catalog: Element[] = [
       'Without JavaScript every top item is a plain link and a panel shows on hover or when focus is inside it, so every link is reachable.',
       'Below `breakpoint` the list sits behind a “Menu” disclosure button (`aria-expanded`), and panels become an accordion in the same order.',
       'The current page is marked on the top item as well as in its panel: once the item is a button, the button carries `aria-current="page"`.',
+      'A panel taller than the viewport below it scrolls inside itself (focus scrolls it too), so no link falls out of reach under a sticky header; the wheel stops at its end rather than scrolling the page behind.',
       'Column headings label their lists (`aria-labelledby`) rather than adding headings to the page outline. prefers-reduced-motion removes the panel’s fade.',
     ],
     usage: `<header class="site-header">   <!-- position: relative; no overflow: hidden -->
