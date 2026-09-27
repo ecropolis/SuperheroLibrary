@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { catalog } from '../data/catalog';
+import { catalog, CATEGORIES } from '../data/catalog';
 import { demos } from '../components/demos/index';
 ---
 
@@ -18,26 +18,40 @@ import { demos } from '../components/demos/index';
     </p>
   </section>
 
-  <section class="wrap gallery" aria-label="Elements">
-    {
-      catalog.map((e) => {
-        const Demo = demos[e.id];
-        return (
-          <article class="card element">
-            <div class="element__demo">{Demo && <Demo />}</div>
-            <div class="element__meta">
-              <p class="element__id"><code>{e.id}</code></p>
-              <h2><a href={`/${e.id}/`}>{e.name}</a></h2>
-              <p>{e.summary}</p>
-              <ul class="chips" aria-label="Also called">
-                {e.aka.slice(0, 4).map((a) => <li>{a}</li>)}
-              </ul>
-            </div>
-          </article>
-        );
-      })
-    }
-  </section>
+  <nav class="wrap jump" aria-label="Categories">
+    <ul>
+      {CATEGORIES.map((c) => <li><a href={`#${c.id}`}>{c.label}</a></li>)}
+    </ul>
+  </nav>
+
+  {
+    CATEGORIES.map((c) => (
+      <section class="wrap gallery" id={c.id} aria-labelledby={`${c.id}-h`}>
+        <header class="gallery__head">
+          <h2 id={`${c.id}-h`}>{c.label}</h2>
+          <p>{c.blurb}</p>
+        </header>
+        {catalog
+          .filter((e) => e.category === c.id)
+          .map((e) => {
+            const Demo = demos[e.id];
+            return (
+              <article class="card element">
+                <div class="element__demo">{Demo && <Demo />}</div>
+                <div class="element__meta">
+                  <p class="element__id"><code>{e.id}</code></p>
+                  <h3><a href={`/${e.id}/`}>{e.name}</a></h3>
+                  <p>{e.summary}</p>
+                  <ul class="chips" aria-label="Also called">
+                    {e.aka.slice(0, 4).map((a) => <li>{a}</li>)}
+                  </ul>
+                </div>
+              </article>
+            );
+          })}
+      </section>
+    ))
+  }
 
   <section class="wrap--narrow how" id="how">
     <h2>How to ask for one</h2>
@@ -93,14 +107,45 @@ import { demos } from '../components/demos/index';
     border-radius: 6px;
     font-size: 0.9rem;
   }
-  .element h2 {
-    margin: 0.4rem 0 0.6rem;
+  .jump ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2.5rem;
   }
-  .element h2 a {
+  .jump a {
+    display: inline-block;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
     color: var(--ink);
     text-decoration: none;
   }
-  .element h2 a:hover {
+  .jump a:hover {
+    border-color: var(--purple-dark);
+  }
+  .gallery {
+    scroll-margin-top: 1rem;
+  }
+  .gallery__head h2 {
+    margin: 0 0 0.35rem;
+  }
+  .gallery__head p {
+    margin: 0;
+    max-width: 44rem;
+    color: var(--muted);
+  }
+  .element h3 {
+    font-size: 1.5rem;
+    margin: 0.4rem 0 0.6rem;
+  }
+  .element h3 a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .element h3 a:hover {
     color: var(--purple-dark);
   }
   .how h2 {

@@ -57,11 +57,16 @@ An element is finished when it has all of these, in one PR:
    - `pitch` — one sentence in the client's words, the lead of the public page. `summary` stays
      the gallery's technical line.
    - `usedOn` with at least one site, and `added` as `YYYY-MM-DD`.
+   - `category` — one of `CATEGORIES`. It decides the element's section on the
+     superherotech.ai hub and its mega-menu column, and the skill mirrors it. Add the element to
+     `GOLDEN` in `scripts/check-categories.mjs` in the same category; the check fails until you do.
 4. **`npm run check` green.** It verifies every entry's file exists, every entry has a demo in
    the index, every demo asset exists, ids are kebab-case and unique, each `search.query` is
    unique and not another entry's `alsoRanks`, `added` is a date, `usedOn` is non-empty, and
    that `astro build` produces one page per entry. It exits 1 with a sentence naming the entry
-   and the rule.
+   and the rule. `scripts/check-categories.mjs` runs first: every element has a known category,
+   every category has at least three elements, the assignment matches `GOLDEN`, and the
+   categories' order and labels are unchanged.
 5. **Its section in the `superhero-ui-library` skill**, with the plugin version bumped. The
    check cannot see agent-skills, so this one is on you; it is still part of "finished".
 
@@ -80,7 +85,7 @@ and imports exactly these paths:
 
 | Path | What the website takes from it |
 | --- | --- |
-| `src/data/catalog.ts` | `catalog` (and `byId`): names, `search`, `pitch`, `aka`, `replaces`, good for / not for, `usedOn` |
+| `src/data/catalog.ts` | `catalog` (and `byId`): names, `search`, `pitch`, `aka`, `replaces`, good for / not for, `usedOn`, `category`; `CATEGORIES` for the hub sections and mega-menu columns |
 | `src/components/demos/index.ts` | `demos`, keyed by element `id` |
 | `src/library/<id>/<File>.astro` | each entry's `file`, imported by its demo |
 | `public/demo/*` | demo assets, copied to the site's `public/elements-demo/`; the site passes `assetBase="/elements-demo/"` to each demo |

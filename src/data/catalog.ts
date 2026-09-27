@@ -26,8 +26,57 @@ export interface Search {
   /** Close variants the same page should rank for without targeting them. */
   alsoRanks?: string[];
 }
+/** The buyer-facing groups every element belongs to exactly one of. */
+export type CategoryId = 'motion' | 'navigation' | 'content' | 'media' | 'conversion' | 'feedback' | 'controls';
+/**
+ * The categories in display order, with the label and one-sentence blurb shown above each group.
+ * `npm run check` pins this order and these labels, and which element sits in which category.
+ */
+export const CATEGORIES: { id: CategoryId; label: string; blurb: string }[] = [
+  {
+    id: 'motion',
+    label: 'Hero & motion',
+    blurb: 'Movement that makes your first screen feel alive, from drifting particles and background video to words that type themselves.',
+  },
+  {
+    id: 'navigation',
+    label: 'Navigation & layout',
+    blurb: 'Ways to help visitors find their way and fit a lot onto one page without it ever feeling crowded.',
+  },
+  {
+    id: 'content',
+    label: 'Content blocks',
+    blurb: 'Tidy ways to present your services, opening hours, locations and facts so visitors take them in at a glance.',
+  },
+  {
+    id: 'media',
+    label: 'Media & showcase',
+    blurb: 'Frames for your photos, videos, reviews and social posts that invite people to look closer.',
+  },
+  {
+    id: 'conversion',
+    label: 'Offers & conversion',
+    blurb: 'Put your offer, deadline or big news in front of visitors at the moment they are ready to act.',
+  },
+  {
+    id: 'feedback',
+    label: 'Feedback & states',
+    blurb: 'Clear messages that tell visitors what just happened, what is still loading and how far along they are.',
+  },
+  {
+    id: 'controls',
+    label: 'Controls & details',
+    blurb: 'Small finishing touches, from choices and menus to link hovers and cookie consent, that make a site feel carefully made.',
+  },
+];
 export interface Element {
   id: string;
+  /**
+   * The one category the element is listed under. superherotech.ai's /elements/ hub sections and
+   * its mega-menu columns are driven by it, and the `superhero-ui-library` skill mirrors it, so
+   * changing an element's category changes all three.
+   */
+  category: CategoryId;
   name: string;
   aka: string[];
   /** The gallery's technical line: what it is and how it behaves. */
@@ -57,6 +106,7 @@ export interface Element {
 export const catalog: Element[] = [
   {
     id: 'before-after',
+    category: 'media',
     name: 'Before / After',
     aka: ['TwentyTwenty', 'image comparison slider', 'compare slider', 'UABB Before After', 'reveal slider'],
     summary: 'Two images in one frame. Drag the handle, or use the arrow keys, to reveal one over the other.',
@@ -100,6 +150,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'particle-field',
+    category: 'motion',
     name: 'Particle field',
     aka: ['particles.js', 'animated particle background', 'constellation background', 'network dots', 'Smart Slider particle effect', 'UABB Particle Background', 'animated material background'],
     summary: 'Slow-drifting dots that join up with fine lines when they come near each other, drawn on a canvas behind a hero or band.',
@@ -138,6 +189,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'mega-menu',
+    category: 'navigation',
     name: 'Mega menu',
     aka: ['Max Mega Menu', 'UberMenu', 'mega dropdown', 'Elementor mega menu', 'WP Mega Menu', 'mega navigation'],
     summary: 'A header nav where a top item opens a full-width panel of grouped links, with column headings and an optional promo. Click or Enter opens it; on small screens it folds into an accordion behind a Menu button.',
@@ -200,6 +252,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'video-background',
+    category: 'motion',
     name: 'Video background',
     aka: ['video hero', 'background video', 'Elementor video background', 'autoplay muted loop video', 'Beaver Builder video row', 'hero video'],
     summary: 'A muted, looping video behind a hero, over a poster, with an optional tint and a visible pause button. Only the poster loads on small screens, under reduced motion and without JavaScript.',
@@ -255,6 +308,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'parallax-band',
+    category: 'motion',
     name: 'Parallax band',
     aka: ['parallax section', 'parallax background row', 'Elementor motion effects', 'Beaver Builder parallax row', 'scroll-speed background', 'parallax background'],
     summary: 'A full-width band whose background image scrolls slower than the page, with a tint and content on top. A scroll-driven transform, not background-attachment: fixed, so it works on iOS.',
@@ -299,6 +353,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'scroll-reveal',
+    category: 'motion',
     name: 'Scroll reveal',
     aka: ['AOS', 'ScrollReveal.js', 'animate on scroll', 'Elementor entrance animations', 'WOW.js', 'fade in on scroll'],
     summary: 'A wrapper that reveals its children as they scroll into view: a fade with a small rise, a slide from a side, or a slight scale, staggered across a list. Content stays visible if the script never runs.',
@@ -346,6 +401,7 @@ export const catalog: Element[] = [
   },
   {
     id: 'business-hours',
+    category: 'content',
     name: 'Business hours',
     aka: ['Business Hours Indicator', 'opening hours widget', 'open now / closed now', 'store hours', 'hours of operation', 'WP Business Hours'],
     summary:
@@ -404,6 +460,7 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
   },
   {
     id: 'news-ticker',
+    category: 'conversion',
     name: 'News ticker',
     aka: ['Content Ticker', 'PowerPack Content Ticker', 'marquee', 'scrolling headlines', 'trending bar', 'announcement bar', 'ticker tape', 'text ticker'],
     summary:
@@ -481,6 +538,7 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
   },
   {
     id: 'flip-box',
+    category: 'content',
     name: 'Flip box',
     aka: ['PowerPack Flip Box', 'UABB Flip Box', 'Elementor Flip Box', 'flip card', 'info box with hover reveal', '3D card flip'],
     summary:
@@ -566,6 +624,7 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
   },
   {
     id: 'social-grid',
+    category: 'media',
     name: 'Instagram feed',
     aka: ['PowerPack Instagram Feed', 'Smash Balloon', 'Instagram feed widget', 'social feed', 'Elfsight Instagram', 'LightWidget'],
     summary:
@@ -637,6 +696,7 @@ const feed = social as SocialFeed;
   },
   {
     id: 'accordion',
+    category: 'navigation',
     name: 'Accordion / FAQ',
     aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible'],
     summary:
@@ -710,6 +770,7 @@ const faqs: AccordionItem[] = [
   },
   {
     id: 'card-slider',
+    category: 'media',
     name: 'Card slider',
     aka: ['PowerPack Card Slider', 'Elementor Testimonial Carousel', 'Slick slider', 'Swiper', 'Owl carousel', 'post carousel', 'team carousel'],
     summary:
@@ -767,6 +828,7 @@ const faqs: AccordionItem[] = [
   },
   {
     id: 'tabs',
+    category: 'navigation',
     name: 'Tabs',
     aka: ['PowerPack Advanced Tabs', 'UABB Advanced Tabs', 'Elementor Tabs', 'tabbed content', 'vertical tabs'],
     summary:
@@ -829,6 +891,7 @@ const faqs: AccordionItem[] = [
   },
   {
     id: 'info-list',
+    category: 'content',
     name: 'Info list',
     aka: ['PowerPack Info List', 'UABB Info List', 'Elementor Icon List', 'icon list', 'steps list', 'process steps', 'vertical timeline', 'feature list'],
     summary:
@@ -888,6 +951,7 @@ const faqs: AccordionItem[] = [
   },
   {
     id: 'video-player',
+    category: 'media',
     name: 'Video player',
     aka: ['PowerPack Video', 'UABB Video', 'Elementor Video', 'YouTube embed', 'Vimeo embed', 'video lightbox', 'lite YouTube embed'],
     summary:
@@ -959,6 +1023,7 @@ const faqs: AccordionItem[] = [
   },
   {
     id: 'testimonial-carousel',
+    category: 'media',
     name: 'Testimonial carousel',
     aka: ['testimonial slider', 'testimonial rotator', 'review scroller', 'reviews slider', 'Elementor Testimonial Carousel', 'Slick carousel', 'Owl Carousel testimonials', 'Strong Testimonials', 'rotating testimonials'],
     summary: 'A row of quote cards, all in the HTML, that scrolls and snaps by swipe, by arrows or on its own. Autoplay waits on each card for its reading time, holds on hover, stops once the visitor takes hold of the row, and has a visible pause button.',
@@ -1024,6 +1089,7 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
   },
   {
     id: 'icon',
+    category: 'media',
     name: 'Icon library',
     aka: ['Font Awesome', 'icon picker', 'icon search', 'Beaver Builder icon', 'UABB icon', 'Elementor icon widget', 'SVG icon'],
     summary: 'One glyph from Font Awesome Free, inlined as a single SVG at build. No icon font, no CSS sprite, no client-side JavaScript.',
@@ -1063,6 +1129,7 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
   },
   {
     id: 'animated-text',
+    category: 'motion',
     name: 'Animated text',
     aka: ['animated headline', 'Elementor Animated Headline', 'text rotator', 'word rotator', 'rotating text', 'typewriter effect', 'typing animation', 'Typed.js', 'fancy text', 'word reveal', 'highlighted headline'],
     summary:
@@ -1147,6 +1214,7 @@ import AnimatedText from '../components/AnimatedText.astro';
   },
   {
     id: 'cookie-consent',
+    category: 'controls',
     name: 'Cookie consent',
     aka: ['CookieYes', 'Cookiebot', 'Complianz', 'GDPR Cookie Consent', 'cookie banner', 'consent bar', 'consent mode'],
     summary: 'A consent bar and the Google Tag Manager loader it gates. Opt-out mode (the default) loads analytics until the visitor declines; opt-in loads nothing from Google until they accept; visitors whose browser time zone is in the EEA, UK or Switzerland get opt-in whichever mode is set. Decline stops GA and deletes the cookies it already wrote. Synced from ecropolis-consent, never edited here.',
@@ -1236,6 +1304,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'animated-background',
+    category: 'motion',
     name: 'Animated background',
     aka: ['Vanta.js', 'Vanta backgrounds', 'UABB Animated Background', 'PowerPack animated background', 'animated hero background', 'waves background', 'fog background', 'birds background'],
     summary:
@@ -1288,6 +1357,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'modal',
+    category: 'conversion',
     name: 'Modal box',
     aka: ['PowerPack Modal Box', 'UABB Modal Popup', 'Elementor Popup', 'popup', 'lightbox', 'exit-intent popup', 'OptinMonster'],
     summary:
@@ -1358,6 +1428,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'announcement-bar',
+    category: 'conversion',
     name: 'Announcement bar',
     aka: ['PowerPack Announcement Bar', 'Hello Bar', 'notification bar', 'top bar', 'promo bar', 'sticky bar', 'WP Notification Bar'],
     summary:
@@ -1430,6 +1501,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'hotspot',
+    category: 'content',
     name: 'Image hotspots',
     aka: ['UABB Hotspot', 'image hotspots', 'interactive image', 'image map', 'hotspot tour', 'product tour image', 'Elementor Hotspot', 'shoppable image'],
     summary:
@@ -1499,6 +1571,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'info-circle',
+    category: 'content',
     name: 'Info circle',
     aka: ['UABB Info Circle', 'circular infographic', 'circle infographic', 'process circle', 'cycle diagram', 'radial menu', 'interactive infographic'],
     summary:
@@ -1561,6 +1634,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'slide-box',
+    category: 'content',
     name: 'Slide box',
     aka: ['UABB Slide Box', 'slide box', 'reveal card', 'sliding card', 'hover reveal box', 'info box with slide-up detail', 'card overlay'],
     summary:
@@ -1641,6 +1715,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'countdown',
+    category: 'conversion',
     name: 'Countdown',
     aka: ['UABB Countdown', 'Elementor Countdown', 'countdown timer', 'evergreen countdown timer', 'sale timer', 'deadline timer', 'order cut-off timer'],
     summary:
@@ -1712,6 +1787,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'content-toggle',
+    category: 'conversion',
     name: 'Content toggle',
     aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch'],
     summary:
@@ -1779,6 +1855,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'off-canvas',
+    category: 'navigation',
     name: 'Off-canvas panel',
     aka: ['UABB Off-Canvas', 'Elementor Off-Canvas', 'slide-out panel', 'side drawer', 'push menu', 'offcanvas', 'flyout panel', 'slide-in cart'],
     summary:
@@ -1848,6 +1925,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'video-gallery',
+    category: 'media',
     name: 'Video gallery',
     aka: ['UABB Video Gallery', 'PowerPack Video Gallery', 'Elementor Video Playlist', 'YouTube gallery', 'Vimeo gallery', 'video grid', 'filterable video gallery'],
     summary:
@@ -1926,6 +2004,7 @@ import { analytics } from '../data/site';
   },
   {
     id: 'map',
+    category: 'content',
     name: 'Map and directions',
     aka: ['UABB Google Map', 'PowerPack Google Map', 'Elementor Google Maps', 'WP Google Maps', 'Google Maps embed', 'store locator', 'location card', 'get directions button'],
     summary:
@@ -1998,6 +2077,7 @@ import LocationMap from '../components/LocationMap.astro';   // not "Map": that 
   },
   {
     id: 'link-effects',
+    category: 'controls',
     name: 'Link effects',
     aka: ['UABB Creative Link', 'PowerPack Link Effects', 'creative link', 'underline animation', 'link hover effects', 'animated underline', 'text hover effects'],
     summary:
@@ -2058,6 +2138,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'tabcordion',
+    category: 'navigation',
     name: 'Tabcordion',
     aka: ['responsive tabs', 'tabs to accordion', 'accordion tabs', 'tabs on mobile', 'product details tabs', 'Easy Responsive Tabs'],
     summary:
@@ -2121,6 +2202,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'tooltip',
+    category: 'feedback',
     name: 'Tooltip',
     aka: ['hover text', 'info icon', 'hint bubble', 'Tippy.js', 'Bootstrap tooltip', 'Elementor Hotspot tooltip'],
     summary:
@@ -2179,6 +2261,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'responsive-table',
+    category: 'content',
     name: 'Responsive table',
     aka: ['mobile table', 'table to cards', 'stacked table', 'TablePress responsive', 'data table', 'comparison table', 'price table'],
     summary:
@@ -2249,6 +2332,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'notice',
+    category: 'feedback',
     name: 'Notice',
     aka: ['alert box', 'info box', 'callout box', 'Bootstrap alert', 'message box', 'UABB Info Box', 'Elementor Alert widget', 'inline message'],
     summary:
@@ -2307,6 +2391,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'toast',
+    category: 'feedback',
     name: 'Toast',
     aka: ['snackbar', 'toast notification', 'toastr', 'Notyf', 'flash message', 'pop-up notification', 'growl notification'],
     summary:
@@ -2373,6 +2458,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'loading',
+    category: 'feedback',
     name: 'Loading',
     aka: ['spinner', 'loading spinner', 'skeleton screen', 'skeleton loader', 'preloader', 'busy indicator', 'loading animation', 'progress spinner'],
     summary:
@@ -2439,6 +2525,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'menu-button',
+    category: 'controls',
     name: 'Menu button',
     aka: ['dropdown button', 'action menu', 'kebab menu', 'three-dot menu', 'more options menu', 'Bootstrap dropdown'],
     summary:
@@ -2511,6 +2598,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'radio-group',
+    category: 'controls',
     name: 'Radio group',
     aka: ['chunky radio buttons', 'radio cards', 'card radio buttons', 'segmented control', 'segmented buttons', 'toggle button group', 'custom radio buttons', 'styled radio buttons', 'Gravity Forms radio', 'WPForms multiple choice'],
     summary:
@@ -2580,6 +2668,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'stepper',
+    category: 'feedback',
     name: 'Stepper',
     aka: ['step indicator', 'progress steps', 'stepped progress indicator', 'checkout steps', 'wizard steps', 'multi-step form progress bar', 'Gravity Forms progress bar', 'WPForms page break progress'],
     summary:
@@ -2645,6 +2734,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'tags',
+    category: 'controls',
     name: 'Tags',
     aka: ['chips', 'tag chips', 'pills', 'badges list', 'filter chips', 'removable tags', 'post tags', 'tag cloud'],
     summary:
@@ -2707,6 +2797,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'scrollbox',
+    category: 'navigation',
     name: 'Scrollbox',
     aka: ['horizontal scroller', 'scroll row', 'overflow row', 'scroll shadows', 'edge fade', 'horizontal scroll section', 'chip row'],
     summary:
@@ -2763,6 +2854,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
   },
   {
     id: 'sticker',
+    category: 'conversion',
     name: 'Sticker',
     aka: ['sale badge', 'sale sticker', 'corner ribbon', 'product badge', 'discount badge', 'new badge', 'price tag', 'WooCommerce sale flash'],
     summary:
