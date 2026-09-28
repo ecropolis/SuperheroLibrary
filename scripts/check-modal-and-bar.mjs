@@ -11,6 +11,12 @@
  *    only in the data-md JSON the script reads, never as markup that could act without it (no
  *    `open`, no <noscript> popup, no meta refresh, no inline on* handler in the element).
  * 4. The runtime is emitted once per page even with four modals on it.
+ * 4b. The demo's `quiet` prop. The gallery index renders every demo with `quiet`; the element's
+ *    own page renders it without. With `quiet`, no data-md config carries a delay, a scroll or
+ *    exit, the offer and exit modals each have an opener button ("Open it", "Show the exit
+ *    modal") and keep their memory under a key of their own. Without it, the two automatic
+ *    configs are exactly as before and the "Forget it" buttons are there. Two planted faults
+ *    (the loud page passed off as quiet, a quiet page missing an opener) must be caught.
  *
  * announcement-bar
  * 5. The date logic: the source between the `<anb-time>` markers, types stripped by Node, run
@@ -98,6 +104,69 @@ for (const rel of ['dist/modal/index.html', 'dist/index.html']) {
   if (dialogs.length && runtimes !== 1) fail(`${rel}: the modal runtime is on the page ${runtimes} times; it must be emitted once.`);
 }
 finish('modal');
+
+// ------------------------------------------------------------- 4b. modal, quiet
+const QUIET_OPENERS = [
+  ['demo-modal-offer', 'Open it'],
+  ['demo-modal-exit', 'Show the exit modal'],
+];
+const LOUD = {
+  'demo-modal-offer': { delay: 20000, scroll: 50, exit: false, once: 'session', key: 'modal:demo-modal-offer', version: 'demo-1' },
+  'demo-modal-exit': { delay: null, scroll: null, exit: true, once: 'session', key: 'modal:demo-modal-exit', version: 'demo-1' },
+};
+const modalConfigs = (html) =>
+  [...html.matchAll(/<dialog\b[^>]*\sdata-md=[^>]*>/g)].map((d) => ({ id: attr(d[0], 'id'), cfg: JSON.parse(decode(attr(d[0], 'data-md'))) }));
+const openers = (html, id) =>
+  [...html.matchAll(new RegExp(`<button\\b[^>]*\\sdata-modal-open="${id}"[^>]*>([\\s\\S]*?)</button>`, 'g'))].map((m) => ({
+    tag: m[0].slice(0, m[0].indexOf('>') + 1),
+    text: m[1].replace(/<[^>]+>/g, '').trim(),
+  }));
+/** Every way `html` fails to be the modal demo rendered with (quiet) or without (!quiet) `quiet`. */
+const quietProblems = (html, quiet) => {
+  const out = [];
+  const cfgs = modalConfigs(html);
+  if (cfgs.length !== 4) out.push(`expected the demo's 4 modals, found ${cfgs.length}`);
+  if (quiet) {
+    for (const { id, cfg } of cfgs) {
+      if (cfg.delay !== null || cfg.scroll !== null || cfg.exit) out.push(`#${id} opens by itself (delay ${cfg.delay}, scroll ${cfg.scroll}, exit ${cfg.exit})`);
+    }
+    for (const [id, text] of QUIET_OPENERS) {
+      const b = openers(html, id);
+      if (b.length !== 1) out.push(`#${id}: expected one opener button, found ${b.length}`);
+      else {
+        if (b[0].text !== text) out.push(`#${id}: the opener reads "${b[0].text}", expected "${text}"`);
+        if (attr(b[0].tag, 'type') !== 'button') out.push(`#${id}: the opener needs type="button"`);
+      }
+      const c = cfgs.find((x) => x.id === id);
+      if (c && c.cfg.key === LOUD[id].key) out.push(`#${id}: shares its memory key with the element page, so a press here would stop it opening there`);
+    }
+    if (/data-demo-md-forget=/.test(html)) out.push('a "Forget it, arm it again" button, with nothing armed to forget');
+  } else {
+    for (const [id, want] of Object.entries(LOUD)) {
+      const c = cfgs.find((x) => x.id === id);
+      if (!c) {
+        out.push(`#${id} is missing`);
+        continue;
+      }
+      for (const [k, v] of Object.entries(want)) if (c.cfg[k] !== v) out.push(`#${id}: ${k} is ${JSON.stringify(c.cfg[k])}, expected ${JSON.stringify(v)}`);
+      if (!html.includes(`data-demo-md-forget="${id}"`)) out.push(`#${id}: no "Forget it" button`);
+      if (openers(html, id).length) out.push(`#${id}: has an opener button; without quiet it opens by itself`);
+    }
+  }
+  return out;
+};
+const quietPage = read('dist/index.html');
+const loudPage = read('dist/modal/index.html');
+if (quietPage && loudPage) {
+  for (const p of quietProblems(quietPage, true)) fail(`dist/index.html (ModalDemo with quiet): ${p}.`);
+  for (const p of quietProblems(loudPage, false)) fail(`dist/modal/index.html (ModalDemo without quiet): ${p}.`);
+  const planted = [
+    ['the element page passed off as quiet', loudPage, true],
+    ['a quiet page without the exit opener', quietPage.replace(/<button\b[^>]*data-modal-open="demo-modal-exit"[^>]*>[\s\S]*?<\/button>/, ''), true],
+  ];
+  for (const [label, html, quiet] of planted) if (!quietProblems(html, quiet).length) fail(`the quiet pin missed a planted fault: ${label}.`);
+}
+finish('modal quiet');
 
 // ------------------------------------------------------------- 5. bar date logic
 const barFile = 'src/library/announcement-bar/AnnouncementBar.astro';
@@ -225,4 +294,4 @@ for (const theme of ['accent', 'dark', 'light']) {
 if (!/\.anb__text :global\(a\) \{\s*color: var\(--anb-link, currentColor\);/.test(barSrc)) fail(`${barFile}: the link fallback must be currentColor (the theme's own text colour), or its contrast needs measuring here too.`);
 finish('announcement-bar contrast');
 
-console.log(`check-modal-and-bar ok: modal no-JS render on 2 pages; ${inWin.length + instants.length + lefts.length} bar time cases; bar markup on 2 pages; contrast ${ratios.join(', ')}.`);
+console.log(`check-modal-and-bar ok: modal no-JS render on 2 pages; quiet demo on the gallery, automatic on its own page, 2 planted faults caught; ${inWin.length + instants.length + lefts.length} bar time cases; bar markup on 2 pages; contrast ${ratios.join(', ')}.`);

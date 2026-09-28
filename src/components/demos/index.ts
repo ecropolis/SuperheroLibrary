@@ -6,6 +6,12 @@
  * is served; the website passes `/elements-demo/`. Reference assets through `asset('<file>')`
  * so `npm run check` can find them.
  *
+ * Each demo also takes an optional `quiet` prop (default false). `quiet` — the demo is one of
+ * many on a page: nothing may open, move, play sound or steal focus by itself. A demo without
+ * automatic behaviour ignores it. This gallery's index and superherotech.ai's /elements/ hub pass
+ * it; an element's own page does not, since there the automatic behaviour is the point. Today
+ * only ModalDemo acts on it (its delay/scroll and exit-intent modals open on a press instead).
+ *
  * `npm run check` reads the `'<id>': Component` lines below, so keep one entry per line.
  */
 import BeforeAfterDemo from './BeforeAfterDemo.astro';
