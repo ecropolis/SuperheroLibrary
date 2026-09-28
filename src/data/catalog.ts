@@ -1209,6 +1209,7 @@ import AnimatedText from '../components/AnimatedText.astro';
 <AnimatedText effect="strike" text="We sell {software|outcomes}." label="We sell outcomes, not software." />`,
     usedOn: [
       { site: 'nicolelawton.com', where: 'Home, the "Let Go. Let Be. Let Me." band over the deep water (pre-launch on nicolelawton.gohero.us). It is the distil original, LetGo.astro, built before this element and not yet swapped for it' },
+      { site: 'nicolelawton.com', where: 'Resources, the closing tagline "Cultivate Empower Connect": build, word by word, gap 600, once. A copy of this file; her phoenix between the words is drawn by the page, on .at__piece + .at__piece::before (pre-launch on nicolelawton.gohero.us)' },
       { site: 'superherotech.ai', where: '/elements/animated-text/ (demo): all six effects' },
     ],
     file: 'src/library/animated-text/AnimatedText.astro',
