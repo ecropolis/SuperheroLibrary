@@ -9,14 +9,22 @@
  * never while the consent bar is waiting, never twice). "Forget" clears their memory so a
  * reviewer can see them again without a new session.
  *
+ * With `quiet` (a page showing many demos at once, like the superherotech.ai hub) nothing opens
+ * by itself: the offer and exit modals get no `delay`, `scroll` or `exit`, each card gets a
+ * button that opens its modal instead, and they keep their memory under their own key so a
+ * press here never hides the automatic ones on the element's own page. Without `quiet` the
+ * demo is unchanged.
+ *
  * The form closes the dialog on submit (method="dialog") and sends nothing anywhere.
  */
 import Modal from '../../library/modal/Modal.astro';
 interface Props {
   /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
   assetBase?: string;
+  /** One of many demos on a page: nothing opens by itself. See index.ts. */
+  quiet?: boolean;
 }
-const { assetBase = '/demo/' } = Astro.props;
+const { assetBase = '/demo/', quiet = false } = Astro.props;
 const asset = (name: string) => assetBase + name;
 ---
 <div class="demo-md">
@@ -29,25 +37,47 @@ const asset = (name: string) => assetBase + name;
     <button class="demo-md__btn" type="button" data-modal-open="demo-modal-ask">Ask a question</button>
   </div>
 
-  <div class="demo-md__item">
-    <p class="demo-md__label">After 20 seconds or half the page, once a session</p>
-    <p>
-      Opens by itself when either comes first, but never in the first 3 seconds, never while a consent
-      bar is waiting and never again this session once closed.
-    </p>
-    <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-offer">Forget it, arm it again</button>
-    <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-offer"></p>
-  </div>
+  {quiet ? (
+    <div class="demo-md__item">
+      <p class="demo-md__label">After a delay or a scroll: by itself on its own page, here on a press</p>
+      <p>
+        On a site it opens after 20 seconds or half the page, whichever comes first, but never in the first
+        3 seconds, never while a consent bar is waiting and never again that session once closed.
+      </p>
+      <button class="demo-md__btn" type="button" data-modal-open="demo-modal-offer">Open it</button>
+    </div>
+  ) : (
+    <div class="demo-md__item">
+      <p class="demo-md__label">After 20 seconds or half the page, once a session</p>
+      <p>
+        Opens by itself when either comes first, but never in the first 3 seconds, never while a consent
+        bar is waiting and never again this session once closed.
+      </p>
+      <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-offer">Forget it, arm it again</button>
+      <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-offer"></p>
+    </div>
+  )}
 
-  <div class="demo-md__item">
-    <p class="demo-md__label">Exit intent</p>
-    <p>
-      Move the pointer out through the top of the window, towards the tabs. Mouse and trackpad only: on a
-      phone or tablet exit intent never fires, because there is no pointer to leave.
-    </p>
-    <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-exit">Forget it, arm it again</button>
-    <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-exit"></p>
-  </div>
+  {quiet ? (
+    <div class="demo-md__item">
+      <p class="demo-md__label">Exit intent: by itself on its own page, here on a press</p>
+      <p>
+        On a site it opens when the pointer leaves through the top of the window, towards the tabs. Mouse and
+        trackpad only: on a phone or tablet there is no pointer to leave.
+      </p>
+      <button class="demo-md__btn" type="button" data-modal-open="demo-modal-exit">Show the exit modal</button>
+    </div>
+  ) : (
+    <div class="demo-md__item">
+      <p class="demo-md__label">Exit intent</p>
+      <p>
+        Move the pointer out through the top of the window, towards the tabs. Mouse and trackpad only: on a
+        phone or tablet exit intent never fires, because there is no pointer to leave.
+      </p>
+      <button class="demo-md__btn demo-md__btn--quiet" type="button" data-demo-md-forget="demo-modal-exit">Forget it, arm it again</button>
+      <p class="demo-md__status" aria-live="polite" data-demo-md-status="demo-modal-exit"></p>
+    </div>
+  )}
 
   <div class="demo-md__item">
     <p class="demo-md__label">Full screen, an image</p>
@@ -67,14 +97,27 @@ const asset = (name: string) => assetBase + name;
   </form>
 </Modal>
 
-<Modal id="demo-modal-offer" title="Before you go further" size="sm" delay={20000} scroll={50} once="session" version="demo-1">
-  <p>This opened by itself, after 20 seconds on the page or half of it scrolled. Close it and it stays closed this session.</p>
-  <form method="dialog"><button class="demo-md__btn">Fine, thanks</button></form>
-</Modal>
+{quiet ? (
+  <Modal id="demo-modal-offer" title="Before you go further" size="sm" key="modal:demo-modal-offer:quiet" version="demo-1">
+    <p>On its own page this opens by itself, after 20 seconds on the page or half of it scrolled, and once closed it stays closed that session.</p>
+    <form method="dialog"><button class="demo-md__btn">Fine, thanks</button></form>
+  </Modal>
+) : (
+  <Modal id="demo-modal-offer" title="Before you go further" size="sm" delay={20000} scroll={50} once="session" version="demo-1">
+    <p>This opened by itself, after 20 seconds on the page or half of it scrolled. Close it and it stays closed this session.</p>
+    <form method="dialog"><button class="demo-md__btn">Fine, thanks</button></form>
+  </Modal>
+)}
 
-<Modal id="demo-modal-exit" title="Leaving already?" size="sm" exit once="session" version="demo-1">
-  <p>The pointer left through the top of the window. This fires once, and only with a mouse or trackpad.</p>
-</Modal>
+{quiet ? (
+  <Modal id="demo-modal-exit" title="Leaving already?" size="sm" key="modal:demo-modal-exit:quiet" version="demo-1">
+    <p>On its own page this opens when the pointer leaves through the top of the window: once, and only with a mouse or trackpad.</p>
+  </Modal>
+) : (
+  <Modal id="demo-modal-exit" title="Leaving already?" size="sm" exit once="session" version="demo-1">
+    <p>The pointer left through the top of the window. This fires once, and only with a mouse or trackpad.</p>
+  </Modal>
+)}
 
 <Modal id="demo-modal-image" title="Hills under an evening sky" hideTitle size="full" closeLabel="Close the image" class="demo-md-dark">
   <img class="demo-md__full" src={asset('hills.svg')} alt="Illustrated hills under a sky fading from navy to purple to orange" width="1600" height="1000" />

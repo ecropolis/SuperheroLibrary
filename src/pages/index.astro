@@ -37,7 +37,7 @@ import { demos } from '../components/demos/index';
             const Demo = demos[e.id];
             return (
               <article class="card element">
-                <div class="element__demo">{Demo && <Demo />}</div>
+                <div class="element__demo">{Demo && <Demo quiet />}</div>
                 <div class="element__meta">
                   <p class="element__id"><code>{e.id}</code></p>
                   <h3><a href={`/${e.id}/`}>{e.name}</a></h3>

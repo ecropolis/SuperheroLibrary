@@ -50,6 +50,11 @@ An element is finished when it has all of these, in one PR:
    `assetBase` prop can move them. Give every host token a fallback (`var(--purple, #5933d8)`);
    the website defines `--purple`, `--purple-dark`, `--navy`, `--white`, `--radius`, `--tint`,
    `--line` and `--ink`, so tell the website session before using any other.
+   Demos also take `quiet?: boolean` (default false). `quiet` — the demo is one of many on a
+   page: nothing may open, move, play sound or steal focus by itself. A demo without automatic
+   behaviour ignores it. The gallery index and the website's hub pass it; an element's own page
+   does not. A demo that opens something by delay, scroll or exit intent (as `modal`'s does) must
+   offer it on a press instead when `quiet`.
 3. **The catalogue entry** in `src/data/catalog.ts`, including:
    - `search: { query, alsoRanks? }` — the query from SE Ranking (US) the public page is
      written for, lowercase as people type it, and close variants it should also rank for.
@@ -88,7 +93,7 @@ and imports exactly these paths:
 | `src/data/catalog.ts` | `catalog` (and `byId`): names, `search`, `pitch`, `aka`, `replaces`, good for / not for, `usedOn`, `category`; `CATEGORIES` for the hub sections and mega-menu columns |
 | `src/components/demos/index.ts` | `demos`, keyed by element `id` |
 | `src/library/<id>/<File>.astro` | each entry's `file`, imported by its demo |
-| `public/demo/*` | demo assets, copied to the site's `public/elements-demo/`; the site passes `assetBase="/elements-demo/"` to each demo |
+| `public/demo/*` | demo assets, copied to the site's `public/elements-demo/`; the site passes `assetBase="/elements-demo/"` to each demo, and `quiet` on the `/elements/` hub, where every demo shares one page |
 
 The public pages show no builder tables; props and theming stay on this gallery.
 
