@@ -26,6 +26,25 @@ export interface Search {
   /** Close variants the same page should rank for without targeting them. */
   alsoRanks?: string[];
 }
+/**
+ * One thing the client has to give us before the element can be built on their site: the hours
+ * for business-hours, the date for countdown. Written as the client reads it, in sentence case.
+ * The portal turns each ask into a field on the request form (required ones must be answered
+ * before the request is filed), and the request engine names a missing one as a gap.
+ * `npm run check` pins the shape: `key` matches /^[a-z][a-z0-9_]*$/ and is at most 40
+ * characters and unique within the element, `label` at most 120, `hint` at most 200, and an
+ * element has at most 6.
+ */
+export interface Ask {
+  /** Stable id of the ask: the request form's field name and a gap's `ask`. Never reuse one for a different question. */
+  key: string;
+  /** The question as the client sees it. */
+  label: string;
+  /** A line under the field: an example, or what to do when they do not have it. */
+  hint?: string;
+  /** The element cannot be built without it. */
+  required?: boolean;
+}
 /** The buyer-facing groups every element belongs to exactly one of. */
 export type CategoryId = 'motion' | 'navigation' | 'content' | 'media' | 'conversion' | 'feedback' | 'controls';
 /**
@@ -88,6 +107,13 @@ export interface Element {
   replaces: string[];
   goodFor: string;
   notFor: string;
+  /**
+   * What the client needs to give us before it can be built on their site. Absent when the
+   * element needs nothing beyond what the brief already covers (a menu is built from the site's
+   * own pages, a loading spinner from nothing). Shown on the element's gallery page as "What the
+   * client needs to give you", and on superherotech.ai as "You'll need to give us".
+   */
+  asks?: Ask[];
   props: Prop[];
   theming: ThemeVar[];
   a11y: string[];
@@ -116,6 +142,10 @@ export const catalog: Element[] = [
     replaces: ['UABB "Before After" module (Beaver Builder)', 'TwentyTwenty jQuery plugin', 'most "image compare" WordPress plugins'],
     goodFor: 'Problem-and-solution illustrations, renovations, retouching, redesigns: anything where the two states share a frame.',
     notFor: 'Two unrelated images. If they do not line up, use a two-column layout instead.',
+    asks: [
+      { key: 'before_image', label: 'The before photo', hint: 'Taken from the same spot and angle as the after photo, so the two line up when a visitor drags between them.', required: true },
+      { key: 'after_image', label: 'The after photo', required: true },
+    ],
     props: [
       { name: 'before', type: 'string', note: 'URL of the image that is revealed from the left.' },
       { name: 'after', type: 'string', note: 'URL of the image underneath.' },
@@ -264,6 +294,9 @@ export const catalog: Element[] = [
     replaces: ['Elementor section “Background type: Video”', 'Beaver Builder row video background', 'Divi video background', 'hand-rolled `<video autoplay muted loop>` embeds'],
     goodFor: 'A hero where the footage is the argument: a venue, a kitchen at work, a site being built. Short, quiet, loopable clips of 10–20 s.',
     notFor: 'Footage with a message, speech or captions (use a real player), or anything a visitor must see: on phones and under reduced motion they get the poster alone.',
+    asks: [
+      { key: 'video', label: 'The video, as a file or a link to download it', hint: 'A short clip that loops without a visible jump. It plays muted, so sound is not needed.', required: true },
+    ],
     props: [
       { name: 'src', type: '{ src, type }[]', note: 'Sources in order of preference, WebM first then MP4. Keep each under ~2 MB; no audio track.' },
       { name: 'poster', type: 'string', note: 'Still shown before, instead of and under the video. Use the video’s first frame so the swap is invisible.' },
@@ -320,6 +353,9 @@ export const catalog: Element[] = [
     replaces: ['Elementor “Motion effects → Scrolling effects” on a section background', 'Beaver Builder row background “Parallax”', 'Divi “Use parallax effect”', '`background-attachment: fixed` CSS parallax'],
     goodFor: 'A break between sections of a long page: a landscape, a workshop, a skyline behind one line of copy and a button.',
     notFor: 'Images that carry information (it is decorative, with empty alt text), portrait photos (the crop is wide), or more than two or three bands on one page.',
+    asks: [
+      { key: 'image', label: 'A wide photo for the band, if you have one', hint: 'At least 2000 pixels across. Text sits on top of it, so a calm area in the picture helps.' },
+    ],
     props: [
       { name: 'image', type: 'string', note: 'Background image URL. Decorative, so it gets empty alt text. Use one at least 1.5× the band’s height at the widest viewport.' },
       { name: 'width', type: 'number', note: 'Intrinsic width of the image.' },
@@ -415,6 +451,11 @@ export const catalog: Element[] = [
     replaces: ['Mabel Business Hours Indicator (Pro)', 'WP Business Hours', 'Opening Hours by Wolfgang', 'hand-written hours in the footer'],
     goodFor: 'Any business with a door: shops, clinics, cafés, salons. Several locations in different time zones on one site, one element per location.',
     notFor: 'Booking availability or staff calendars; this states when the doors are open, not which slots are free.',
+    asks: [
+      { key: 'hours', label: 'Opening hours, per day and per location', hint: 'For example Mon–Fri 9–5, Sat 10–2, closed Sunday. Name each location if you have more than one.', required: true },
+      { key: 'time_zone', label: 'The time zone your hours are in', hint: 'The city is enough, such as Chicago.', required: true },
+      { key: 'holidays', label: 'Holiday hours and closures coming up', hint: 'Days you close or keep shorter hours. You can send more later.' },
+    ],
     props: [
       { name: 'hours', type: 'BusinessHoursData', note: 'The data: `timeZone` (IANA), `weekly`, and optional `exceptions`, `closures`, `seasons`, `alwaysOpen`, `byAppointment`, `note`. Import the type from the component. Priority: closure > exception > season > weekly.' },
       { name: 'variant', type: "'line' | 'badge' | 'table' | 'full'", default: "'full'", note: 'line: the sentence. badge: Open/Closed pill and the sentence. table: the week, today marked. full: badge, table, note and the coming exceptions.' },
@@ -474,6 +515,10 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
     replaces: ['PowerPack Content Ticker (Beaver Builder)', 'Elementor Pro Post Ticker / Nav Menu ticker', 'news ticker WordPress plugins', 'the HTML marquee tag'],
     goodFor: 'A strip under the header or above the footer: the latest posts, this week’s offers, the next few events, a “Trending” row on a blog. Five to eight short headlines.',
     notFor: 'A page that already has a moving hero or carousel; more than one per page; body copy, or anything a visitor must read to finish a task (it truncates and moves on).',
+    asks: [
+      { key: 'items', label: 'The headlines, and the page each one links to', hint: 'Or tell us where they come from, such as your blog or events list, and we will fill it from there.', required: true },
+      { key: 'label', label: 'The word on its label, such as “Latest” or “Offers”' },
+    ],
     props: [
       { name: 'items', type: '{ text, href?, image?, imageAlt?, meta? }[]', note: 'The headlines, passed in by the host (a content collection, a data file, the events or reviews JSON the site already builds from). `meta` is a short date or tag shown muted. `imageAlt` defaults to empty: the headline names the link.' },
       { name: 'label', type: 'string', note: 'The chip, e.g. “Trending”. Also the strip’s accessible name.' },
@@ -552,6 +597,10 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
     goodFor: 'Services grids, team members, features: three or four cards in a row, where the front names the thing and the back says a little more and links on.',
     notFor:
       'Content people must read without interacting. The back is optional detail, never the only place a price, a phone number or an opening time lives: put those on the front or on the page.',
+    asks: [
+      { key: 'front', label: 'The front of each card: a title and a short line', hint: 'Add an icon or a photo for a card if you have one in mind.', required: true },
+      { key: 'back', label: 'The back of each card: the longer text, and where its link goes', required: true },
+    ],
     props: [
       { name: 'title', type: 'string', note: 'Front heading, and the accessible name of the card’s button.' },
       { name: 'text', type: 'string', note: 'The front’s short line.' },
@@ -638,6 +687,10 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
     replaces: ['PowerPack Instagram Feed', 'Smash Balloon / Elfsight / LightWidget embeds'],
     goodFor: 'Restaurants, salons, makers, and anyone whose Instagram is their portfolio: the grid keeps the site as fresh as the account.',
     notFor: 'Accounts that post rarely (a stale grid dates the site), and anything that needs like or comment counts: the API does not return them reliably for the account’s visitors, and they date the moment the page is built.',
+    asks: [
+      { key: 'handle', label: 'Your Instagram handle', required: true },
+      { key: 'consent', label: 'Permission to connect the account', hint: 'Whoever manages the account approves the connection. We never need its password.', required: true },
+    ],
     props: [
       { name: 'feed', type: 'SocialFeed', note: 'The feed JSON: `{ source: { username, profile_url, connected, last_pulled_at }, posts: [{ id, permalink, media_type, taken_at, image: { url, width, height }, alt, caption }] }`. At build, from `src/data/social.json`. Import the type from the component.' },
       { name: 'columns', type: 'number | { base?, md?, lg? }', default: '{ base: 3, md: 4, lg: 6 }', note: 'Columns per viewport breakpoint: md from 48rem, lg from 64rem. A missing md takes base; a missing lg takes md.' },
@@ -718,6 +771,9 @@ const feed = social as SocialFeed;
     goodFor: 'An FAQ page or section; services, policies or specifications that visitors scan for the one they need; any page where most readers want one answer out of many.',
     notFor:
       'Content everyone must read (behind a tap, most people never see it), a single paragraph, or navigation. Nor is it a promise of search features: since August 2023 Google shows FAQ rich results only for well-known, authoritative government and health sites. The schema is still correct markup that tells machines these are questions and answers; it does not buy extra space in results.',
+    asks: [
+      { key: 'items', label: 'The questions, or titles, and the answer to each', hint: 'If they are your frequently asked questions, we also mark them up so search engines can read them.', required: true },
+    ],
     props: [
       { name: 'items', type: 'AccordionItem[]', note: '`{ title, body?, slot?, id?, open? }`. `title` is plain text (the summary and the JSON-LD question). `body` is an HTML string; or name a slot in `slot` and pass `<div slot="…">…</div>`. `id` is the deep-link anchor (default: the title, slugified).' },
       { name: 'exclusive', type: 'boolean', default: 'true', note: 'One open at a time. Uses the `name` attribute, so the browser closes the others itself.' },
@@ -785,6 +841,9 @@ const faqs: AccordionItem[] = [
     goodFor: 'Testimonials, team members, recent posts, related products: a set of similar cards where seeing three and knowing there are more is enough.',
     notFor:
       'A hero (that is video-background or particle-field territory), or anything every visitor must see all of: a slider hides most of its cards, so when each card matters a grid is the honest choice.',
+    asks: [
+      { key: 'cards', label: 'What each card shows, if it is not already on your site', hint: 'Such as each team member with a photo and a line, or the products to feature.' },
+    ],
     props: [
       { name: 'label', type: 'string', note: 'Accessible name of the carousel, e.g. “What our customers say”. Required.' },
       { name: 'default slot', type: 'cards', note: 'Each direct child is one card (article, div, figure), not a list. The script names each “3 of 8”.' },
@@ -842,6 +901,9 @@ const faqs: AccordionItem[] = [
     replaces: ['PowerPack “Advanced Tabs” (Beaver Builder)', 'UABB “Advanced Tabs”', 'Elementor Tabs widget'],
     goodFor: 'Alternatives a visitor picks one of: plans, service areas, a product’s description, specifications and delivery, an about page’s team, history and values.',
     notFor: 'Content people must compare side by side (use a table or columns), or more than about six tabs: past that the strip scrolls and some tabs are out of sight.',
+    asks: [
+      { key: 'tabs', label: 'The name of each tab and what goes in it', required: true },
+    ],
     props: [
       { name: 'tabs', type: 'Tab[]', note: '`{ id, label, icon?, panel?, slot? }`. `id` is the anchor and hash (unique on the page). `icon` is an inline SVG string (decorative). `panel` is an HTML string; or name a slot in `slot`.' },
       { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
@@ -905,6 +967,9 @@ const faqs: AccordionItem[] = [
     replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists'],
     goodFor: 'Services, “how it works”, process steps, milestones and feature lists.',
     notFor: 'Navigation (that is a menu) and long prose (write paragraphs).',
+    asks: [
+      { key: 'items', label: 'The items, each with a title and a line of text', hint: 'Add a link, an icon or a photo for any item that has one.', required: true },
+    ],
     props: [
       { name: 'items', type: 'InfoItem[]', note: '`{ title, text?, href?, icon?, iconLabel?, image?, imageAlt?, number?, meta? }`. `icon` is an inline SVG string; `number` overrides the position (“01”); `meta` is a small line above the title (a year, a duration).' },
       { name: 'layout', type: '“stack” | “inline”', default: '“stack”', note: 'Stack is one column, marker at the left. Inline is a grid of `columns`; where it has one column it is laid out as the stack.' },
@@ -965,6 +1030,11 @@ const faqs: AccordionItem[] = [
     replaces: ['PowerPack / UABB / Elementor video modules', 'raw YouTube/Vimeo iframes', 'lite-youtube-embed', 'video lightbox plugins'],
     goodFor: 'A video people choose to watch: an explainer on a service page, a testimonial, a tour of the premises.',
     notFor: 'Ambient loops behind a hero (that is video-background) and autoplay with sound, which no page of ours ever does.',
+    asks: [
+      { key: 'video', label: 'The video: a YouTube or Vimeo link, or the file', required: true },
+      { key: 'poster', label: 'A still image to show before it plays, if you have one', hint: 'Without one we use a frame from the video.' },
+      { key: 'captions', label: 'Captions or a transcript, if you have them', hint: 'Needed for a video file we host. YouTube and Vimeo carry their own.' },
+    ],
     props: [
       { name: 'src', type: 'string | { src, type? }[]', note: 'A YouTube URL or id (watch, youtu.be, shorts, embed), a Vimeo URL or id (unlisted `/id/hash` kept), a .mp4/.webm URL, or sources in order of preference. Anything else fails the build with a sentence.' },
       { name: 'title', type: 'string', note: 'Required. Names the play button ("Play: <title>"), the iframe and the lightbox.' },
@@ -1037,6 +1107,10 @@ const faqs: AccordionItem[] = [
     replaces: ['Elementor Pro “Testimonial Carousel” widget', 'Slick and Owl Carousel testimonial sliders', 'Strong Testimonials and similar WordPress plugins', 'Beaver Builder and UABB testimonials modules'],
     goodFor: 'Five to fifteen testimonials or reviews you want read, short and long mixed, on a home page or a service page.',
     notFor: 'A live feed of Google or Tripadvisor reviews: this shows what you give it and fetches nothing. And two or three quotes, which read better side by side.',
+    asks: [
+      { key: 'quotes', label: 'The quotes, each with the name to show beside it', hint: 'A second line, such as the service they used or their town, is welcome.', required: true },
+      { key: 'permission', label: 'Confirmation that each person agreed to be quoted and named that way', required: true },
+    ],
     props: [
       { name: 'items', type: '{ quote, name, meta? }[]', note: 'The cards, in order. `name` as the person agreed to be named; `meta` is a second line, such as the service and date.' },
       { name: 'label', type: 'string', default: '“N testimonials, scroll sideways for more”', note: 'Accessible name of the row. Say how many and that it scrolls.' },
@@ -1103,6 +1177,9 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
     replaces: ['Font Awesome as a web font (the whole set on every page)', 'icon fonts', 'page-builder icon modules'],
     goodFor: 'A glyph next to text, in a button, or standing alone: navigation, feature lists, contact details, social links, icon-only buttons (with `label` set).',
     notFor: 'Illustrations and logos — an icon is a glyph, not artwork. And any Pro-only style or glyph: ask for it by name and we license and embed it directly in that site, never here.',
+    asks: [
+      { key: 'icons', label: 'Which icons you want, and where', hint: 'Describe them in words, such as a phone beside the number. We match them from Font Awesome Free.' },
+    ],
     props: [
       { name: 'name', type: 'string', note: 'Font Awesome Free icon name, kebab-case: "house", "user", "phone-volume". Required.' },
       { name: 'style', type: '"solid" | "regular" | "brands"', default: 'solid', note: 'Free ships exactly these three styles, and not every icon has all three.' },
@@ -1157,6 +1234,9 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
       'The one line that carries a page or a band: a tagline, a promise, a mantra. Highlight suits a first-screen headline because it is readable from the first frame; the other five suit a line the visitor meets after it.',
     notFor:
       'Body copy, anything a visitor must read to act (a price, an instruction), or more than one on a screen. Not the first screen’s h1 in build, typewriter or distil: they start invisible, which delays the moment it can be read and the page’s Largest Contentful Paint. Typewriter splits letters, so not for scripts that join them (Arabic, Devanagari).',
+    asks: [
+      { key: 'words', label: 'The line it animates, and which words move', hint: 'Such as the word that is struck out and the word that replaces it. We can suggest one from your brief.' },
+    ],
     props: [
       { name: 'effect', type: `'build' | 'typewriter' | 'rotate' | 'distil' | 'highlight' | 'strike'`, default: `'build'`, note: 'Which of the six.' },
       { name: 'text', type: 'string', note: 'The words, with marks as the effect needs: `|` between parts (build, distil) or lines (typewriter); `[…]` round the words that fall away (distil); `{a|b|c}` the slot (rotate); `{…}` the marked words (highlight); `{old|new}` the change (strike). A missing mark is a build error that says which.' },
@@ -1374,6 +1454,10 @@ import { analytics } from '../data/site';
       'Something the visitor asked for: a form behind a “Get a quote” button, a video or a large image on request, a link in an email that opens the offer (#<id>). Or one offer after real engagement: half the page read, or a mouse heading for the tab bar. A popup is a tool with a cost, so use it where the content is worth the interruption.',
     notFor:
       'Opening on arrival. A popup that covers the content the moment the page loads is what put popups out of favour: people leave, and Google’s guidance on intrusive interstitials says a mobile page whose content is blocked on arrival can rank lower. That is why automatic opens here wait for 3 s of visible time at the least. Also not for every page, not for more than one automatic popup per page (the element opens only the first anyway), and not for content people need in order to use the page, which belongs on the page. Exit intent works with a mouse or trackpad only: on a phone or tablet it never fires, so a mobile audience needs a scroll or delay trigger or none.',
+    asks: [
+      { key: 'message', label: 'The offer or message it shows', hint: 'A heading, a few lines, and the button or form it leads to.', required: true },
+      { key: 'trigger', label: 'When it should open', hint: 'When a visitor presses a button, after some time on the page, part-way down it, or as they go to leave.' },
+    ],
     props: [
       { name: 'id', type: 'string', note: 'Required. The dialog’s id: any element with data-modal-open="<id>" opens it, and with openOnHash so does #<id> in the URL.' },
       { name: 'title', type: 'string', note: 'Required. The dialog’s accessible name, shown as its heading (aria-labelledby).' },
@@ -1444,6 +1528,11 @@ import { analytics } from '../data/site';
       'Something true for a while and then not: holiday hours, a sale with an end, a launch, a closure, a change of address. Give it `until` or a `countdown` and it takes itself down on time, in the business’s time zone, with no one editing the site.',
     notFor:
       'Permanent content: a phone number or a tagline that is always there belongs in the header. Two bars stacked on one page: say the one thing. A rolling list of headlines is news-ticker. And a sticky bar by default: a bar that follows the reader down the page covers content on a phone; ask for sticky when it earns it.',
+    asks: [
+      { key: 'message', label: 'The announcement, in one line', required: true },
+      { key: 'dates', label: 'When it should start and stop showing', hint: 'Leave it open if it stays until you say. Give the time zone for a time of day.' },
+      { key: 'link', label: 'Where it should link, if anywhere' },
+    ],
     props: [
       { name: 'text', type: 'string', note: 'The announcement, when not given as the default slot. One line on a laptop; it wraps on a phone.' },
       { name: 'href / linkText', type: 'string', default: '— / “Read more”', note: 'A normal link after the text.' },
@@ -1519,6 +1608,10 @@ import { analytics } from '../data/site';
       'One picture that stands for a lot of parts: a room or a product whose features each need a line, a floor plan, a site map of a campus or a trail, a diagram of a machine. The tour suits a picture people should see in order, like the stops of a visit or the steps of an assembly.',
     notFor:
       'Text people must read to use the page: behind a pin, many never see it (the numbered list under the image is only there without JavaScript and in print). More than about eight pins, which crowd the picture and a phone. Pins that are links to other pages: that is a list of links, or cards. And a picture without a spot to point at, where a caption does the job.',
+    asks: [
+      { key: 'image', label: 'The image the points sit on', required: true },
+      { key: 'points', label: 'Each point: where it goes on the image, a short title and a line or two about it', required: true },
+    ],
     props: [
       { name: 'src', type: 'string', note: 'The image.' },
       { name: 'alt', type: 'string', note: 'Required. Describe the whole picture; the pins add the detail. "" only when the pins and their text say everything.' },
@@ -1588,6 +1681,9 @@ import { analytics } from '../data/site';
       'Three to eight things of equal weight that belong together: the steps of a process that repeats, the services round one promise, the branches of a small business, the parts of a method. The circle says “these go round together”; the middle gives each its moment.',
     notFor:
       'Content people must read in order or all at once (a list does that better), more than eight items (they crowd the circle and the text box in its middle), or items with long texts: the middle holds about 30 words. Steps with a start and an end, which are info-list’s vertical timeline. And not a navigation menu, whatever “radial menu” searches suggest: items choose text, they do not go anywhere.',
+    asks: [
+      { key: 'items', label: 'Between two and ten items, each with a short title and a sentence or two', hint: 'An icon or photo for each helps. We can choose icons if you have none.', required: true },
+    ],
     props: [
       { name: 'items', type: '{ title, text, icon?, image?, link?: { text, href } }[]', note: '2 to 10 items (the build fails outside that); each needs a title, a text and an `icon` (inline SVG) or an `image`. Both are decorative: the title names the item. `link` adds a link under the text.' },
       { name: 'size', type: 'string (CSS length)', default: '32rem', note: 'The circle’s diameter; never wider than its container. The circle needs a container at least 28rem wide; below that it is a list.' },
@@ -1651,6 +1747,10 @@ import { analytics } from '../data/site';
       'A grid of teasers whose detail is worth one more gesture: services that each need three lines of explanation and a link, job openings (title on the front, what the job is and Apply on the back), products with ingredients or specifications, team members with a short bio.',
     notFor:
       'Two faces of equal weight: that is flip-box, which turns a card over to a second, equally important side. Pick slide-box when the front is a teaser and the back its detail sliding over it; pick flip-box when both sides stand on their own. Neither is for anything a visitor must read without interacting: the back never holds the only copy of a price, a phone number or an opening time. And a panel that drops open below the card and pushes the page down (UABB’s other styles) is an accordion.',
+    asks: [
+      { key: 'front', label: 'The front of each card: a title and a short line', hint: 'Add an icon or a photo for a card if you have one in mind.', required: true },
+      { key: 'back', label: 'What slides in over it: the longer text, and where its link goes', required: true },
+    ],
     props: [
       { name: 'title', type: 'string', note: 'Front heading, and the accessible name of the card’s button.' },
       { name: 'text', type: 'string', note: 'The front’s short line.' },
@@ -1733,6 +1833,10 @@ import { analytics } from '../data/site';
       'A real deadline: a sale that ends, an event that starts, a daily order cut-off (onEnd="repeat" every day), a webinar. Evergreen suits an offer that is genuinely held for each visitor for a set time, such as a welcome discount.',
     notFor:
       'A deadline that is not real. An evergreen timer that restarts on every visit, or a sale that never ends, is a false urgency claim, and the FTC and UK CMA treat fake countdowns as a deceptive practice; this element keeps a visitor’s evergreen start on return precisely so the deadline stays true. Also not a clock or a stopwatch, and not for the page’s one line of news (announcement-bar has its own “Ends in 2 days” countdown).',
+    asks: [
+      { key: 'ends_at', label: 'The date and time it counts to', hint: 'With its time zone. For an offer held for each visitor, say how long it lasts instead.', required: true },
+      { key: 'after', label: 'What it should show once it ends', hint: 'A message, nothing at all, or a count to the same time the next day or week.' },
+    ],
     props: [
       { name: 'to', type: "'YYYY-MM-DD' | 'YYYY-MM-DDTHH:MM'", note: 'The end, as the business’s wall clock reads it. A date alone is that day’s midnight. Give `to` or `evergreen`.' },
       { name: 'timeZone', type: 'string (IANA)', note: 'Required with `to`: “America/Chicago”, not the visitor’s zone. A time inside a spring-forward gap resolves to the jump.' },
@@ -1804,6 +1908,9 @@ import { analytics } from '../data/site';
       'The pricing page’s monthly or annual switch, and any two versions of the same content a visitor picks between: homes or businesses, metric or imperial, before or during a project. One line of label each side.',
     notFor:
       'Tabs. A toggle is two versions of ONE thing switched in place, so the panels share a shape (the same plans, two prices). Three or more views, or two different topics (Features and Reviews), are tabs, which name each panel as a tab and scale past two. Also not for hiding content people need; both panels are one click apart, and without JavaScript both show.',
+    asks: [
+      { key: 'versions', label: 'The two versions and what each one says', hint: 'Such as your monthly and annual prices.', required: true },
+    ],
     props: [
       { name: 'labels', type: '[string, string]', note: 'Required. The two states, [a, b]: “Monthly”, “Annual”. They label the switch and head the panels.' },
       { name: 'slot a / slot b', type: 'slots', note: 'Required. The two panels: `<div slot="a">…</div>` and `<div slot="b">…</div>`.' },
@@ -1942,6 +2049,10 @@ import { analytics } from '../data/site';
     goodFor: 'A page of several videos: testimonials, a how-to library, event recordings, a portfolio of films. Categories when there are enough to be worth sorting.',
     notFor:
       'One video on its own (that is video-player), an ambient loop behind a hero (video-background), and a whole channel kept in sync by itself: the list is written into the page, so a new upload means an edit. Galleries of photos are not this either.',
+    asks: [
+      { key: 'videos', label: 'The videos, each with its title: a YouTube or Vimeo link, or the file', required: true },
+      { key: 'categories', label: 'How to group them, if visitors should be able to filter' },
+    ],
     props: [
       { name: 'videos', type: '{ url, title, caption?, poster?, category?, tracks? }[]', note: 'Required. `url` takes what video-player’s `src` takes: a YouTube URL or id (watch, youtu.be, shorts, embed), a Vimeo URL or id, a .mp4/.webm URL, or [{ src, type }]. Anything else fails the build. `title` is required. `category` is one string or several.' },
       { name: 'mode', type: "'lightbox' | 'inline'", default: "'lightbox'", note: 'Lightbox plays in one <dialog> over the page. Inline replaces the tile’s poster with the player; pressing another tile puts it back.' },
@@ -2022,6 +2133,10 @@ import { analytics } from '../data/site';
     goodFor: 'A contact or visit page, a footer with the address, several branches each with its own card. Anywhere the question is “where is it and how do I get there”.',
     notFor:
       'A styled, branded or interactive map: custom colours, your own markers, clustering, a store locator that searches by distance. That needs the Google Maps JavaScript API, which needs an API key and a billing account, loads Google’s script on every visit, and adds Google’s map origins to the site’s CSP and consent policy; quote it as its own piece of work. Full opening hours are business-hours, which also owns the LocalBusiness structured data.',
+    asks: [
+      { key: 'addresses', label: 'The address of each location', hint: 'As you would write it on an envelope, with a phone number if you want one shown.', required: true },
+      { key: 'show_map', label: 'Whether each location should offer a map as well as directions', hint: 'The map loads from Google only when a visitor asks for it.' },
+    ],
     props: [
       { name: 'locations', type: '{ name, address, phone?, hours?, query?, photo?, embed? }[]', note: 'Required. `address` is its lines, as on an envelope. `query` is what Google searches for, by default the address; give “Business name, address” when Google knows the business, so its place card opens. `photo` is the facade image for the embed. `embed` overrides the element’s for this card.' },
       { name: 'embed', type: 'boolean', default: 'false', note: 'Offer the click-to-load map on each card. Off, the cards are links only.' },
@@ -2155,6 +2270,9 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       'A few sections that sit in columns of different widths: product details beside a gallery, a service’s scope in a card grid, visiting information in a sidebar. On a phone several sections can stay open at once, so people can compare two without reopening.',
     notFor:
       'A tab set that should stay tabs until the phone, or that needs a vertical strip, icons, manual activation or a #hash that follows the selection: use tabs, which decides by the window. A list of questions, FAQ schema, or answers that find-in-page should reach while closed: use accordion, which is native <details>. And anything everyone must read: behind a tab or a tap, most people never see it.',
+    asks: [
+      { key: 'panels', label: 'The name of each section and what goes in it', required: true },
+    ],
     props: [
       { name: 'panels', type: 'TabcordionPanel[]', note: '`{ id, label, body?, slot? }`. `id` is the anchor (unique on the page); `body` an HTML string, or name a slot in `slot`.' },
       { name: 'label', type: 'string', note: 'Accessible name of the tab strip. Required.' },
@@ -2278,6 +2396,9 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     goodFor: 'Data people read across and down: class timetables, price lists, opening times by branch, plan comparisons, specifications. Cards when each row stands on its own; scroll when people compare down a column.',
     notFor:
       'Layout: a table puts a page’s columns in a grid only if they are data, never to line things up. Large, sortable or filterable data sets: that is a data-grid application, not a page element. And prose: a cell of paragraphs belongs in a list or an accordion.',
+    asks: [
+      { key: 'data', label: 'What goes in the table, as a spreadsheet or a list', required: true },
+    ],
     props: [
       { name: 'caption', type: 'string', note: 'What the table is. Required: it names the table, and the scroll region.' },
       { name: 'captionHidden', type: 'boolean', default: 'false', note: 'Hide the caption visually (a heading above already says it); screen readers still announce it.' },
@@ -2870,6 +2991,9 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     goodFor: 'One short word or number on a product, offer, post or event card: Sale, New, -20%, Sold out, Last few, Free delivery.',
     notFor:
       'A list of labels (that is tags), a message the visitor must read (put it in the text: a sticker is decoration a screen reader still names, not the only place a price or a condition lives), or a banner across the page (announcement-bar). One sticker per card; two fight each other.',
+    asks: [
+      { key: 'labels', label: 'What each sticker says, and which cards or photos carry it', hint: 'Such as “New” on this month’s products.' },
+    ],
     props: [
       { name: 'text', type: 'string', note: 'What it shows: “Sale”, “New”, “-20%”. Keep it short; a ribbon holds about eight characters. Required.' },
       { name: 'label', type: 'string', note: 'What a screen reader says instead, when the text is not the meaning: “Buy one, get one free” for “2 for 1”. A bare “-20%” or “-$10” gets “20% off” / “$10 off” without it; other languages need it. `label=""` marks the sticker decorative on purpose.' },

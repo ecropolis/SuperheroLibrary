@@ -21,6 +21,20 @@ const Demo = demos[e.id];
 
     <div class="demo">{Demo && <Demo />}</div>
 
+    {e.asks && e.asks.length > 0 && (
+      <>
+        <h2 id="client-needs">What the client needs to give you</h2>
+        <ul class="asks">
+          {e.asks.map((a) => (
+            <li data-ask={a.key}>
+              <span class="ask-label">{a.label}</span>{a.required && <span class="ask-req"> (required)</span>}
+              {a.hint && <span class="ask-hint">{a.hint}</span>}
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+
     <h2>How to ask for it</h2>
     <p>
       Say "the <code>{e.id}</code>" and where it goes. Also called:{' '}
@@ -125,6 +139,15 @@ const Demo = demos[e.id];
      them inside themselves rather than widening the page or splitting words. */
   .table-scroll {
     overflow-x: auto;
+  }
+  .ask-req {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .ask-hint {
+    display: block;
+    font-size: 0.95rem;
+    color: var(--body);
   }
   .back {
     margin-top: 3rem;

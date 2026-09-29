@@ -4,7 +4,9 @@
  * superherotech.ai depends on (README, "Consumed by superherotech.ai").
  *
  * 1. Catalogue rules, read from src/data/catalog.ts (Node strips the types), including one
- *    theming prefix per element: no two entries' `--<prefix>-*` variables share a prefix.
+ *    theming prefix per element: no two entries' `--<prefix>-*` variables share a prefix, and
+ *    the shape of `asks` (what the client must give us), with every element in NEEDS_INPUT
+ *    carrying at least one required ask.
  * 2. The demos index, read as text: Node cannot import .astro files, so the
  *    `'<id>': Component` lines and the `import Component from './File.astro'` lines are
  *    parsed. Keep one entry per line there.
@@ -12,7 +14,8 @@
  *    from public/demo/); every
  *    `asset('<file>')` in it exists in public/demo/, and no demo hard-codes /demo/ (the
  *    website may serve those files from another folder and passes `assetBase`).
- * 4. `astro build`, then one page per entry in dist/.
+ * 4. `astro build`, then one page per entry in dist/, whose "What the client needs to give
+ *    you" list is exactly the entry's asks, in order.
  *
  * `npm run build` does not run this, and the website's fetch of the tarball does not
  * either. CI runs it before calling the website's deploy hook.
@@ -28,6 +31,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (p) => relative(root, p);
 const failures = [];
 const fail = (msg) => failures.push(msg);
+
+function unescapeHtml(s) {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
 
 function finish(stage) {
   if (failures.length === 0) return;
@@ -127,6 +140,67 @@ for (const e of catalog) {
     else prefixes.set(p, e.id);
   }
 }
+// What each element needs from the client (favourites-to-requests §1). The portal makes a form
+// field of every ask and the request engine names a missing required one as a gap, so the shape
+// is a contract: keys are field names, labels are what the client reads.
+const ASK_KEY = /^[a-z][a-z0-9_]*$/;
+const MAX_ASKS = 6;
+// Elements that cannot be built without something only the client has: their hours, their date,
+// their addresses, their account, their media, their words. Each must carry at least one required
+// ask, so a request for one is never filed without it. Elements not listed may still have asks,
+// all optional (icon, sticker), or none (mega-menu, loading).
+const NEEDS_INPUT = [
+  'accordion', 'announcement-bar', 'before-after', 'business-hours', 'content-toggle', 'countdown',
+  'flip-box', 'hotspot', 'info-circle', 'info-list', 'map', 'modal', 'news-ticker',
+  'responsive-table', 'slide-box', 'social-grid', 'tabcordion', 'tabs', 'testimonial-carousel',
+  'video-background', 'video-gallery', 'video-player',
+];
+const plainText = (v) => typeof v === 'string' && v.trim() === v && v.length > 0;
+for (const e of catalog) {
+  if (e.asks === undefined) continue;
+  const where = `Entry "${e.id}"`;
+  if (!Array.isArray(e.asks)) {
+    fail(`${where} has an \`asks\` that is not a list.`);
+    continue;
+  }
+  if (e.asks.length === 0) fail(`${where} has an empty \`asks\`; leave it out when the element needs nothing from the client.`);
+  if (e.asks.length > MAX_ASKS) fail(`${where} has ${e.asks.length} asks; at most ${MAX_ASKS}, or the request form turns into a questionnaire.`);
+  const keys = new Set();
+  for (const [j, a] of e.asks.entries()) {
+    const at = `${where}, ask #${j + 1}${a && typeof a.key === 'string' ? ` ("${a.key}")` : ''}`;
+    if (!a || typeof a !== 'object') {
+      fail(`${at} is not an object.`);
+      continue;
+    }
+    const extra = Object.keys(a).filter((k) => !['key', 'label', 'hint', 'required'].includes(k));
+    if (extra.length) fail(`${at} has ${extra.join(', ')}; an ask has only key, label, hint and required.`);
+    if (typeof a.key !== 'string' || !ASK_KEY.test(a.key) || a.key.length > 40) {
+      fail(`${at} has key ${JSON.stringify(a.key)}; a key is lowercase letters, digits and underscores, starting with a letter, at most 40 characters.`);
+    } else if (keys.has(a.key)) {
+      fail(`${at} repeats a key; keys are unique within an element.`);
+    } else {
+      keys.add(a.key);
+    }
+    if (!plainText(a.label) || a.label.length > 120) {
+      fail(`${at} needs a label of 1 to 120 characters with no surrounding spaces.`);
+    } else if (a.label[0] !== a.label[0].toUpperCase() || /[.:]$/.test(a.label)) {
+      fail(`${at} has label "${a.label}"; write it in sentence case, capital first, with no closing full stop or colon.`);
+    }
+    if (a.hint !== undefined && (!plainText(a.hint) || a.hint.length > 200)) {
+      fail(`${at} has a hint that is empty, padded or over 200 characters.`);
+    }
+    if (a.required !== undefined && typeof a.required !== 'boolean') {
+      fail(`${at} has required ${JSON.stringify(a.required)}; it is true, false or left out.`);
+    }
+  }
+}
+for (const id of NEEDS_INPUT) {
+  const e = catalog.find((x) => x.id === id);
+  if (!e) fail(`NEEDS_INPUT in scripts/check-catalog.mjs names "${id}", which is not in the catalogue.`);
+  else if (!(e.asks ?? []).some((a) => a?.required === true)) {
+    fail(`Entry "${id}" cannot be built without something from the client, but has no required ask; add one, or take it out of NEEDS_INPUT and say why.`);
+  }
+}
 finish('catalogue');
 
 // ------------------------------------------------------------- 2. demos index
@@ -222,7 +296,24 @@ for (const e of catalog) {
     fail(`Entry "${e.id}": ${rel(page)} does not look like an element page.`);
   }
   if (home && !home.includes(`href="/${e.id}/"`)) fail(`Entry "${e.id}" is not linked from the gallery index.`);
+
+  // The page's "What the client needs to give you" list is the catalogue's asks, in order.
+  const html = readFileSync(page, 'utf8');
+  const shown = [...html.matchAll(/<li data-ask="([^"]*)"[^>]*>\s*<span class="ask-label"[^>]*>([\s\S]*?)<\/span>/g)].map((m) => ({
+    key: m[1],
+    label: unescapeHtml(m[2]),
+    required: html.slice(m.index + m[0].length).match(/^\s*(<span class="ask-req")?/)[1] !== undefined,
+  }));
+  const want = (e.asks ?? []).map((a) => ({ key: a.key, label: a.label, required: a.required === true }));
+  if (JSON.stringify(shown) !== JSON.stringify(want)) {
+    const say = (list) => JSON.stringify(list.map((a) => `${a.key}: ${a.label}${a.required ? ' (required)' : ''}`));
+    fail(`Entry "${e.id}": ${rel(page)} lists what the client needs as ${say(shown)}, but the catalogue's asks are ${say(want)}; the page must show every ask, in order, with its required mark.`);
+  }
+  if (want.length === 0 && html.includes('id="client-needs"')) {
+    fail(`Entry "${e.id}": ${rel(page)} has a "What the client needs to give you" heading but the entry has no asks.`);
+  }
 }
 finish('build output');
 
-console.log(`check ok: ${catalog.length} elements, ${catalog.length} pages built.`);
+const withAsks = catalog.filter((e) => e.asks?.length).length;
+console.log(`check ok: ${catalog.length} elements, ${catalog.length} pages built, ${withAsks} with asks.`);
