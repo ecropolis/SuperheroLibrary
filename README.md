@@ -165,6 +165,32 @@ portal and console each pin its SHA-256. `scripts/check-styles.mjs` holds the da
 prints that hash. **A change here must be followed by the portal and the console taking the file
 again and moving their pins to the new hash.** Until they do, their checks fail.
 
+## Palettes
+
+`src/data/palettes.ts` is the source for the twelve colour palettes a client picks from, two per
+direction: the six the portal's questionnaire has always offered (same slugs, same hexes, so no
+brand guide changes), each followed by a new sibling. Each palette carries the brand guide's five
+`colors`, the seven `roles` the `/colours/` hero is painted with, a mood line, what the colours
+say in different places, what it suits and the style boards it pairs with. It is plain data with
+no imports, so any app can copy it.
+
+Contrast is measured, not typed: `paletteContrast()` computes the WCAG 2.x ratios for ink,
+on-primary, accent and muted, and `scripts/check-palettes.mjs` measures them again and holds the
+floors (4.5, 4.5, 3, 4.5). The new six pass all four. Where one of the original six falls under a
+floor, its hexes stay as they are and the pair is shown as `fail`; the check lists those failures
+exactly, so a new one, or one that quietly starts passing, fails the build.
+
+It is consumed by:
+
+- **SuperheroPortal**, `src/brand/palettes.data.ts`: the questionnaire's palette step and the brand guide.
+- **SuperheroAdmin**, `src/domain/palettes.data.ts`: the console's brand panel.
+- **superherotech.ai**, which vendors it for the public `/colours/` page.
+
+The pin rule is the same as for style boards: only the file header may differ between copies,
+the portal and console each pin the SHA-256 of the body, and `check-palettes.mjs` prints it.
+**A change here must be followed by the portal and the console taking the file again and moving
+their pins to the new hash.**
+
 ## Licence
 
 MIT, Ecropolis LLC. Elements are copied into client sites; see `LICENSE`.
