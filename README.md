@@ -147,6 +147,24 @@ runs the real widget inside sandboxed frames rather than on the page, because th
 code: on superherotech.ai, which runs it too, a demo click would otherwise change the visitor's
 real consent. The demo's header comment has the detail.
 
+## Style boards
+
+`src/data/styles.ts` is the source for the ten style boards and sixteen flavours a client picks
+from: ids, labels, palettes, type, the words for colour, shape and motion, what each board
+suits, the demo site that shows it where one honestly does, and the detail the portal draws a
+board with. It is plain data with no imports, so any app can copy it.
+
+It is consumed by:
+
+- **SuperheroPortal**, `src/styles/boards.data.ts`: the style step clients pick on.
+- **SuperheroAdmin**, `src/domain/styleBoards.data.ts`: the console's style panel.
+- **superherotech.ai**, which vendors it for the public `/styles/` page.
+
+Only the file header may differ between copies. Below it, the three files are one file, and the
+portal and console each pin its SHA-256. `scripts/check-styles.mjs` holds the data's rules and
+prints that hash. **A change here must be followed by the portal and the console taking the file
+again and moving their pins to the new hash.** Until they do, their checks fail.
+
 ## Licence
 
 MIT, Ecropolis LLC. Elements are copied into client sites; see `LICENSE`.
