@@ -62,16 +62,25 @@ An element is finished when it has all of these, in one PR:
    - `pitch` — one sentence in the client's words, the lead of the public page. `summary` stays
      the gallery's technical line.
    - `usedOn` with at least one site, and `added` as `YYYY-MM-DD`.
+   - `asks` — what the client has to give us before it can be built on their site (the hours,
+     the date, the photos), as `{ key, label, hint?, required? }`, at most six, labels written
+     for the client in sentence case. Leave it out when the element needs nothing beyond what
+     the brief covers. The portal makes each ask a field on the request form and the request
+     engine names a missing required one, so treat a `key` as a field name: never reuse one
+     for a different question. The element's gallery page lists the asks under the demo as
+     "What the client needs to give you". If the element cannot be built without one of them,
+     mark it `required` and add the element to `NEEDS_INPUT` in `scripts/check-catalog.mjs`.
    - `category` — one of `CATEGORIES`. It decides the element's section on the
      superherotech.ai hub and its mega-menu column, and the skill mirrors it. Add the element to
      `GOLDEN` in `scripts/check-categories.mjs` in the same category; the check fails until you do.
 4. **`npm run check` green.** It verifies every entry's file exists, every entry has a demo in
    the index, every demo asset exists, ids are kebab-case and unique, each `search.query` is
-   unique and not another entry's `alsoRanks`, `added` is a date, `usedOn` is non-empty, and
-   that `astro build` produces one page per entry. It exits 1 with a sentence naming the entry
-   and the rule. `scripts/check-categories.mjs` runs first: every element has a known category,
-   every category has at least three elements, the assignment matches `GOLDEN`, and the
-   categories' order and labels are unchanged.
+   unique and not another entry's `alsoRanks`, `added` is a date, `usedOn` is non-empty, `asks`
+   has the shape above and every `NEEDS_INPUT` element has a required ask, and that `astro build`
+   produces one page per entry whose client-needs list is exactly its asks. It exits 1 with a
+   sentence naming the entry and the rule. `scripts/check-categories.mjs` runs first: every
+   element has a known category, every category has at least three elements, the assignment
+   matches `GOLDEN`, and the categories' order and labels are unchanged.
 5. **Its section in the `superhero-ui-library` skill**, with the plugin version bumped. The
    check cannot see agent-skills, so this one is on you; it is still part of "finished".
 
@@ -90,7 +99,7 @@ and imports exactly these paths:
 
 | Path | What the website takes from it |
 | --- | --- |
-| `src/data/catalog.ts` | `catalog` (and `byId`): names, `search`, `pitch`, `aka`, `replaces`, good for / not for, `usedOn`, `category`; `CATEGORIES` for the hub sections and mega-menu columns |
+| `src/data/catalog.ts` | `catalog` (and `byId`): names, `search`, `pitch`, `aka`, `replaces`, good for / not for, `usedOn`, `category`, `asks` (once the site's pass lands: each page's "You'll need to give us" list, and `/elements/index.json`); `CATEGORIES` for the hub sections and mega-menu columns |
 | `src/components/demos/index.ts` | `demos`, keyed by element `id` |
 | `src/library/<id>/<File>.astro` | each entry's `file`, imported by its demo |
 | `public/demo/*` | demo assets, copied to the site's `public/elements-demo/`; the site passes `assetBase="/elements-demo/"` to each demo, and `quiet` on the `/elements/` hub, where every demo shares one page |
