@@ -191,6 +191,34 @@ the portal and console each pin the SHA-256 of the body, and `check-palettes.mjs
 **A change here must be followed by the portal and the console taking the file again and moving
 their pins to the new hash.**
 
+## Type
+
+`src/data/type.ts` is the source for the house font set and the twelve pairings a client picks
+from. It holds sixteen families: fifteen Fontsource packages and the device's own sans. Each
+family records its board class (a `FontKey` from styles.ts), package, licence, designer, axes,
+the weights the pairings use, a metric-matched fallback with its `size-adjust` and overrides, and
+the kilobytes of its Latin woff2. Each pairing records a heading, a body and an optional label
+family, a feel, recommended heading and body settings, what it suits, and the style boards it
+serves. `familyFor(key)` gives the family a board class renders in. It is plain data with no
+imports, so any app can copy it. **No font file is committed here.** A site installs the
+package, imports the Latin subset and serves it from its own origin.
+
+The rules are strict. Only SIL OFL 1.1 and Apache 2.0 are allowed, because both let the files be
+redistributed and self-hosted. A pairing's families weigh at most 120 KB together. "System"
+costs nothing and stays on the list. A pairing serves a board only when its families match the
+board's heading and body classes, and its label class when the board has one, so the board's
+`type.note` stays true. `kb` and `metrics` were measured from the Fontsource 5.3.0 files with
+Capsize. The header of `type.ts` says how.
+
+It is consumed by:
+
+- **SuperheroPortal**, `src/brand/type.data.ts`: the brand guide's typography and hearts.
+- **superherotech.ai**, which vendors it for the public `/type/` page and to render `/styles/`.
+
+The pin rule is the same as for style boards. Only the file header may differ between copies, each
+copy pins the SHA-256 of the body, and `scripts/check-type.mjs` prints it. **A change here must
+be followed by the copies taking the file again and moving their pins to the new hash.**
+
 ## Licence
 
 MIT, Ecropolis LLC. Elements are copied into client sites; see `LICENSE`.
