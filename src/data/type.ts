@@ -492,7 +492,7 @@ export const TYPE_PAIRINGS: readonly TypePairing[] = [
     feel: "A serif and a sans drawn as one family: steady, legible and unfussy.",
     headings: { scale: 1, weight: 600, tracking: "0", upper: false, lineHeight: 1.2 },
     bodySettings: { size: "1.0625rem", lineHeight: 1.6, measure: "66ch" },
-    suits: ["Accountants, lawyers and advisers", "Charities and member bodies"],
+    suits: ["Accountants, lawyers and advisors", "Charities and member bodies"],
     pairsWith: ["classic"],
   },
   {
@@ -503,7 +503,7 @@ export const TYPE_PAIRINGS: readonly TypePairing[] = [
     feel: "A high-contrast display serif, spaced out in capitals, over a calm text serif.",
     headings: { scale: 0.85, weight: 400, tracking: "0.08em", upper: true, lineHeight: 1.2 },
     bodySettings: { size: "1.0625rem", lineHeight: 1.65, measure: "64ch" },
-    suits: ["Jewellers and fine goods", "Boutique hotels and restaurants"],
+    suits: ["Jewelers and fine goods", "Boutique hotels and restaurants"],
     pairsWith: ["luxurious"],
   },
   {
@@ -525,7 +525,7 @@ export const TYPE_PAIRINGS: readonly TypePairing[] = [
     feel: "A Renaissance book face over a soft sans: warm, literate and unhurried.",
     headings: { scale: 1.1, weight: 500, tracking: "0", upper: false, lineHeight: 1.15 },
     bodySettings: { size: "1.0625rem", lineHeight: 1.6, measure: "66ch" },
-    suits: ["Wineries and heritage estates", "Bookshops and publishers"],
+    suits: ["Wineries and heritage estates", "Bookstores and publishers"],
     pairsWith: ["natural"],
   },
   {
@@ -547,7 +547,7 @@ export const TYPE_PAIRINGS: readonly TypePairing[] = [
     feel: "Big hand-lettered headings over a round sans that children and parents both find easy.",
     headings: { scale: 1.1, weight: 700, tracking: "0", upper: false, lineHeight: 1.1 },
     bodySettings: { size: "1.125rem", lineHeight: 1.6, measure: "60ch" },
-    suits: ["Nurseries and children's services", "Schools and clubs"],
+    suits: ["Preschools and children's services", "Schools and clubs"],
     pairsWith: ["childlike"],
   },
   {

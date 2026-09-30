@@ -202,7 +202,7 @@ export const catalog: Element[] = [
       { name: 'minWidth', type: 'number', default: '700', note: 'Draw nothing below this viewport width. 0 draws everywhere. Tracked live, not decided once.' },
       { name: 'class', type: 'string', note: 'Class for the host to position and stack it with.' },
     ],
-    theming: [{ name: '--pf-color', fallback: '#fff', note: 'Dot and line colour. Also settable as plain `color` on the canvas.' }],
+    theming: [{ name: '--pf-color', fallback: '#fff', note: 'Dot and line color. Also settable as plain `color` on the canvas.' }],
     a11y: [
       'Decorative: aria-hidden, no pointer events.',
       'prefers-reduced-motion: one still frame is drawn, so the look survives without the movement.',
@@ -307,10 +307,10 @@ export const catalog: Element[] = [
       { name: 'class', type: 'string', note: 'Class on the wrapper, for the host to theme and size it.' },
     ],
     theming: [
-      { name: '--vb-bg', fallback: '#111', note: 'Colour behind the poster while it loads.' },
-      { name: '--vb-overlay', fallback: '#000', note: 'Tint colour.' },
+      { name: '--vb-bg', fallback: '#111', note: 'Color behind the poster while it loads.' },
+      { name: '--vb-overlay', fallback: '#000', note: 'Tint color.' },
       { name: '--vb-overlay-opacity', fallback: '0.4', note: 'Tint strength; the `overlay` prop overrides it.' },
-      { name: '--vb-fg', fallback: '#fff', note: 'Content text colour.' },
+      { name: '--vb-fg', fallback: '#fff', note: 'Content text color.' },
       { name: '--vb-control-bg', fallback: 'rgb(0 0 0 / 0.55)', note: 'Pause button fill.' },
       { name: '--vb-control-fg', fallback: '#fff', note: 'Pause button icon and ring.' },
       { name: '--vb-focus', fallback: '#fff', note: 'Pause button focus ring.' },
@@ -368,10 +368,10 @@ export const catalog: Element[] = [
       { name: 'class', type: 'string', note: 'Class on the band, for the host to theme it.' },
     ],
     theming: [
-      { name: '--pb-bg', fallback: '#222', note: 'Colour behind the image while it loads.' },
-      { name: '--pb-overlay', fallback: '#000', note: 'Tint colour.' },
+      { name: '--pb-bg', fallback: '#222', note: 'Color behind the image while it loads.' },
+      { name: '--pb-overlay', fallback: '#000', note: 'Tint color.' },
       { name: '--pb-overlay-opacity', fallback: '0.35', note: 'Tint strength; the `overlay` prop overrides it.' },
-      { name: '--pb-fg', fallback: '#fff', note: 'Content text colour.' },
+      { name: '--pb-fg', fallback: '#fff', note: 'Content text color.' },
       { name: '--pb-height', fallback: '60vh', note: 'Minimum height; the `minHeight` prop overrides it.' },
     ],
     a11y: [
@@ -476,12 +476,12 @@ export const catalog: Element[] = [
       { name: '--bh-badge-bg', fallback: 'transparent', note: 'Fill behind the pill.' },
       { name: '--bh-today-bg', fallback: 'rgb(0 0 0 / 0.05)', note: 'Today’s row in the table.' },
       { name: '--bh-line', fallback: 'rgb(0 0 0 / 0.15)', note: 'Table rules.' },
-      { name: '--bh-text', fallback: 'inherit', note: 'Text colour.' },
+      { name: '--bh-text', fallback: 'inherit', note: 'Text color.' },
     ],
     a11y: [
       'The week is a real table with a caption naming the time zone, and scoped column and row headers. Today’s row says "(today)" and carries aria-current="date"; the highlight is on top of the word.',
       'The sentence is in an aria-live="polite" region, rewritten only when its text changes, not every minute.',
-      'Open and closed are words; colour and the dot are on top. Times are <time datetime> elements.',
+      'Open and closed are words; color and the dot are on top. Times are <time datetime> elements.',
       'The static HTML never claims a state, so a cached page is never wrong; with JavaScript off the table and both slots show.',
       'No motion, so nothing to reduce.',
     ],
@@ -539,13 +539,13 @@ import { hours } from '../data/hours';   // export const hours: BusinessHoursDat
       { name: 'class', type: 'string', note: 'Class on the strip, for the host to theme and place it.' },
     ],
     theming: [
-      { name: '--nt-accent', fallback: '#3b2fc9', note: 'The host’s accent: the label chip, hover colour and focus ring all follow it.' },
+      { name: '--nt-accent', fallback: '#3b2fc9', note: 'The host’s accent: the label chip, hover color and focus ring all follow it.' },
       { name: '--nt-bg', fallback: '#f1f2f6', note: 'Strip background.' },
       { name: '--nt-fg', fallback: '#1b1c22', note: 'Strip text and button icons.' },
       { name: '--nt-label-bg', fallback: 'var(--nt-accent)', note: 'Label chip fill, if it should differ from the accent.' },
       { name: '--nt-label-fg', fallback: '#fff', note: 'Label chip text.' },
-      { name: '--nt-link', fallback: 'inherit', note: 'Headline colour.' },
-      { name: '--nt-link-hover', fallback: 'var(--nt-accent)', note: 'Headline colour on hover and focus.' },
+      { name: '--nt-link', fallback: 'inherit', note: 'Headline color.' },
+      { name: '--nt-link-hover', fallback: 'var(--nt-accent)', note: 'Headline color on hover and focus.' },
       { name: '--nt-muted', fallback: '#585b6b', note: 'Meta text and the marquee’s dots. Keep 4.5:1 on --nt-bg.' },
       { name: '--nt-focus', fallback: 'var(--nt-accent)', note: 'Focus ring.' },
       { name: '--nt-control-line', fallback: 'rgb(0 0 0 / 0.25)', note: 'Button ring.' },
@@ -723,7 +723,7 @@ const posts = (await getCollection('blog')).sort((a, b) => +b.data.date - +a.dat
       'An empty alt falls back to the caption’s first sentence, then to "Instagram post from <date>"; a name that would repeat gets a number. No tile is nameless.',
       'Hover captions also show on keyboard focus, and are aria-hidden: the text lives in the alt, never only in the overlay. Captions below are ordinary text after the link.',
       'Every link opens Instagram in a new tab and says so once, through aria-describedby, rather than in each name.',
-      'The grid is a list labelled by the header line. The caption fade is instant under prefers-reduced-motion. No JavaScript.',
+      'The grid is a list labeled by the header line. The caption fade is instant under prefers-reduced-motion. No JavaScript.',
     ],
     usage: `// package.json: the site fetches the feed before every build
 "prebuild": "node scripts/fetch-social.mjs"
@@ -778,7 +778,7 @@ const feed = social as SocialFeed;
       { name: 'items', type: 'AccordionItem[]', note: '`{ title, body?, slot?, id?, open? }`. `title` is plain text (the summary and the JSON-LD question). `body` is an HTML string; or name a slot in `slot` and pass `<div slot="…">…</div>`. `id` is the deep-link anchor (default: the title, slugified).' },
       { name: 'exclusive', type: 'boolean', default: 'true', note: 'One open at a time. Uses the `name` attribute, so the browser closes the others itself.' },
       { name: 'openFirst', type: 'boolean', default: 'false', note: 'Open the first item on load.' },
-      { name: 'numbered', type: 'boolean', default: 'false', note: '“1) 2) 3)” before each title, in the accent colour.' },
+      { name: 'numbered', type: 'boolean', default: 'false', note: '“1) 2) 3)” before each title, in the accent color.' },
       { name: 'icon', type: '“chevron” | “plus” | “none”', default: '“chevron”', note: 'Chevron turns over; plus becomes a minus.' },
       { name: 'boxed', type: 'boolean', default: 'false', note: 'Separate bordered boxes with `--ac-gap` between, instead of a ruled list.' },
       { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Heading level of each title inside its summary, so the page outline stays unbroken.' },
@@ -867,7 +867,7 @@ const faqs: AccordionItem[] = [
     ],
     a11y: [
       'The track is a region with aria-roledescription="carousel" and the `label` as its name, and it is focusable, so ← → scroll it. Each card is role="group" with aria-roledescription="slide" and “3 of 8” in its name.',
-      'The cards’ own links are ordinary tab stops; focusing one scrolls its whole card into view. Arrows and dots are real buttons with names (“Previous”, “Page 2 of 3”); the current dot has aria-current and a longer shape, not only a colour. No aria-live: nothing is announced on its own.',
+      'The cards’ own links are ordinary tab stops; focusing one scrolls its whole card into view. Arrows and dots are real buttons with names (“Previous”, “Page 2 of 3”); the current dot has aria-current and a longer shape, not only a color. No aria-live: nothing is announced on its own.',
       'Swiping, trackpad and scroll-wheel are the browser’s own scrolling. Paging is smooth, and instant under prefers-reduced-motion.',
       'Autoplay (off by default) has a visible pause button, WCAG 2.2.2, named for what it will do. It waits while hovered, while focus is inside, while the tab is hidden and while off screen, and a swipe restarts its countdown. Under prefers-reduced-motion (tracked live) it never starts and the button is not shown.',
       'Without JavaScript the track scrolls by hand with its scrollbar visible; arrows, dots and the pause button are absent.',
@@ -984,12 +984,12 @@ const faqs: AccordionItem[] = [
     theming: [
       { name: '--il-accent', fallback: '#3451b2', note: 'Default marker fill and dot ring. Map it to the host accent.' },
       { name: '--il-marker-bg', fallback: 'var(--il-accent)', note: 'Marker fill (for outline icons: a tint or transparent).' },
-      { name: '--il-marker-fg', fallback: '#fff', note: 'Icon or number colour.' },
+      { name: '--il-marker-fg', fallback: '#fff', note: 'Icon or number color.' },
       { name: '--il-marker-size', fallback: 'by `size`', note: 'Marker box, any length.' },
       { name: '--il-marker-radius', fallback: '50%', note: 'Marker corners; 8px for rounded squares.' },
-      { name: '--il-connector', fallback: 'rgb(0 0 0 / 0.18)', note: 'Connector colour.' },
+      { name: '--il-connector', fallback: 'rgb(0 0 0 / 0.18)', note: 'Connector color.' },
       { name: '--il-connector-width', fallback: '2px', note: 'Connector thickness.' },
-      { name: '--il-title / --il-text / --il-meta', fallback: 'inherit', note: 'Text colours.' },
+      { name: '--il-title / --il-text / --il-meta', fallback: 'inherit', note: 'Text colors.' },
       { name: '--il-gap / --il-col-gap', fallback: '1.75rem / 1.5rem', note: 'Space between rows / columns. The connector spans the row gap.' },
       { name: '--il-focus', fallback: 'currentColor', note: 'Focus ring around a linked item.' },
     ],
@@ -1059,9 +1059,9 @@ const faqs: AccordionItem[] = [
       { name: '--vp-play-size', fallback: '4.5rem', note: 'Diameter of the circle; the icon is 45% of it.' },
       { name: '--vp-overlay', fallback: 'rgb(0 0 0 / 0.12)', note: 'Tint over the poster (keeps a white icon readable on a light poster).' },
       { name: '--vp-radius', fallback: '0', note: 'Corner radius of the frame.' },
-      { name: '--vp-bg', fallback: '#000', note: 'Frame colour behind the poster, the video and the letterbox.' },
+      { name: '--vp-bg', fallback: '#000', note: 'Frame color behind the poster, the video and the letterbox.' },
       { name: '--vp-focus', fallback: '#fff', note: 'Focus ring on the play and close buttons (a dark halo sits outside it).' },
-      { name: '--vp-caption', fallback: 'inherit', note: 'Caption text colour.' },
+      { name: '--vp-caption', fallback: 'inherit', note: 'Caption text color.' },
       { name: '--vp-backdrop', fallback: 'rgb(0 0 0 / 0.88)', note: 'Lightbox backdrop.' },
       { name: '--vp-close-bg', fallback: 'rgb(255 255 255 / 0.15)', note: 'Lightbox close button fill.' },
       { name: '--vp-close-fg', fallback: '#fff', note: 'Lightbox close icon.' },
@@ -1070,7 +1070,7 @@ const faqs: AccordionItem[] = [
       'The play button is a real <button> named “Play: <title>”, over the whole poster; Tab reaches it and Enter or Space plays. The poster image has its own alt text.',
       'In place, focus moves into the player on play: the iframe (titled with the video’s title) or the <video>. The keyboard then drives the player itself.',
       'Self-hosted video keeps the browser’s native controls: keyboard operable, with a captions menu for `tracks`. A captions track is expected because a video with speech and no captions fails WCAG 1.2.2, and the build warns without one.',
-      'Lightbox: a native modal <dialog> named with the title, so focus is trapped and Escape closes it; the close button is labelled and a backdrop click closes too. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing removes the iframe or pauses the file, so sound never continues behind it, and returns focus to the play button. The page does not scroll underneath.',
+      'Lightbox: a native modal <dialog> named with the title, so focus is trapped and Escape closes it; the close button is labeled and a backdrop click closes too. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing removes the iframe or pauses the file, so sound never continues behind it, and returns focus to the play button. The page does not scroll underneath.',
       'Nothing plays until the visitor asks, so there is no autoplay to pause. prefers-reduced-motion only removes the play button’s hover growth.',
       'Without JavaScript a file plays through its native controls, and YouTube, Vimeo and the lightbox offer a plain link to watch the video where it lives.',
     ],
@@ -1188,7 +1188,7 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
       { name: 'title', type: 'string', note: 'Optional native tooltip text (an SVG <title>), independent of `label`.' },
       { name: 'class', type: 'string', note: 'Class on the <svg>, for the host to size or theme it further.' },
     ],
-    theming: [{ name: '--ic-color', fallback: 'currentColor', note: 'Icon colour. Most call sites need none of this: the icon already follows the surrounding text colour.' }],
+    theming: [{ name: '--ic-color', fallback: 'currentColor', note: 'Icon color. Most call sites need none of this: the icon already follows the surrounding text color.' }],
     a11y: [
       'Decorative by default: no `label` means `aria-hidden="true"`, because most icons sit beside text that already says what they mean.',
       'With `label`, the icon gets `role="img"` and that exact text as its accessible name — set it whenever the icon is the only content conveying meaning, such as an icon-only button.',
@@ -1258,9 +1258,9 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
       { name: '--at-weight', fallback: 'inherit', note: 'Weight.' },
       { name: '--at-line-height', fallback: 'inherit', note: 'Line height.' },
       { name: '--at-tracking', fallback: 'inherit', note: 'Letter spacing.' },
-      { name: '--at-ink', fallback: 'inherit', note: 'Text colour.' },
+      { name: '--at-ink', fallback: 'inherit', note: 'Text color.' },
       { name: '--at-align', fallback: 'inherit', note: 'Alignment.' },
-      { name: '--at-slot-display', fallback: 'inline-grid', note: 'Rotate’s slot. `grid` gives it a line of its own (“We build” / “websites”), which a centred headline wants.' },
+      { name: '--at-slot-display', fallback: 'inline-grid', note: 'Rotate’s slot. `grid` gives it a line of its own (“We build” / “websites”), which a centered headline wants.' },
       { name: '--at-slot-align', fallback: 'start', note: 'Where each option sits in the slot, which is as wide as the widest: `start` for a slot at the end of a line, `center` for a slot on its own line.' },
       { name: '--at-wrap', fallback: 'normal', note: 'white-space. `nowrap` keeps a line whole, as distil usually wants.' },
       { name: '--at-accent', fallback: 'currentColor', note: 'The caret, the underline and the strike line.' },
@@ -1312,7 +1312,7 @@ import AnimatedText from '../components/AnimatedText.astro';
       'A hand-written cookie banner that loads Google Analytics before the visitor clicks anything: it asks, but the tracking has already happened',
     ],
     goodFor:
-      'A site that runs Google Analytics, or anything else, through Google Tag Manager and wants the consent choice on its own page, in its own colours, with no subscription. In opt-out mode US visitors are measured until they decline; with strictRegions on (the default), visitors in EEA, UK and Swiss time zones get prior consent, so nothing is fetched from Google until they accept. That region test reads the browser’s time zone: no IP lookup, no network call, and a VPN or a traveller can be misread either way.',
+      'A site that runs Google Analytics, or anything else, through Google Tag Manager and wants the consent choice on its own page, in its own colors, with no subscription. In opt-out mode US visitors are measured until they decline; with strictRegions on (the default), visitors in EEA, UK and Swiss time zones get prior consent, so nothing is fetched from Google until they accept. That region test reads the browser’s time zone: no IP lookup, no network call, and a VPN or a traveler can be misread either way.',
     notFor:
       'A site that sets no cookies and loads no third-party tags. It needs no banner at all: leave gtmId empty and this renders nothing. Its job is gating Tag Manager, not decoration. Also not for sites that need per-category toggles, a stored consent log to show an auditor, or IAB TCF signals for ad networks: it is one yes-or-no for analytics, with ad storage denied unless enableAds is set. It does not make a site compliant by itself. It implements prior consent where that is required; the privacy policy, and what the site promises in it, are the site owner’s.',
     props: [
@@ -1332,7 +1332,7 @@ import AnimatedText from '../components/AnimatedText.astro';
       { name: '--cc-text', fallback: '#4c5a60', note: 'Body copy at 13.5px: needs 4.5:1 on --cc-bg (default 6.33:1).' },
       { name: '--cc-ink', fallback: '#1d2b30', note: 'Decline label and its hover border.' },
       { name: '--cc-link', fallback: '#1f4f55', note: 'Privacy Policy link.' },
-      { name: '--cc-accent', fallback: '#1f4f55', note: 'Accept/OK fill. Needs 4.5:1 against --cc-accent-ink (default 9.10:1): use the site’s dark surface tone, not its CTA colour.' },
+      { name: '--cc-accent', fallback: '#1f4f55', note: 'Accept/OK fill. Needs 4.5:1 against --cc-accent-ink (default 9.10:1): use the site’s dark surface tone, not its CTA color.' },
       { name: '--cc-accent-hover', fallback: '#143a3f', note: 'Accept/OK hover fill.' },
       { name: '--cc-accent-ink', fallback: '#fff', note: 'Accept/OK label.' },
       { name: '--cc-shadow', fallback: '0 14px 40px rgba(16, 32, 36, .18)', note: 'Bar shadow.' },
@@ -1345,7 +1345,7 @@ import AnimatedText from '../components/AnimatedText.astro';
       'The bar is a non-modal dialog named “Cookie consent”. It does not take focus or trap it, and the page stays usable while it is open. Sites mount it at the end of the body, so keyboard users reach it after the page content.',
       'It stays hidden (the hidden attribute) until the script has chosen the wording for the visitor’s mode, and is hidden again after a choice, so a screen reader never reads a bar that is not on screen.',
       'Any element with data-cc-reopen (the “Cookie settings” link in a site’s footer) opens it again, so the choice can be changed at any time. There is no Escape shortcut: the choice is made with the buttons.',
-      'No movement: only 0.15s colour transitions on hover. Default text and button colours clear 4.5:1; a site that themes it must keep them there.',
+      'No movement: only 0.15s color transitions on hover. Default text and button colors clear 4.5:1; a site that themes it must keep them there.',
     ],
     usage: `---
 // src/layouts/BaseLayout.astro, as on superherotech.ai. Do not copy CookieConsent.astro by hand:
@@ -1409,7 +1409,7 @@ import { analytics } from '../data/site';
       { name: 'speed', type: 'number', default: '1', note: 'Multiplier on the preset’s own pace; the scroll presets take 40 s per tile at 1.' },
       { name: 'minWidth', type: 'number', default: '700', note: 'Below this viewport width the still frame is drawn and nothing animates. 0 animates everywhere. Tracked live.' },
       { name: 'motion', type: "'auto' | 'off'", default: "'auto'", note: 'off draws the still frame always; such an instance does not count against one-per-page.' },
-      { name: 'pointer', type: "'drift' | 'repel' | 'none'", default: "'drift'", note: 'How the canvas presets answer the mouse: waves lean and swell toward its x, cells and bubbles lean in or away, fog slides in parallax, rings and the halo centre trail it, birds are drawn or scattered, snow gusts with a sweep. Fine pointers only (hover + pointer: fine), never on touch; no reaction under reduced motion, with motion="off" or below minWidth. Listeners sit on the host, the canvas keeps pointer-events: none. The scroll presets do not react.' },
+      { name: 'pointer', type: "'drift' | 'repel' | 'none'", default: "'drift'", note: 'How the canvas presets answer the mouse: waves lean and swell toward its x, cells and bubbles lean in or away, fog slides in parallax, rings and the halo center trail it, birds are drawn or scattered, snow gusts with a sweep. Fine pointers only (hover + pointer: fine), never on touch; no reaction under reduced motion, with motion="off" or below minWidth. Listeners sit on the host, the canvas keeps pointer-events: none. The scroll presets do not react.' },
       { name: 'texture', type: 'string', note: 'scroll-x / scroll-y only: URL of the host’s own square, seamlessly tiling image, drawn at 512 px, in place of the generated one. Never a client image on a shared page.' },
       { name: 'class', type: 'string', note: 'Class for the host to position and stack it with.' },
     ],
@@ -1483,7 +1483,7 @@ import { analytics } from '../data/site';
       { name: '--md-radius', fallback: '12px', note: 'Box corners; size="full" has none.' },
       { name: '--md-padding', fallback: 'clamp(1.25rem, 4vw, 2rem)', note: 'Inside the box.' },
       { name: '--md-shadow', fallback: '0 1.5rem 4rem rgb(0 0 0 / 0.3)', note: 'Box shadow.' },
-      { name: '--md-close-bg', fallback: 'transparent', note: 'Close button fill (a faint grey on hover).' },
+      { name: '--md-close-bg', fallback: 'transparent', note: 'Close button fill (a faint gray on hover).' },
       { name: '--md-close-fg', fallback: 'currentColor', note: 'Close icon.' },
       { name: '--md-focus', fallback: 'currentColor', note: 'Focus ring on the close button.' },
       { name: '--md-width-sm', fallback: '24rem', note: 'Max width of size="sm".' },
@@ -1547,7 +1547,7 @@ import { analytics } from '../data/site';
       { name: 'countdown', type: "'YYYY-MM-DDTHH:MM'", note: '“Ends in 2 days 4 hours” after the text, refreshed on the minute; the bar hides when it passes.' },
       { name: 'timeZone', type: 'string (IANA)', note: 'Required with from, until or countdown: “America/Chicago”, not the visitor’s zone.' },
       { name: 'endsIn / ends', type: 'string', default: '“Ends in” / “Ends”', note: 'Words before the countdown, and before the end date shown without JavaScript. The units (days, hours, minutes) are English.' },
-      { name: 'theme', type: "'accent' | 'dark' | 'light'", default: "'accent'", note: 'Which pair of colours.' },
+      { name: 'theme', type: "'accent' | 'dark' | 'light'", default: "'accent'", note: 'Which pair of colors.' },
       { name: 'dismissLabel', type: 'string', default: '“Dismiss announcement”', note: 'Name of the dismiss button.' },
       { name: 'class', type: 'string', note: 'Class on the bar.' },
     ],
@@ -1558,7 +1558,7 @@ import { analytics } from '../data/site';
       { name: '--anb-dark-fg', fallback: '#fff', note: 'theme="dark" text.' },
       { name: '--anb-light-bg', fallback: '#eef2f1', note: 'theme="light" ground (12.92:1).' },
       { name: '--anb-light-fg', fallback: '#1d2b30', note: 'theme="light" text.' },
-      { name: '--anb-link', fallback: 'currentColor', note: 'Link colour; underlined either way. If you set it, keep 4.5:1 on the ground.' },
+      { name: '--anb-link', fallback: 'currentColor', note: 'Link color; underlined either way. If you set it, keep 4.5:1 on the ground.' },
       { name: '--anb-min-height', fallback: '2.75rem', note: 'Bar height: the 44px dismiss button.' },
       { name: '--anb-font-size', fallback: '0.95rem', note: 'Text size.' },
       { name: '--anb-focus', fallback: 'currentColor', note: 'Focus ring on the link and the dismiss button.' },
@@ -1568,7 +1568,7 @@ import { analytics } from '../data/site';
       'A region (role="region") named by its own text, or by `label`. The link is a normal link.',
       'The dismiss button is a real 44px <button> named “Dismiss announcement”. After a dismiss, focus moves to the next focusable thing on the page, not to nowhere.',
       'The countdown is a <time datetime> with the absolute end, and deliberately not a live region: it changes every minute and should not be read out each time.',
-      'The fallback colours of all three themes clear 4.5:1 (7.27, 14.75 and 12.92 to 1); `npm run check` computes them.',
+      'The fallback colors of all three themes clear 4.5:1 (7.27, 14.75 and 12.92 to 1); `npm run check` computes them.',
       'prefers-reduced-motion: a dismissed bar disappears at once instead of collapsing.',
       'Without JavaScript the bar shows when the build put it inside its window, the countdown gives the end date instead, and it cannot be dismissed: the button stays hidden rather than doing nothing.',
     ],
@@ -1654,7 +1654,7 @@ import { analytics } from '../data/site';
   src="/images/showroom.webp" width={1600} height={1000}
   alt="The showroom: a sofa by the window, a lamp and a plant"
   points={[
-    { x: 50, y: 62, title: 'Three-seat sofa', text: 'Washable covers in twelve colours.' },
+    { x: 50, y: 62, title: 'Three-seat sofa', text: 'Washable covers in twelve colors.' },
     { x: 73, y: 25, title: 'Arc lamp', text: 'Warm light on a dimmer.' },
     { x: 87, y: 58, title: 'Rubber plant', text: 'Copes with low light.', image: '/images/plant.webp', imageAlt: '' },
   ]}
@@ -1671,7 +1671,7 @@ import { analytics } from '../data/site';
     name: 'Info circle',
     aka: ['UABB Info Circle', 'circular infographic', 'circle infographic', 'process circle', 'cycle diagram', 'radial menu', 'interactive infographic'],
     summary:
-      'Items (an icon or a round image each) spaced evenly round a circle, positions computed at build; the chosen item’s title and text show in the middle. Hover, focus and click choose; each item is a button with aria-pressed and the centre is a polite live region. Optional autoplay with a pause button. In a container narrower than 28rem, and without JavaScript, it is a plain list with every item’s text showing.',
+      'Items (an icon or a round image each) spaced evenly round a circle, positions computed at build; the chosen item’s title and text show in the middle. Hover, focus and click choose; each item is a button with aria-pressed and the center is a polite live region. Optional autoplay with a pause button. In a container narrower than 28rem, and without JavaScript, it is a plain list with every item’s text showing.',
     pitch: 'Five things you do, round one circle: point at one and it tells its story in the middle — and on a phone it is simply a list.',
     // SE Ranking US, 2026-09-26: circular infographic 320/mo, difficulty 7 (circle infographic
     // and infographic circle are the same cluster, 320/7); info circle 40/10; interactive
@@ -1701,7 +1701,7 @@ import { analytics } from '../data/site';
       { name: '--inc-item-fg', fallback: 'var(--inc-accent)', note: 'Its icon.' },
       { name: '--inc-active-fg', fallback: '#fff', note: 'The chosen item’s icon (7.27:1 on the accent).' },
       { name: '--inc-centre-bg', fallback: '#f4f1fe', note: 'The disc behind the text in the middle, and behind list icons.' },
-      { name: '--inc-fg', fallback: '#1e283c', note: 'Text (13.24:1 on the centre disc).' },
+      { name: '--inc-fg', fallback: '#1e283c', note: 'Text (13.24:1 on the center disc).' },
       { name: '--inc-ring', fallback: 'rgb(89 51 216 / 0.35)', note: 'The dashed circumference.' },
       { name: '--inc-size', fallback: '32rem', note: 'Diameter; the `size` prop sets it.' },
       { name: '--inc-item-size', fallback: '4.5rem', note: 'Each item’s disc (never under 44px).' },
@@ -1875,7 +1875,7 @@ import { analytics } from '../data/site';
       'Without JavaScript: the static line “Ends Oct 3, 5:00 PM CDT” in a <time datetime> (an evergreen one reads “Ends in 30 minutes”). The digits from the build’s clock are not shown, because they would be stale and never tick.',
       'No layout shift: the script placed right after the element shows and corrects the digits before the first paint.',
       'prefers-reduced-motion: no tick animation on a changing digit and no ring transition; the numbers simply change.',
-      'The square style’s fallback colours clear 4.5:1 (14.75:1); `npm run check` computes it.',
+      'The square style’s fallback colors clear 4.5:1 (14.75:1); `npm run check` computes it.',
     ],
     usage: `<!-- A sale that ends at 5 PM Chicago time, whatever zone the visitor is in. -->
 <h2>The autumn sale ends in</h2>
@@ -1898,7 +1898,7 @@ import { analytics } from '../data/site';
     name: 'Content toggle',
     aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch'],
     summary:
-      'Two labelled versions of one thing, a switch (role="switch") or two pressed buttons between them, and two panels in slots a and b. Optional badge on one label, a choice remembered for the session, and ?<param>= to preselect. Without JavaScript both panels show under their labels as headings.',
+      'Two labeled versions of one thing, a switch (role="switch") or two pressed buttons between them, and two panels in slots a and b. Optional badge on one label, a choice remembered for the session, and ?<param>= to preselect. Without JavaScript both panels show under their labels as headings.',
     pitch: 'Let visitors flip between two versions of the same thing — monthly or annual prices, homes or businesses — without leaving the page.',
     // SE Ranking US, 2026-09-26: toggle content 110/mo, difficulty 27; content switcher 90/18;
     // css toggle switch 170/16; html toggle switch 90/9. "content toggle" and "pricing toggle"
@@ -1946,7 +1946,7 @@ import { analytics } from '../data/site';
       'The badge describes the switch (aria-describedby), so “Save 20%” is heard as well as seen.',
       'The shown panel keeps its label as a heading for screen readers only, so it is clear which version is on the page; the other panel is hidden, not just covered.',
       'Without JavaScript both panels render, each under its label as a heading, and the switch (which could not work) is not shown.',
-      'No layout shift: the script right after the element settles it before the first paint. prefers-reduced-motion: the knob jumps instead of sliding and the panel does not fade. In forced-colours mode the track and knob are drawn with system colours.',
+      'No layout shift: the script right after the element settles it before the first paint. prefers-reduced-motion: the knob jumps instead of sliding and the panel does not fade. In forced-colors mode the track and knob are drawn with system colors.',
     ],
     usage: `<ContentToggle labels={['Monthly', 'Annual']} badge="Save 20%" param="billing" remember>
   <PricingTable slot="a" period="month" />
@@ -1999,7 +1999,7 @@ import { analytics } from '../data/site';
       { name: '--ofc-backdrop', fallback: 'rgb(15 20 35 / 0.55)', note: 'Behind a modal panel.' },
       { name: '--ofc-shadow', fallback: '0 0 3rem rgb(0 0 0 / 0.25)', note: 'The panel’s shadow.' },
       { name: '--ofc-padding', fallback: 'clamp(1rem, 4vw, 1.5rem)', note: 'Inside the panel.' },
-      { name: '--ofc-close-bg', fallback: 'transparent', note: 'Close button fill (a faint grey on hover).' },
+      { name: '--ofc-close-bg', fallback: 'transparent', note: 'Close button fill (a faint gray on hover).' },
       { name: '--ofc-close-fg', fallback: 'currentColor', note: 'Close icon.' },
       { name: '--ofc-focus', fallback: 'currentColor', note: 'Focus ring inside the panel.' },
       { name: '--ofc-z', fallback: '110', note: 'Stacking of a push panel, below the cookie-consent bar (120). A modal panel is in the browser’s top layer, like every modal dialog.' },
@@ -2073,15 +2073,15 @@ import { analytics } from '../data/site';
       { name: '--vg-gap', fallback: '1.25rem', note: 'Gap between tiles.' },
       { name: '--vg-template', fallback: '(unset)', note: 'The whole grid-template-columns, when the host wants its own grid: `repeat(4, 1fr)`.' },
       { name: '--vg-radius', fallback: '0.5rem', note: 'Corner radius of each frame.' },
-      { name: '--vg-bg', fallback: '#000', note: 'Frame colour behind the poster and the player.' },
+      { name: '--vg-bg', fallback: '#000', note: 'Frame color behind the poster and the player.' },
       { name: '--vg-panel', fallback: 'linear-gradient(135deg, #2c3656, #1e283c)', note: 'A tile without a poster.' },
       { name: '--vg-overlay', fallback: 'rgb(0 0 0 / 0.12)', note: 'Tint over the poster.' },
       { name: '--vg-play-bg', fallback: 'rgb(0 0 0 / 0.7)', note: 'Play button circle. Keep 3:1 against the posters.' },
       { name: '--vg-play-fg', fallback: '#fff', note: 'Play icon.' },
       { name: '--vg-play-size', fallback: '3.5rem', note: 'Diameter of the circle.' },
       { name: '--vg-focus', fallback: '#5933d8', note: 'Focus ring on tiles and chips.' },
-      { name: '--vg-title', fallback: 'inherit', note: 'Tile title colour.' },
-      { name: '--vg-caption', fallback: 'inherit', note: 'Caption colour.' },
+      { name: '--vg-title', fallback: 'inherit', note: 'Tile title color.' },
+      { name: '--vg-caption', fallback: 'inherit', note: 'Caption color.' },
       { name: '--vg-chip-bg', fallback: '#fff', note: 'Chip fill.' },
       { name: '--vg-chip-fg', fallback: '#1e283c', note: 'Chip text (14.75:1 on the fallback fill).' },
       { name: '--vg-chip-border', fallback: '#c9cedb', note: 'Chip outline.' },
@@ -2093,8 +2093,8 @@ import { analytics } from '../data/site';
     ],
     a11y: [
       'Each tile’s play control is a real <button> named “Play: <title>”, over the whole poster, with a visible focus ring. The title is also printed under the tile as a heading (titleTag).',
-      'Filter chips are a labelled group of <button aria-pressed>, “All” first and pressed. Choosing one hides the other tiles and a polite live region says how many are shown (“Open films: 3 videos.”).',
-      'Lightbox: one native modal <dialog>, named by the video’s title: focus trapped, Escape and a backdrop click close it, the close button is labelled. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing empties the dialog so the sound stops, returns focus to the tile and releases the scroll lock.',
+      'Filter chips are a labeled group of <button aria-pressed>, “All” first and pressed. Choosing one hides the other tiles and a polite live region says how many are shown (“Open films: 3 videos.”).',
+      'Lightbox: one native modal <dialog>, named by the video’s title: focus trapped, Escape and a backdrop click close it, the close button is labeled. On open the video starts and focus goes to the close button, because a YouTube or Vimeo iframe keeps every key, Escape included; Tab moves on into the player. Closing empties the dialog so the sound stops, returns focus to the tile and releases the scroll lock.',
       'Inline: focus moves into the player (the titled iframe, or the <video>). One tile plays at a time.',
       'Self-hosted files keep the browser’s native controls with a captions menu. A captions track is expected (WCAG 1.2.2); the build warns without one.',
       'prefers-reduced-motion: tiles shown by a filter appear at once instead of fading in, and the play button does not grow on hover. Nothing plays until asked.',
@@ -2111,7 +2111,7 @@ import { analytics } from '../data/site';
 />
 <!-- .videos { --vg-play-bg: var(--brand); --vg-radius: var(--radius); --vg-chip-on-bg: var(--brand); } -->`,
     license:
-      'The videos stay yours, or their owners’: the gallery plays them from YouTube, Vimeo or your own site, under those services’ terms, and adds nothing of its own. The films in our demo are the Blender Foundation’s open films Big Buck Bunny and Sintel, CC BY 3.0, credited under each one as that licence asks.',
+      'The videos stay yours, or their owners’: the gallery plays them from YouTube, Vimeo or your own site, under those services’ terms, and adds nothing of its own. The films in our demo are the Blender Foundation’s open films Big Buck Bunny and Sintel, CC BY 3.0, credited under each one as that license asks.',
     usedOn: [{ site: 'superherotech.ai', where: '/elements/video-gallery/ (demo)' }],
     file: 'src/library/video-gallery/VideoGallery.astro',
     added: '2026-09-26',
@@ -2133,7 +2133,7 @@ import { analytics } from '../data/site';
     replaces: ['UABB / PowerPack “Google Map” modules (Beaver Builder)', 'Elementor’s Google Maps widget', 'WP Google Maps and similar plugins', 'a Google Maps <iframe> pasted into the footer'],
     goodFor: 'A contact or visit page, a footer with the address, several branches each with its own card. Anywhere the question is “where is it and how do I get there”.',
     notFor:
-      'A styled, branded or interactive map: custom colours, your own markers, clustering, a store locator that searches by distance. That needs the Google Maps JavaScript API, which needs an API key and a billing account, loads Google’s script on every visit, and adds Google’s map origins to the site’s CSP and consent policy; quote it as its own piece of work. Full opening hours are business-hours, which also owns the LocalBusiness structured data.',
+      'A styled, branded or interactive map: custom colors, your own markers, clustering, a store locator that searches by distance. That needs the Google Maps JavaScript API, which needs an API key and a billing account, loads Google’s script on every visit, and adds Google’s map origins to the site’s CSP and consent policy; quote it as its own piece of work. Full opening hours are business-hours, which also owns the LocalBusiness structured data.',
     asks: [
       { key: 'addresses', label: 'The address of each location', hint: 'As you would write it on an envelope, with a phone number if you want one shown.', required: true },
       { key: 'show_map', label: 'Whether each location should offer a map as well as directions', hint: 'The map loads from Google only when a visitor asks for it.' },
@@ -2141,7 +2141,7 @@ import { analytics } from '../data/site';
     props: [
       { name: 'locations', type: '{ name, address, phone?, hours?, query?, photo?, embed? }[]', note: 'Required. `address` is its lines, as on an envelope. `query` is what Google searches for, by default the address; give “Business name, address” when Google knows the business, so its place card opens. `photo` is the facade image for the embed. `embed` overrides the element’s for this card.' },
       { name: 'embed', type: 'boolean', default: 'false', note: 'Offer the click-to-load map on each card. Off, the cards are links only.' },
-      { name: 'zoom', type: 'number (1–21)', default: 'Google’s choice', note: 'Zoom of the embedded map: 15 is a neighbourhood, 18 a street.' },
+      { name: 'zoom', type: 'number (1–21)', default: 'Google’s choice', note: 'Zoom of the embedded map: 15 is a neighborhood, 18 a street.' },
       { name: 'layout', type: "'stack' | 'split'", default: "'stack'", note: 'Stack: the map above the details, cards in a grid. Split: the map beside the details when there is room, one card per row.' },
       { name: 'titleTag', type: "'h2' | 'h3' | 'h4'", default: "'h3'", note: 'Element for each card’s name.' },
       { name: 'openLabel / directionsLabel / showLabel / notice', type: 'string', default: '“Open in Google Maps” / “Directions” / “Show the map” / “Loads a map from Google.”', note: 'Words, for a non-English site.' },
@@ -2211,7 +2211,7 @@ import LocationMap from '../components/LocationMap.astro';   // not "Map": that 
     goodFor:
       'Navigation, a card’s call to action, footer links, a “Read more”: short links that should feel alive. underline-grow also suits links in running text, because it is underlined at rest. peek suits a link whose destination has a one-word answer: “Pricing” → “$49/mo”, “Hours” → “Open now”.',
     notFor:
-      'Links in a paragraph with any effect that has no underline at rest (all but underline-grow and peek): a link must look like a link before anyone points at it, and colour alone does not say so. Buttons, which are not links. More than one or two effects on a site: pick one for navigation and one for calls to action, and keep them.',
+      'Links in a paragraph with any effect that has no underline at rest (all but underline-grow and peek): a link must look like a link before anyone points at it, and color alone does not say so. Buttons, which are not links. More than one or two effects on a site: pick one for navigation and one for calls to action, and keep them.',
     props: [
       { name: 'effect', type: "'underline-slide' | 'underline-grow' | 'brackets' | 'highlight' | 'box' | 'strike-to-underline' | 'arrow' | 'circle' | 'peek' | 'swash' | 'tag'", note: 'With `href`, renders <a class="lk-<effect>">. Leave both out (<LinkEffects />) to emit only the stylesheet, once, e.g. in the layout.' },
       { name: 'href', type: 'string', note: 'The link. Required with `effect`.' },
@@ -2221,7 +2221,7 @@ import LocationMap from '../components/LocationMap.astro';   // not "Map": that 
     ],
     theming: [
       { name: '--lk-accent', fallback: '#5933d8', note: 'Lines, brackets, frame, ring, swash, arrow and peek words, tag fill. Keep 4.5:1 against --lk-bg, since the arrow and peek words are text (the fallbacks are 7.27:1).' },
-      { name: '--lk-ink', fallback: '#1e283c', note: 'The text colour highlight and tag pin: 14.75:1 on --lk-bg and 11.68:1 on --lk-mark.' },
+      { name: '--lk-ink', fallback: '#1e283c', note: 'The text color highlight and tag pin: 14.75:1 on --lk-bg and 11.68:1 on --lk-mark.' },
       { name: '--lk-on-accent', fallback: '#fff', note: 'Tag text over its fill: 7.27:1 on --lk-accent.' },
       { name: '--lk-mark', fallback: '#ffe38f', note: 'The highlight marker.' },
       { name: '--lk-bg', fallback: '#fff', note: 'The page behind the links, and the tag’s resting fill. Set it to the section’s background so the check’s arithmetic matches.' },
@@ -2232,9 +2232,9 @@ import LocationMap from '../components/LocationMap.astro';   // not "Map": that 
     a11y: [
       'Every effect fires on :focus-visible exactly as on :hover (one selector, `:is(:hover, :focus-visible)`), and the browser’s own focus ring stays.',
       'prefers-reduced-motion: every transition sits inside `(prefers-reduced-motion: no-preference)`, so otherwise the end state appears at once. Nothing plays by itself.',
-      'The text never drops below 4.5:1 mid-animation. Effects move decorations, not the text colour; highlight pins the text to --lk-ink, which passes on the page and on the marker; tag paints its text and fill as two layers of one background moving together, so each pixel of text is one passing pair or the other. `npm run check` computes the fallback pairs.',
+      'The text never drops below 4.5:1 mid-animation. Effects move decorations, not the text color; highlight pins the text to --lk-ink, which passes on the page and on the marker; tag paints its text and fill as two layers of one background moving together, so each pixel of text is one passing pair or the other. `npm run check` computes the fallback pairs.',
       'Decorative glyphs (the brackets, the arrow) are silent to screen readers, and the swash SVG is aria-hidden. The peek words are read as part of the link’s name (“Pricing $49/mo”).',
-      'Windows High Contrast (forced colours): system link colours, and the underline-based effects keep a real underline.',
+      'Windows High Contrast (forced colors): system link colors, and the underline-based effects keep a real underline.',
       'No JavaScript at all, so the render without it is the same.',
     ],
     usage: `---
@@ -2352,7 +2352,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       { name: '--tt-radius', fallback: '0.375rem', note: 'Tip corners.' },
       { name: '--tt-max', fallback: '18rem', note: 'Widest the tip gets before it wraps.' },
       { name: '--tt-font-size', fallback: '0.875rem', note: 'Tip text size.' },
-      { name: '--tt-trigger', fallback: 'inherit', note: 'Trigger colour (text and icon).' },
+      { name: '--tt-trigger', fallback: 'inherit', note: 'Trigger color (text and icon).' },
       { name: '--tt-focus', fallback: 'currentColor', note: 'Trigger focus ring.' },
       { name: '--tt-z', fallback: '1000', note: 'Stacking in browsers without the Popover API (elsewhere the tip is in the top layer).' },
     ],
@@ -2460,20 +2460,20 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     name: 'Notice',
     aka: ['alert box', 'info box', 'callout box', 'Bootstrap alert', 'message box', 'UABB Info Box', 'Elementor Alert widget', 'inline message'],
     summary:
-      'A message in the page, in one of four kinds (info, success, warning, danger), each with its colours and a Font Awesome Free icon, an optional title and an optional close button remembered for the visit. role="status" for info and success, role="alert" for warning and danger; the kind is also said in words.',
-    pitch: 'Say what just happened, or what needs attention, right where it applies, in a colour that says how much it matters.',
+      'A message in the page, in one of four kinds (info, success, warning, danger), each with its colors and a Font Awesome Free icon, an optional title and an optional close button remembered for the visit. role="status" for info and success, role="alert" for warning and danger; the kind is also said in words.',
+    pitch: 'Say what just happened, or what needs attention, right where it applies, in a color that says how much it matters.',
     // SE Ranking US, 2026-09-26: inline alert 260/mo, difficulty 13; alert banner 210/12;
     // css alert box 260/38; callout box 330/17. The pre-assigned "alert banner component" has
     // no US volume, so the page targets "inline alert", which is also what this is (the banner
     // across the top of a site is announcement-bar).
     search: { query: 'inline alert', alsoRanks: ['alert banner', 'css alert box', 'callout box'] },
-    replaces: ['Bootstrap alerts', 'page-builder alert / info box / notice modules', 'hand-built callout boxes with a coloured border'],
+    replaces: ['Bootstrap alerts', 'page-builder alert / info box / notice modules', 'hand-built callout boxes with a colored border'],
     goodFor:
       'The state of the page or of a form after an action (“Your changes were saved”, “We could not take the payment”), a condition people need before they act (“Only 3 places left”), a note that holds for a while (“Classes resume on Monday”). One notice near what it is about.',
     notFor:
       'A message across the top of the whole site (that is announcement-bar), a confirmation that should vanish on its own (toast), or form-field errors, which belong beside their field with aria-describedby. And not several on one screen: when everything is a warning, nothing is.',
     props: [
-      { name: 'kind', type: "'info' | 'success' | 'warning' | 'danger'", default: "'info'", note: 'Colours, icon, role and the word read before the message.' },
+      { name: 'kind', type: "'info' | 'success' | 'warning' | 'danger'", default: "'info'", note: 'Colors, icon, role and the word read before the message.' },
       { name: 'title', type: 'string', note: 'A short bold line above the text.' },
       { name: 'text', type: 'string', note: 'The message, when not given as the default slot. The slot takes links and paragraphs.' },
       { name: 'icon', type: 'string | false', note: 'A Font Awesome Free solid icon name in place of the kind’s own (circle-info, circle-check, triangle-exclamation, circle-exclamation), or false for none. An unknown name fails the build.' },
@@ -2496,9 +2496,9 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     ],
     a11y: [
       'role="status" for info and success, role="alert" for warning and danger. A screen reader announces a live region when its content arrives or changes: a notice the host inserts after an action is announced, one rendered with the page is read in place.',
-      'The kind is said in words as well as colour and icon: a visually hidden “Warning:” (or `kindLabel`) leads the title or the text. The icon is aria-hidden.',
+      'The kind is said in words as well as color and icon: a visually hidden “Warning:” (or `kindLabel`) leads the title or the text. The icon is aria-hidden.',
       'The close button is a real 44px <button> named “Dismiss”. After a dismiss, focus moves to the next focusable thing on the page.',
-      'Every kind’s fallback text is at least 4.5:1 on its ground and its accent at least 3:1; `npm run check` computes all eight. In forced-colours mode the edge and icon take the system text colour.',
+      'Every kind’s fallback text is at least 4.5:1 on its ground and its accent at least 3:1; `npm run check` computes all eight. In forced-colors mode the edge and icon take the system text color.',
       'No motion.',
       'Without JavaScript the notice shows and cannot be closed: the close button stays hidden rather than doing nothing.',
     ],
@@ -2544,7 +2544,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       { name: '--ts-bg', fallback: '#1e283c', note: 'The toast.' },
       { name: '--ts-fg', fallback: '#fff', note: 'Its text (14.75:1).' },
       { name: '--ts-action', fallback: '#c4b5ff', note: 'The action’s text, underlined (8.01:1).' },
-      { name: '--ts-info / --ts-success / --ts-warning / --ts-danger', fallback: '#8cc2ff / #7fdc9c / #ffd166 / #ffa3a3', note: 'Icon colours per kind, each at least 7:1 on the fallback ground.' },
+      { name: '--ts-info / --ts-success / --ts-warning / --ts-danger', fallback: '#8cc2ff / #7fdc9c / #ffd166 / #ffa3a3', note: 'Icon colors per kind, each at least 7:1 on the fallback ground.' },
       { name: '--ts-focus', fallback: '#c4b5ff', note: 'Focus ring on the action and close button.' },
       { name: '--ts-radius', fallback: '10px', note: 'Corners.' },
       { name: '--ts-shadow', fallback: '0 0.75rem 2rem rgb(0 0 0 / 0.28)', note: 'Shadow.' },
@@ -2587,7 +2587,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     aka: ['spinner', 'loading spinner', 'skeleton screen', 'skeleton loader', 'preloader', 'busy indicator', 'loading animation', 'progress spinner'],
     summary:
       'Three ways to say “wait” in one element: an inline spinner with a name (role="status"), skeleton placeholders from CSS gradients (lines, avatar, card; aria-hidden), and a busy wrapper that, while data-busy is set, makes its content aria-busy and inert, covers it with the spinner and says what is happening. No motion under reduced motion; without JavaScript the busy content stays usable.',
-    pitch: 'Show people the page heard them: a spinner where something is working, grey shapes where content is on its way, and a form that cannot be clicked twice while it saves.',
+    pitch: 'Show people the page heard them: a spinner where something is working, gray shapes where content is on its way, and a form that cannot be clicked twice while it saves.',
     // SE Ranking US, 2026-09-26: css loading animation 480/mo, difficulty 18; css skeleton
     // 390/27; skeleton ui 480/23; loading spinner 720/33. The pre-assigned "skeleton loader
     // css" has no US volume and "skeleton loader" is 20/45; the page targets the loading
@@ -2622,10 +2622,10 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     ],
     a11y: [
       'Spinner: role="status" with a name (“Loading”, or `label`); the ring is aria-hidden. Rendered in place before the wait, it is read when reached; for an announcement, use busy.',
-      'Skeleton: the shapes are aria-hidden, because grey bars mean nothing read aloud. With `label`, a visually hidden status says it instead.',
+      'Skeleton: the shapes are aria-hidden, because gray bars mean nothing read aloud. With `label`, a visually hidden status says it instead.',
       'Busy: while data-busy is set the content is aria-busy="true" and inert, so it cannot be clicked, focused or submitted twice. The status that says `label` sits outside the busy content, because screen readers hold back changes inside an aria-busy region. If focus was in the content, it moves to the wrapper and back to the same control when the wait ends. `slowText` is said if the wait runs long; `doneLabel` when it clears.',
       'prefers-reduced-motion: the ring stops turning and fades gently instead, the skeleton does not shimmer, and the busy overlay appears without a fade.',
-      'In forced-colours mode the ring and the skeleton shapes take the system text colour.',
+      'In forced-colors mode the ring and the skeleton shapes take the system text color.',
       'Without JavaScript a spinner and a skeleton render as given, and a busy wrapper renders its content, usable: the overlay, aria-busy and inert only ever come from the script.',
     ],
     usage: `<button type="submit">Search <Loading size="sm" label="Searching" /></button>
@@ -2689,13 +2689,13 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       { name: '--mb-min-width / --mb-max-height', fallback: '12rem / 20rem', note: 'Menu size; past the height it scrolls.' },
     ],
     a11y: [
-      'The WAI-ARIA Authoring Practices menu button: the button has aria-haspopup="menu", aria-expanded and aria-controls; the menu is role="menu", labelled by the button, and its items are role="menuitem" (or "menuitemradio" with aria-checked) with tabindex="-1", so the menu is one Tab stop.',
+      'The WAI-ARIA Authoring Practices menu button: the button has aria-haspopup="menu", aria-expanded and aria-controls; the menu is role="menu", labeled by the button, and its items are role="menuitem" (or "menuitemradio" with aria-checked) with tabindex="-1", so the menu is one Tab stop.',
       'On the button, Enter, Space and ↓ open the menu on the first item (the checked one in a radio menu) and ↑ opens it on the last. In the menu, ↓ ↑ move and wrap, Home and End jump, a letter moves to the next item starting with it, Enter and Space activate, Escape closes and returns focus to the button, Tab closes and moves on.',
       'A click outside or focus leaving the element closes the menu. A disabled item is aria-disabled: reachable and announced, not activatable.',
       'The menu opens below the button, or above it when the room below is short and there is more above, measured each time it opens; it never runs off the side of the viewport.',
       'Buttons and items are at least 44px tall; the icon-only button is 44px square with its full label as aria-label.',
       'prefers-reduced-motion: the menu appears without its 120 ms fade.',
-      'Without JavaScript it is a <details>: the summary shows the same label and opens the same list, and link items work. No menu roles are rendered until the script can honour them.',
+      'Without JavaScript it is a <details>: the summary shows the same label and opens the same list, and link items work. No menu roles are rendered until the script can honor them.',
     ],
     usage: `<MenuButton label="Share" items={[
   { label: 'Copy link', value: 'copy' },
@@ -2769,8 +2769,8 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       'The keyboard is the browser’s: Tab enters the group on the checked radio (or the first), the arrow keys move and select, Space selects, Tab leaves. No script is involved.',
       'Each radio is named by its title only; a chunky card’s line of text is its description (aria-describedby), and the hint describes the group.',
       'A visible 3px focus ring on the radio, or around the whole card or segment in those looks. Every option is at least 44px tall.',
-      'Colour is never the only signal: the checked radio has a dot, the checked card a heavier border and a fill, and in forced-colors mode checked cards and segments get a Highlight outline.',
-      'prefers-reduced-motion: no colour transition.',
+      'Color is never the only signal: the checked radio has a dot, the checked card a heavier border and a fill, and in forced-colors mode checked cards and segments get a Highlight outline.',
+      'prefers-reduced-motion: no color transition.',
       'Without JavaScript nothing is missing: it is a form control, and it posts `name=value` in a plain form, with `required` validation by the browser. The script only adds the data-changed event for hosts.',
     ],
     usage: `<form method="post" action="/checkout/">
@@ -2830,11 +2830,11 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     ],
     a11y: [
       'An ordered list, so a screen reader announces the count and each step’s position. The current step’s item has aria-current="step"; exactly one does, or none once every step is done.',
-      'A done step is announced “Completed: <label>” (visually hidden text) and shows a check, so state is never colour alone: done has a check, current a halo and a bolder label, upcoming an outline.',
+      'A done step is announced “Completed: <label>” (visually hidden text) and shows a check, so state is never color alone: done has a check, current a halo and a bolder label, upcoming an outline.',
       'Only done steps link. The whole stepper is a <nav> named by `label` when any step can link, and just a named list otherwise.',
       'go() changes the states and links in place and moves no focus and announces nothing: the form should move focus to its next section’s heading, which is what a screen reader user needs to hear.',
       'Links have a visible 3px focus ring. In forced-colors mode done and current markers use Highlight.',
-      'prefers-reduced-motion: no colour transition when it advances.',
+      'prefers-reduced-motion: no color transition when it advances.',
       'Without JavaScript it is exactly as rendered: the static state is right for a page per step, the common case.',
     ],
     usage: `<!-- A page per step: the build renders the right state. -->
@@ -2887,7 +2887,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       { name: '--tg-bg', fallback: '#eef0f4', note: 'Chip background.' },
       { name: '--tg-fg', fallback: '#1d2433', note: 'Chip text (13.61:1 on the fallback background; keep 4.5:1).' },
       { name: '--tg-hover-bg', fallback: '#dfe3ec', note: 'A link chip under the pointer (12.08:1).' },
-      { name: '--tg-border', fallback: 'transparent', note: 'Chip border; in forced-colours mode it draws the chip.' },
+      { name: '--tg-border', fallback: 'transparent', note: 'Chip border; in forced-colors mode it draws the chip.' },
       { name: '--tg-radius', fallback: '999px', note: 'Chip corners.' },
       { name: '--tg-gap', fallback: '0.5rem', note: 'Space between chips and between rows.' },
       { name: '--tg-font-size', fallback: '0.875rem', note: 'Text size.' },
@@ -2901,7 +2901,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       'Each removable chip has a real <button> named “Remove <tag>”. After a removal, focus moves to the next chip’s button (or the previous one, or the list when none are left) and a polite status line says “Removed <tag>”.',
       'On a touch screen (pointer: coarse) each removal button and “+N more” is a 44 by 44 px target; the chip keeps its height, so rows do not spread apart.',
       '“+N more” is a button with aria-expanded and aria-controls naming the list; after it, focus stays on it, now reading “Show fewer”.',
-      'No motion. Colours clear 4.5:1 with their fallbacks; `npm run check` computes them.',
+      'No motion. Colors clear 4.5:1 with their fallbacks; `npm run check` computes them.',
       'Without JavaScript every tag shows and the removal and “+N more” buttons stay hidden rather than doing nothing. With it, a collapsed list and remembered removals are settled by the script right after the list, before the first paint, so nothing jumps.',
     ],
     usage: `<!-- Topics on a post -->
@@ -3000,13 +3000,13 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
       { name: 'label', type: 'string', note: 'What a screen reader says instead, when the text is not the meaning: “Buy one, get one free” for “2 for 1”. A bare “-20%” or “-$10” gets “20% off” / “$10 off” without it; other languages need it. `label=""` marks the sticker decorative on purpose.' },
       { name: 'shape', type: "'label' | 'circle' | 'ribbon'", default: "'label'", note: 'A turned rectangle, a round sticker, or a band across the corner.' },
       { name: 'corner', type: "'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'", default: "'top-left'", note: 'Which corner of the positioned parent.' },
-      { name: 'tone', type: "'accent' | 'sale' | 'dark'", default: "'accent'", note: 'Which pair of colours.' },
+      { name: 'tone', type: "'accent' | 'sale' | 'dark'", default: "'accent'", note: 'Which pair of colors.' },
       { name: 'class', type: 'string', note: 'Class on the sticker, for the host to theme or nudge it.' },
     ],
     theming: [
       { name: '--sk-accent-bg / --sk-accent-fg', fallback: '#5933d8 / #fff', note: 'tone="accent" (7.27:1).' },
       { name: '--sk-sale-bg / --sk-sale-fg', fallback: '#b42318 / #fff', note: 'tone="sale" (6.57:1).' },
-      { name: '--sk-dark-bg / --sk-dark-fg', fallback: '#1e283c / #fff', note: 'tone="dark" (14.75:1). If you map any pair to brand colours, keep 4.5:1.' },
+      { name: '--sk-dark-bg / --sk-dark-fg', fallback: '#1e283c / #fff', note: 'tone="dark" (14.75:1). If you map any pair to brand colors, keep 4.5:1.' },
       { name: '--sk-offset', fallback: '0.75rem', note: 'Distance from the edges (label and circle; the ribbon sits flush).' },
       { name: '--sk-size', fallback: '4.5rem', note: 'Diameter of the circle.' },
       { name: '--sk-ribbon-size', fallback: '6.5rem', note: 'The square corner box the ribbon crosses.' },
@@ -3019,7 +3019,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     a11y: [
       'Read as written, where it sits in the source: put it before the card’s title and a screen reader says “Sale, Evening print”.',
       'When the text is not the meaning, `label` is read and the text is hidden from assistive technology. “-20%” and “-$10” get “20% off” and “$10 off” by themselves (English). `label=""` hides a sticker that only repeats what the card already says.',
-      'The fallback colours of all three tones clear 4.5:1 (7.27, 6.57 and 14.75 to 1); `npm run check` computes them. A transparent border draws it in forced-colours mode.',
+      'The fallback colors of all three tones clear 4.5:1 (7.27, 6.57 and 14.75 to 1); `npm run check` computes them. A transparent border draws it in forced-colors mode.',
       'It ignores the pointer, so a tap on it reaches the card’s link. It is never focusable and never interactive.',
       'No motion at all, so nothing to reduce. No JavaScript, so nothing differs without it.',
     ],

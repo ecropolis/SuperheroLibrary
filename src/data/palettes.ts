@@ -212,8 +212,8 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
       { name: "accent", hex: "#c9a227" },
     ],
     culture:
-      "Navy is the colour of uniforms, banks and courtrooms in the US and UK, so it reads as trust and authority, and can read as cold. Gold says quality; at Chinese New Year or an Indian wedding it says prosperity and celebration, so the accent may feel warmer to some visitors than you meant.",
-    suits: ["Law", "Finance", "Consulting", "Accountancy", "Insurance"],
+      "Navy is the color of uniforms, banks and courtrooms in the US and UK, so it reads as trust and authority, and can read as cold. Gold says quality; at Chinese New Year or an Indian wedding it says prosperity and celebration, so the accent may feel warmer to some visitors than you meant.",
+    suits: ["Law", "Finance", "Consulting", "Accounting", "Insurance"],
     pairsWith: ["classic", "minimal"],
   },
   {
@@ -240,7 +240,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
     id: "warm-earthy",
     name: "Warm & earthy",
     direction: "warm-earthy",
-    mood: "warm, homely, rooted",
+    mood: "warm, homey, rooted",
     colors: { primary: "#9c4a2f", secondary: "#6f7d4d", accent: "#e0a458", background: "#faf6f0", text: "#33302b" },
     roles: [
       { name: "background", hex: "#faf6f0" },
@@ -292,7 +292,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
       { name: "accent", hex: "#f43f5e" },
     ],
     culture:
-      "Violet reads as creative and digital because so much software uses it. It has older meanings: in Catholic churches it marks Lent and Advent, a colour of waiting and penitence, and in Thailand it is traditionally worn in mourning. The hot pink-red accent reads as urgent, so use it sparingly.",
+      "Violet reads as creative and digital because so much software uses it. It has older meanings: in Catholic churches it marks Lent and Advent, a color of waiting and penitence, and in Thailand it is traditionally worn in mourning. The hot pink-red accent reads as urgent, so use it sparingly.",
     suits: ["Software", "Agencies", "Startups", "Events", "Music"],
     pairsWith: ["high-tech", "bold"],
   },
@@ -333,7 +333,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
     ],
     culture:
       "Green says growth, health and go on most traffic lights, and money in the US, where the notes are green. In many Muslim communities green carries religious weight, and on packaging it implies environmental claims, so be ready to back them.",
-    suits: ["Landscaping", "Outdoors", "Health", "Garden centres", "Vets"],
+    suits: ["Landscaping", "Outdoors", "Health", "Garden centers", "Vets"],
     pairsWith: ["natural", "playful"],
   },
   {
@@ -353,7 +353,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
     ],
     culture:
       "Dark green on cream is British racing green and the old railway liveries, so in the UK it reads as heritage and quality. Elsewhere it simply reads as woods and fields. The rust accent keeps it from looking like a bank.",
-    suits: ["Farms", "Garden centres", "Estate agents", "Outdoor gear", "Distilleries"],
+    suits: ["Farms", "Garden centers", "Real estate agents", "Outdoor gear", "Distilleries"],
     pairsWith: ["natural", "classic", "luxurious"],
   },
   {
@@ -372,7 +372,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
       { name: "accent", hex: "#b08d57" },
     ],
     culture:
-      "Warm greys step back so photographs lead, which is why galleries and interior designers use them. Neutrals carry few cultural meanings of their own, but grey alone can feel sombre or unfinished; the bronze warms it and hints at craft rather than luxury.",
+      "Warm grays step back so photographs lead, which is why galleries and interior designers use them. Neutrals carry few cultural meanings of their own, but gray alone can feel somber or unfinished; the bronze warms it and hints at craft rather than luxury.",
     suits: ["Interiors", "Photography", "Boutiques", "Architecture"],
     pairsWith: ["minimal", "luxurious"],
   },
@@ -412,8 +412,8 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
       { name: "accent", hex: "#ffb703" },
     ],
     culture:
-      "Red is luck and celebration at Chinese New Year and the colour of the bride at a Hindu wedding; in most shops it means sale, and on forms it means error. With sunshine yellow it can recall fast food, which the steadier blue helps to offset.",
-    suits: ["Events", "Children's activities", "Festivals", "Creative studios", "Toy shops"],
+      "Red is luck and celebration at Chinese New Year and the color of the bride at a Hindu wedding; in most shops it means sale, and on forms it means error. With sunshine yellow it can recall fast food, which the steadier blue helps to offset.",
+    suits: ["Events", "Children's activities", "Festivals", "Creative studios", "Toy stores"],
     pairsWith: ["playful", "childlike", "bold"],
   },
   {
@@ -433,7 +433,7 @@ const PALETTE_DATA: readonly Omit<Palette, "contrast">[] = [
     ],
     culture:
       "Yellow is optimism and warmth to most visitors and also caution, from road signs to hazard tape, so a calm teal carries the text. Saffron-yellow is the robe of Buddhist monks in Thailand and Sri Lanka, worth knowing if your visitors include those communities.",
-    suits: ["Swim and surf schools", "Cafés", "Holiday lets", "Kids' classes", "Florists"],
+    suits: ["Swim and surf schools", "Cafés", "Vacation rentals", "Kids' classes", "Florists"],
     pairsWith: ["playful", "natural", "retro"],
   },
 ];
