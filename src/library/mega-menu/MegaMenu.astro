@@ -18,6 +18,19 @@
  * accordion. Each panel starts with a link to the top item's own `href`, so that page stays
  * reachable once the item has become a button.
  *
+ * No layout shift: the menu is served at the size the script leaves it. Below `breakpoint`, a
+ * browser that runs scripts paints it collapsed from the first frame (a `<style>` inside the
+ * nav, keyed on its `data-breakpoint`, asks `(scripting: enabled) and (max-width: <breakpoint -
+ * 0.02>px)`, the script's own question), so the header does not drop by the height of the list
+ * when the script runs. The Menu button is visible from that first frame and opens the list once
+ * the script has run, which for a collapsed menu is as soon as the browser reaches it, right
+ * after the nav (a wide menu waits for DOMContentLoaded; its served links work meanwhile). Above
+ * `breakpoint` a top item's link carries the same caret as the button that replaces it, so the
+ * bar keeps its width. A browser without the `scripting` media feature shows the full list
+ * until the script collapses it, as before. Below `breakpoint` the menu needs its script: a
+ * page whose policy refuses it (a CSP without the script's hash) gets a Menu button that does
+ * nothing.
+ *
  * Sizing: the panel (and the mobile list) spans the nav's nearest positioned ancestor. By
  * default that is the nav itself; to span the whole header, give the header
  * `position: relative` and set `--mm-anchor: static` on the nav. Nothing above it may clip it
@@ -87,10 +100,25 @@ const promos = await Promise.all(
   items.map((i) => (i.promo && Astro.slots.has(i.promo) ? Astro.slots.render(i.promo) : Promise.resolve(''))),
 );
 const cur = (href: string) => (current && href === current ? 'page' : undefined);
+/**
+ * The collapsed layout before the script runs. The script collapses where
+ * `(max-width: <breakpoint - 0.02>px)` matches, the breakpoint parsed from data-breakpoint; this
+ * asks the same question in CSS, for this breakpoint only, so two menus with different breakpoints
+ * on one page each get their own rule. `:not(.mm--js)` hands over to the script once it runs.
+ */
+// <mm-prescript>
+const bp = parseFloat(String(breakpoint)) || 0;
+const key = `.mm:not(.mm--js)[data-breakpoint=${JSON.stringify(String(breakpoint))}]`;
+const preScript =
+  bp > 0
+    ? `@media (scripting: enabled) and (max-width: ${bp - 0.02}px) { ${key} > .mm__toggle { display: inline-flex; } ${key} > .mm__bar { display: none; } }`
+    : '';
+// </mm-prescript>
 ---
 
 <nav class:list={['mm', className]} aria-label={label} data-mm data-breakpoint={breakpoint}>
-  <button class="mm__toggle" type="button" aria-expanded="false" aria-controls={`${uid}-list`} hidden data-mm-toggle>
+  {preScript && <style is:inline set:html={preScript} />}
+  <button class="mm__toggle" type="button" aria-expanded="false" aria-controls={`${uid}-list`} data-mm-toggle>
     <span class="mm__burger" aria-hidden="true"></span>{menuLabel}
   </button>
   <ul class="mm__bar" id={`${uid}-list`} data-mm-list>
@@ -102,6 +130,7 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
           <li class="mm__item">
             <a class="mm__top" href={item.href} aria-current={cur(item.href)} data-mm-link>
               {item.label}
+              {hasPanel && <span class="mm__caret" aria-hidden="true" />}
             </a>
             {hasPanel && (
               <button
@@ -164,8 +193,13 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
 
 <script is:inline>
   (() => {
-    if (window.__megaMenu) return;
-    window.__megaMenu = true;
+    // The first menu's script defines the runtime; each later menu's script only sets up the
+    // collapsed menus parsed so far, its own included, so its Menu button works without waiting
+    // for the rest of the page.
+    if (window.__megaMenu) {
+      if (typeof window.__megaMenu === 'function') window.__megaMenu();
+      return;
+    }
     const HOVER_OPEN = 150;
     const HOVER_CLOSE = 300;
 
@@ -294,9 +328,10 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
         t[n].focus();
       });
 
+      // The stylesheet shows the Menu button in the collapsed layout only; the script never
+      // unhides it, so the served page and the scripted one agree on where it is.
       const apply = () => {
         nav.classList.toggle('mm--compact', compact());
-        toggle.hidden = !compact();
         setMenu(false);
       };
       narrow.addEventListener('change', apply);
@@ -304,7 +339,19 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     };
 
     const boot = () => document.querySelectorAll('[data-mm]').forEach(init);
-    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', boot) : boot();
+    // A collapsed menu's Menu button does nothing until init has run, so a collapsed menu is set
+    // up the moment the browser reaches its script, right after the nav. A wide one waits for
+    // DOMContentLoaded, as it always has: its served links already work and measure the same as
+    // the buttons that replace them, so there is nothing to gain from setting it up mid-parse.
+    const bootCollapsed = () =>
+      document.querySelectorAll('[data-mm]').forEach((nav) => {
+        const bp = parseFloat(nav.dataset.breakpoint) || 0;
+        if (bp > 0 && matchMedia(`(max-width: ${bp - 0.02}px)`).matches) init(nav);
+      });
+    const start = () => (document.readyState === 'loading' ? bootCollapsed() : boot());
+    window.__megaMenu = start;
+    start();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   })();
 </script>
 
@@ -332,6 +379,9 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+    /* A link and the button that replaces it measure the same, whatever the host's reset:
+       border-box for both, and the button takes the text settings the link inherits. */
+    box-sizing: border-box;
     min-height: 2.75rem;
     padding: 0.5rem 0.85rem;
     border: 0;
@@ -340,8 +390,20 @@ const cur = (href: string) => (current && href === current ? 'page' : undefined)
     color: inherit;
     font: inherit;
     font-weight: 600;
+    letter-spacing: inherit;
+    word-spacing: inherit;
+    text-transform: inherit;
     text-decoration: none;
     cursor: pointer;
+  }
+  /* The Menu button exists in the collapsed layout only: once the script has collapsed the menu,
+     and before that from the per-breakpoint rule inside the nav, which applies only when
+     scripting is enabled. Without JavaScript it never shows, so there is no dead button. */
+  .mm__toggle {
+    display: none;
+  }
+  .mm--compact .mm__toggle {
+    display: inline-flex;
   }
   .mm__top:hover,
   .mm__top[aria-expanded='true'],
