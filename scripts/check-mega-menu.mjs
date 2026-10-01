@@ -18,7 +18,15 @@
  *    while a panel is open; the collapsed layout is left alone.
  * 4. Docs. Every `--mm-*` the stylesheet reads is in the component header and the catalogue's
  *    theming list, except what the script itself sets; every catalogue variable is read.
- * 5. Mutations. Each check runs against deliberately broken copies and must fail on every one.
+ * 5. No shift. Below the breakpoint the served page is already folded where the script will fold
+ *    it: the frontmatter's `// <mm-prescript>` block is run for several breakpoints and must give
+ *    one `(scripting: enabled)` rule at the script's own matchMedia threshold, keyed on that
+ *    breakpoint, that shows the Menu button and folds the list; the built nav opens with it. The
+ *    Menu button is not served `hidden` and the script never unhides it; only the collapsed layout
+ *    hides the list; a panel item's link carries its button's caret and both are border-box, so
+ *    the swap above the breakpoint keeps the bar's width; a collapsed menu is set up when its script
+ *    is reached, asking the same question as the stylesheet.
+ * 6. Mutations. Each check runs against deliberately broken copies and must fail on every one.
  *
  * Exits 1 with one line per failure.
  */
@@ -54,7 +62,8 @@ const html = readFileSync(pagePath, 'utf8');
 const squash = (s) => s.replace(/\s+/g, ' ').trim();
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const logicBlock = (code) => code.match(/\/\/ <mm-fit>\n([\s\S]*?)\/\/ <\/mm-fit>/)?.[1] ?? null;
-const styleOf = (code) => code.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+// The component's own stylesheet: a `<style>` alone on its line (the header comment names the tag too).
+const styleOf = (code) => code.match(/^<style>$([\s\S]*?)^<\/style>$/m)?.[1] ?? '';
 const scriptOf = (code) => code.match(/<script is:inline>([\s\S]*?)<\/script>/)?.[1] ?? '';
 const headerOf = (code) => code.match(/^---\n\/\*\*([\s\S]*?)\*\//)?.[1] ?? '';
 /** Declarations of the first rule whose selector list is exactly `selector` (whitespace-free compare). */
@@ -219,7 +228,114 @@ const docCases = (code, theming) => {
 for (const f of docCases(src, entry.theming)) fail(f);
 finish('docs');
 
-// -------------------------------------------------------------- 5. mutations
+// ------------------------------------------------------------- 5. no shift
+// Below the breakpoint the script folds the list behind the Menu button. If the page were served
+// unfolded, everything under the header would jump up by the list's height when the script ran
+// (superherotech.ai, 2026-10-01: 233px → 69px at 412px, CLS 0.307). So the served page is already
+// folded wherever the script will fold it, and only when scripting is on.
+const prescriptBlock = (code) => code.match(/\/\/ <mm-prescript>\n([\s\S]*?)\/\/ <\/mm-prescript>/)?.[1] ?? null;
+/** Runs the frontmatter's pre-script block for one breakpoint; returns its CSS. */
+const preScriptFor = (blockCode, breakpoint) => new Function('breakpoint', `${blockCode}\nreturn preScript;`)(breakpoint);
+/** What the inline script asks matchMedia for a nav with this data-breakpoint, from its own source. */
+const scriptQueryFor = (js, dataBreakpoint) => {
+  const parse = js.match(/const bp = (parseFloat\(nav\.dataset\.breakpoint\) \|\| 0);/)?.[1];
+  const query = js.match(/matchMedia\(`([^`]*)`\)/)?.[1];
+  if (!parse || !query) return null;
+  const nav = { dataset: { breakpoint: dataBreakpoint } };
+  return new Function('nav', `const bp = ${parse};\nreturn \`${query}\`;`)(nav);
+};
+/** The rule the pre-script CSS must be, for a nav whose data-breakpoint is `value`. */
+const preScriptShape = (css, value, scriptQuery) => {
+  const out = [];
+  const media = css.match(/^@media ([^{]+)\{([\s\S]*)\}$/);
+  if (!media) return [`breakpoint ${value}: the pre-script CSS is not one @media block: ${css}`];
+  const [, query, body] = media;
+  if (!/^\(scripting: enabled\) and /.test(query.trim())) out.push(`breakpoint ${value}: the pre-script rule must sit under (scripting: enabled), or a visit without JavaScript loses the list with no Menu button to open it.`);
+  if (scriptQuery && query.trim() !== `(scripting: enabled) and ${scriptQuery}`) out.push(`breakpoint ${value}: the pre-script rule asks "${query.trim()}" and the script asks matchMedia "${scriptQuery}"; between the two widths the menu would still jump.`);
+  const key = `.mm:not(.mm--js)[data-breakpoint=${JSON.stringify(String(value))}]`;
+  if (decl(rule(body, `${key} > .mm__toggle`), 'display') !== 'inline-flex') out.push(`breakpoint ${value}: no \`${key} > .mm__toggle { display: inline-flex }\`; the Menu button's place must be held before the script runs.`);
+  if (decl(rule(body, `${key} > .mm__bar`), 'display') !== 'none') out.push(`breakpoint ${value}: no \`${key} > .mm__bar { display: none }\`; the list must be folded before the script runs.`);
+  return out;
+};
+const noShiftCases = (code) => {
+  const out = [];
+  const blk = prescriptBlock(code);
+  if (!blk) return [`${file} has no \`// <mm-prescript>\` … \`// </mm-prescript>\` block in its frontmatter.`];
+  const js = scriptOf(code);
+  for (const bp of [960, 720, 1040, '1200']) {
+    let css;
+    try {
+      css = preScriptFor(blk, bp);
+    } catch (e) {
+      out.push(`the pre-script block threw for breakpoint ${bp}: ${e.message}`);
+      continue;
+    }
+    out.push(...preScriptShape(css, bp, scriptQueryFor(js, String(bp))));
+  }
+  // Two menus with different breakpoints on one page: each rule names only its own.
+  try {
+    const [a, b] = [preScriptFor(blk, 1040), preScriptFor(blk, 720)];
+    if (a.includes('data-breakpoint="720"') || b.includes('data-breakpoint="1040"') || !a.includes('[data-breakpoint="1040"]')) out.push('the pre-script rule is not keyed on its own data-breakpoint; two menus with different breakpoints on one page would fold each other.');
+    if (preScriptFor(blk, 0) !== '') out.push('breakpoint 0 never collapses (the script says so), so it must emit no pre-script rule.');
+  } catch (e) {
+    out.push(`the pre-script block threw: ${e.message}`);
+  }
+  // The rule must be in the nav, as its first child, so it is parsed before the nav is painted.
+  if (!/<nav\b[^>]*data-mm\b[^>]*>\s*\{preScript && <style is:inline set:html=\{preScript\} \/>\}/.test(code)) out.push('the nav must open with `{preScript && <style is:inline set:html={preScript} />}`, so the rule is parsed before anything in the nav is painted.');
+  // The Menu button: served without `hidden`, shown by the stylesheet only in the collapsed layout.
+  const toggleTag = code.match(/<button class="mm__toggle"[^>]*>/)?.[0] ?? '';
+  if (!toggleTag) out.push('no `<button class="mm__toggle" …>` in the markup.');
+  else if (/\shidden(?=[\s>])/.test(toggleTag)) out.push('the Menu button is served `hidden`, and `.mm [hidden]` is display: none !important: no rule could hold its place before the script runs.');
+  if (/toggle\.hidden\s*=/.test(js)) out.push('the script sets toggle.hidden; the stylesheet decides where the Menu button shows, the same way before the script and after.');
+  const css = styleOf(code);
+  if (decl(rule(css, '.mm__toggle'), 'display') !== 'none') out.push('`.mm__toggle { display: none }` is gone; without JavaScript (and above the breakpoint) the Menu button would show and do nothing.');
+  if (decl(rule(css, '.mm--compact .mm__toggle'), 'display') !== 'inline-flex') out.push('`.mm--compact .mm__toggle { display: inline-flex }` is gone; the collapsed menu would have no Menu button.');
+  // Without JavaScript the list shows: only the collapsed class folds it.
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = squash(m[1].replace(/\/\*[\s\S]*?\*\//g, ''));
+    if (!/\.mm__bar(?![\w-])/.test(sel) || decl(m[2], 'display') !== 'none') continue;
+    for (const part of sel.split(',')) if (/\.mm__bar(?![\w-])/.test(part) && !part.trim().startsWith('.mm--compact')) out.push(`\`${part.trim()}\` hides the list outside the collapsed layout; without JavaScript the list must show.`);
+  }
+  // Above the breakpoint the script swaps each panel item's link for a button: same width.
+  const link = code.match(/<a class="mm__top"[^>]*data-mm-link>([\s\S]*?)<\/a>/)?.[1] ?? '';
+  if (!/\{hasPanel && <span class="mm__caret" aria-hidden="true" \/>\}/.test(link)) out.push('a top link with a panel must carry the caret its button carries, or the bar widens when the script swaps them.');
+  const top = rule(css, '.mm__top, .mm__toggle');
+  if (decl(top, 'box-sizing') !== 'border-box') out.push('`.mm__top, .mm__toggle` must be box-sizing: border-box: a link is content-box by default and a button border-box, so with min-height they differ in height.');
+  for (const p of ['letter-spacing', 'text-transform']) if (decl(top, p) !== 'inherit') out.push(`\`.mm__top, .mm__toggle\` must set ${p}: inherit; a button does not inherit it and the link does.`);
+  // A collapsed menu is set up when the browser reaches its script, not at DOMContentLoaded,
+  // and "collapsed" is the same question everywhere the script asks it.
+  if (!/\n\s*start\(\);\n/.test(js)) out.push('the script must call start() at once (it follows the nav); waiting for DOMContentLoaded leaves a collapsed menu\'s Menu button dead until the whole page has parsed.');
+  if (!/const bootCollapsed = \(\) =>[\s\S]*?\.matches\) init\(nav\);/.test(js)) out.push('bootCollapsed() must set up each menu whose collapsed query matches.');
+  const queries = new Set([...js.matchAll(/matchMedia\(`([^`]*)`\)/g)].map((m) => m[1]));
+  const parses = new Set([...js.matchAll(/const bp = ([^;]+);/g)].map((m) => m[1]));
+  if (queries.size !== 1 || parses.size !== 1) out.push(`the script asks "collapsed?" in more than one way (${[...queries].join(' | ')}; ${[...parses].join(' | ')}); the early setup and the menu itself must agree, and both must agree with the stylesheet.`);
+  return out;
+};
+for (const f of noShiftCases(src)) fail(f);
+
+// The built page: each nav carries its own rule, at its own breakpoint, and the Menu button
+// is not served hidden.
+const builtNoShift = (page) => {
+  const out = [];
+  const navs = [...page.matchAll(/<nav\b([^>]*\bdata-mm\b[^>]*)>([\s\S]*?)<\/nav>/g)];
+  if (!navs.length) return ['the built demo page has no mega-menu nav.'];
+  const js = [...page.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('__megaMenu')) ?? '';
+  for (const [, attrs, inner] of navs) {
+    const value = attrs.match(/data-breakpoint="([^"]*)"/)?.[1];
+    if (!value) { out.push('a built nav has no data-breakpoint.'); continue; }
+    const style = inner.match(/^\s*<style>([\s\S]*?)<\/style>/)?.[1];
+    if (!style) { out.push(`the built nav (breakpoint ${value}) does not open with its pre-script <style>.`); continue; }
+    out.push(...preScriptShape(style.trim(), value, scriptQueryFor(js, value)));
+    const toggle = inner.match(/<button class="mm__toggle"[^>]*>/)?.[0] ?? '';
+    if (!toggle) out.push(`the built nav (breakpoint ${value}) has no Menu button.`);
+    else if (/\shidden(?=[\s>])/.test(toggle)) out.push(`the built nav (breakpoint ${value}) serves its Menu button hidden.`);
+  }
+  return out;
+};
+for (const f of builtNoShift(html)) fail(f);
+finish('no shift');
+
+// -------------------------------------------------------------- 6. mutations
 const swap = (s, from, to) => s.replace(from, to);
 let killed = 0;
 let total = 0;
@@ -266,6 +382,41 @@ const noTheme = entry.theming.filter((t) => t.name !== '--mm-panel-max');
 total += 2;
 killed += await mutate(entry.theming, [['catalogue omits --mm-panel-max', noTheme]], (t) => docCases(src, t));
 killed += await mutate(entry.theming, [['catalogue lists a variable nobody reads', [...entry.theming, { name: '--mm-ghost' }]]], (t) => docCases(src, t));
+
+const shiftMutants = [
+  ['the pre-script rule ignores scripting', swap(src, '`@media (scripting: enabled) and (max-width:', '`@media (max-width:')],
+  ['the pre-script threshold is not the script’s', swap(src, '(max-width: ${bp - 0.02}px) { ${key}', '(max-width: ${bp}px) { ${key}')],
+  ['the script’s threshold is not the stylesheet’s', swap(src, 'matchMedia(`(max-width: ${bp - 0.02}px)`)', 'matchMedia(`(max-width: ${bp - 1}px)`)')],
+  ['the pre-script rule is not keyed on the breakpoint', swap(src, '`.mm:not(.mm--js)[data-breakpoint=${JSON.stringify(String(breakpoint))}]`', '`.mm:not(.mm--js)`')],
+  ['the pre-script rule outlives the script', swap(src, '`.mm:not(.mm--js)[data-breakpoint=', '`.mm[data-breakpoint=')],
+  ['the pre-script rule does not hold the Menu button', swap(src, '${key} > .mm__toggle { display: inline-flex; } ', '')],
+  ['the pre-script rule does not fold the list', swap(src, ' ${key} > .mm__bar { display: none; }', '')],
+  ['a rule for breakpoint 0', swap(src, '  bp > 0\n    ?', '  bp >= 0\n    ?')],
+  ['the nav does not carry the rule', swap(src, '  {preScript && <style is:inline set:html={preScript} />}\n', '')],
+  ['the Menu button is served hidden', swap(src, 'aria-controls={`${uid}-list`} data-mm-toggle>', 'aria-controls={`${uid}-list`} hidden data-mm-toggle>')],
+  ['the script unhides the Menu button', swap(src, "        nav.classList.toggle('mm--compact', compact());\n", "        nav.classList.toggle('mm--compact', compact());\n        toggle.hidden = !compact();\n")],
+  ['the Menu button shows without JavaScript', swap(src, '  .mm__toggle {\n    display: none;\n  }\n', '')],
+  ['the collapsed menu has no Menu button', swap(src, '  .mm--compact .mm__toggle {\n    display: inline-flex;\n  }\n', '')],
+  ['the list is hidden without JavaScript', swap(src, '  .mm__bar {\n    display: flex;', '  .mm__bar {\n    display: none;')],
+  ['the link has no caret', swap(src, '              {hasPanel && <span class="mm__caret" aria-hidden="true" />}\n            </a>', '            </a>')],
+  ['link and button size their boxes differently', swap(src, '    box-sizing: border-box;\n    min-height: 2.75rem;', '    min-height: 2.75rem;')],
+  ['the button ignores the host’s letter-spacing', swap(src, '    letter-spacing: inherit;\n', '')],
+  ['the script waits for DOMContentLoaded', swap(src, '    window.__megaMenu = start;\n    start();\n', '    window.__megaMenu = start;\n')],
+  ['the early setup asks another question', swap(src, 'if (bp > 0 && matchMedia(`(max-width: ${bp - 0.02}px)`).matches) init(nav);', 'if (bp > 0 && matchMedia(`(max-width: ${bp}px)`).matches) init(nav);')],
+  ['the early setup sets up nothing', swap(src, '.matches) init(nav);', '.matches) return;')],
+];
+total += shiftMutants.length;
+killed += await mutate(src, shiftMutants, noShiftCases);
+
+const builtMutants = [
+  ['the built Menu button is hidden', html.replace(/(<button class="mm__toggle")/, '$1 hidden')],
+  ['the built rule is missing', html.replace(/(<nav\b[^>]*\bdata-mm\b[^>]*>)<style>[\s\S]*?<\/style>/, '$1')],
+  ['the built rule is at another width', html.replace(/(<nav\b[^>]*\bdata-mm\b[^>]*><style>@media \(scripting: enabled\) and \(max-width: )([\d.]+)px/, (_, a, n) => `${a}${Number(n) + 40}px`)],
+  ['the built rule names another breakpoint', html.replace(/(<style>@media[^<]*?)\[data-breakpoint="(\d+)"\] > \.mm__bar/, (_, a, n) => `${a}[data-breakpoint="${Number(n) + 1}"] > .mm__bar`)],
+];
+total += builtMutants.length;
+killed += await mutate(html, builtMutants, builtNoShift);
 finish('mutations');
 
-console.log(`check-mega-menu ok: ${FIT_CASES.length} panelTop cases; panel cap in source and built CSS; script and docs; ${killed}/${total} mutants killed.`);
+const shiftCount = [...html.matchAll(/<nav\b[^>]*\bdata-mm\b/g)].length;
+console.log(`check-mega-menu ok: ${FIT_CASES.length} panelTop cases; panel cap in source and built CSS; script and docs; no shift (pre-script rule at the script's threshold for 4 breakpoints, keyed per breakpoint, ${shiftCount} built nav(s), Menu button not served hidden, list shown without JavaScript, link and button the same width); ${killed}/${total} mutants killed.`);
