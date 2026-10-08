@@ -1,0 +1,127 @@
+---
+/**
+ * Demo for `product-page`: two of Neutral Goods' products from public/demo/shop-catalog.json,
+ * the enamel mug (two variations at two prices, so a picker, and a description holding "<" that
+ * must show as typed) and the field notebook (one variation, so no picker). A cart for the same
+ * shop sits above them, as it would in a site's header, so Add to cart works; its `api` is the
+ * fake origin a stub answers (the cart demo's, byte for byte; npm run check pins the copy), so
+ * nothing reaches a network. Stock is passed at
+ * build from public/demo/shop-stock.json.
+ *
+ * The structured data is shown, not emitted (`jsonLd="visible"`): this page is published on
+ * superherotech.ai, which must not carry Product markup for a product nobody sells. A real
+ * product page leaves `jsonLd` at its default and emits it.
+ */
+import Cart from '../../library/cart/Cart.astro';
+import ProductPage from '../../library/product-page/ProductPage.astro';
+import fixture from '../../../public/demo/shop-catalog.json';
+import stock from '../../../public/demo/shop-stock.json';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+  /** Unused: nothing here moves or opens by itself. */
+  quiet?: boolean;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+const catalog = { ...fixture, products: fixture.products.map((p) => ({ ...p, images: p.images.map(asset) })) };
+const mug = catalog.products.find((p) => p.slug === 'enamel-mug')!;
+const notebook = catalog.products.find((p) => p.slug === 'field-notebook')!;
+const shipping = {
+  flatShippingCents: 800,
+  freeShippingOverCents: 5000,
+  pickupPoints: [
+    { id: 'market', name: 'the Saturday market' },
+    { id: 'workshop', name: 'the workshop' },
+  ],
+};
+const stub = `(() => {
+  if (window.__shopDemo) return;
+  const API = 'https://shop.demo.invalid';
+  const stock = ${JSON.stringify(stock)};
+  const state = { mode: 'ok' };
+  window.__shopDemo = state;
+  const real = window.fetch.bind(window);
+  const later = (v, ms) => new Promise((ok) => setTimeout(() => ok(v), ms));
+  const reply = (status, body) => later(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }), 450);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input.url;
+    if (!url.startsWith(API + '/')) return real(input, init);
+    const u = new URL(url);
+    if (u.pathname.endsWith('/stock')) {
+      const out = {};
+      for (const id of (u.searchParams.get('ids') || '').split(',')) if (id in stock) out[id] = stock[id];
+      return reply(200, out);
+    }
+    if (u.pathname.endsWith('/checkout')) {
+      const body = JSON.parse(init.body);
+      document.dispatchEvent(new CustomEvent('shop-demo-request', { detail: body }));
+      if (state.mode === 'network') return new Promise((_, no) => setTimeout(() => no(new TypeError('Failed to fetch')), 450));
+      if (state.mode === 'closed') return reply(503, { ok: false, error: 'shop_closed' });
+      if (state.mode === 'short') {
+        const first = body.items[0];
+        return reply(409, { ok: false, error: 'short', short: [{ variationId: first.variationId, available: Math.max(0, first.quantity - 1) }] });
+      }
+      return reply(200, { url: 'https://square.link/u/demo' + body.idempotencyKey.replace(/-/g, '').slice(0, 8) });
+    }
+    return reply(404, { ok: false, error: 'not_found' });
+  };
+})();`;
+---
+<script is:inline set:html={stub} />
+<div class="demo-pp">
+  <div class="demo-pp__bar">
+    <p class="demo-pp__shop">Neutral Goods</p>
+    <Cart id="demo-page-cart" shop="demo-page" catalog={catalog} api="https://shop.demo.invalid" hrefBase={null} {...shipping} />
+  </div>
+  <ProductPage
+    product={mug}
+    currency={catalog.currency}
+    shop="demo-page"
+    headingLevel={2}
+    brand="Neutral Goods"
+    url="https://example.com/shop/enamel-mug/"
+    stock={stock}
+    optionLabel="Choose a color"
+    jsonLd="visible"
+    {...shipping}
+  />
+  <hr />
+  <ProductPage product={notebook} currency={catalog.currency} shop="demo-page" headingLevel={2} url="https://example.com/shop/field-notebook/" stock={stock} jsonLd="visible" {...shipping} />
+</div>
+<script is:inline>
+  (() => {
+    // The demo never leaves the page: a checkout here only closes the drawer.
+    const root = document.currentScript.previousElementSibling;
+    root.addEventListener('cart-checkout', (e) => {
+      e.preventDefault();
+      root.querySelector('#demo-page-cart-panel')?.close();
+    });
+  })();
+</script>
+
+<style>
+  .demo-pp {
+    display: grid;
+    gap: 2rem;
+  }
+  .demo-pp__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #dfe3ea;
+    border-radius: 12px;
+  }
+  .demo-pp__shop {
+    margin: 0;
+    font-weight: 700;
+  }
+  .demo-pp hr {
+    width: 100%;
+    border: 0;
+    border-top: 1px solid #dfe3ea;
+  }
+</style>

@@ -1,0 +1,453 @@
+---
+/**
+ * ProductPage — one product of the Superhero Shop, built at deploy from the catalogue
+ * (fetchCatalog, beside product-list): its images, name, description, a variation picker when
+ * it has more than one variation, quantity, Add to cart, a shipping or pickup note, and the
+ * page's Product structured data. Replaces the single-product page of WooCommerce, Ecwid and
+ * Square Online, and the Shopify Buy Button's product embed.
+ *
+ * DESCRIPTION. The Worker returns Square's item `description`, which is PLAIN TEXT: it passes the
+ * field through and neither returns nor sanitises HTML (Square's `description_html` is not in
+ * the contract). So it is rendered as text: paragraphs at blank lines, single newlines kept.
+ * Anything that looks like markup is shown as typed, never parsed.
+ *
+ * ADD TO CART uses the cart element's attribute contract, not an import: a
+ * <form data-cart-form data-cart-shop> with fields `variation` and `quantity`. Its button stays
+ * `hidden` until a <Cart shop="…"> for the same shop has run on the page, so put the cart in
+ * the layout. Without JavaScript the page reads in full and a line says ordering needs it.
+ *
+ * VARIATIONS. One variation: no picker, the price is shown. More: a radio group (real radios in
+ * a fieldset with a legend, `optionLabel`), each labelled with its name and price; the price
+ * line follows the choice. A variation known to be sold out (build-time `stock`, or `liveStock`)
+ * is disabled and says "Sold out"; when all are, the button says so and cannot be pressed.
+ *
+ * JSON-LD. One `Product` (name, description, image, productID, optional brand and url) with
+ * `offers`: an array of one `Offer` per variation (sku = the Square variation id, name, price as
+ * a decimal string, priceCurrency, url, and availability when stock is known: untracked means
+ * InStock). It is the page's only Product node: delete any hand-written one. `<` is escaped, so a
+ * description can never close the script. Prices are the build's; the next deploy (fired by the
+ * Worker on a catalogue change) updates them.
+ *
+ * ACCESSIBILITY. The name is a heading at `headingLevel` (1 on a product's own page). The main
+ * image's alt is the product name (`imageAlt` to say more); the others are "<name>, view 2".
+ * Quantity is a labelled number input, 1 to 20 (the Worker's limit). No live region here: the
+ * cart announces its count. No motion.
+ *
+ * CSP: `img-src` for Square's image host; with `liveStock`, `connect-src https://shop.superherotech.ai`.
+ *
+ * Theming: --pp-accent / --pp-on-accent (the button, 7.27:1), --pp-fg, --pp-muted, --pp-border,
+ * --pp-radius, --pp-image-bg, --pp-focus, --pp-gap, --pp-aspect.
+ */
+interface Variation {
+  id: string;
+  name: string;
+  price_cents: number;
+  tracked: boolean;
+}
+interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  images?: string[];
+  variations: Variation[];
+}
+interface PickupPoint {
+  id: string;
+  name: string;
+  details?: string;
+}
+interface Props {
+  /** One product from the catalogue. Required. */
+  product: Product;
+  /** The catalogue's currency. Default USD. */
+  currency?: string | null;
+  /** The shop's site key: the cart this page adds to. Required. */
+  shop: string;
+  /** Absolute URL of this page, for the JSON-LD. Default: Astro.site + the path, when the site is configured. */
+  url?: string;
+  /** The seller's name, for the JSON-LD brand. */
+  brand?: string;
+  /** Emit the Product JSON-LD. Default true. 'visible' shows the same JSON as text in a <details>
+   * instead of emitting it: for demos, which must not publish structured data for a product nobody sells. */
+  jsonLd?: boolean | 'visible';
+  /** Level of the name's heading. Default 1. */
+  headingLevel?: 1 | 2 | 3;
+  /** The picker's question. Default "Choose one". */
+  optionLabel?: string;
+  /** The main image's alt. Default the product name. */
+  imageAlt?: string;
+  /** The image box, in px. Default 800 × 800. */
+  imageWidth?: number;
+  imageHeight?: number;
+  /** Build-time stock, { [variationId]: number | null }. */
+  stock?: Record<string, number | null>;
+  /** Check stock from the browser on load. Default false. */
+  liveStock?: boolean;
+  /** The Worker's origin. Default https://shop.superherotech.ai. */
+  api?: string;
+  /** As the cart's props: the note under the button is written from these. */
+  flatShippingCents?: number | null;
+  freeShippingOverCents?: number | null;
+  pickupPoints?: PickupPoint[];
+  /** Your own note instead of the one written from the three props above. */
+  note?: string;
+  class?: string;
+}
+
+const {
+  product,
+  currency: cur = 'USD',
+  shop,
+  url: urlProp,
+  brand,
+  jsonLd = true,
+  headingLevel = 1,
+  optionLabel = 'Choose one',
+  imageAlt,
+  imageWidth = 800,
+  imageHeight = 800,
+  stock,
+  liveStock = false,
+  api = 'https://shop.superherotech.ai',
+  flatShippingCents = null,
+  freeShippingOverCents = null,
+  pickupPoints = [],
+  note,
+  class: className,
+} = Astro.props;
+
+if (!product || !Array.isArray(product.variations) || product.variations.length === 0) throw new Error('ProductPage: `product` is required, one catalogue product with at least one variation.');
+if (!shop || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shop)) throw new Error(`ProductPage "${product.name}": \`shop\` "${shop}" is not a site key.`);
+
+const currency = cur || 'USD';
+const nf = new Intl.NumberFormat('en-US', { style: 'currency', currency });
+const digits = nf.resolvedOptions().maximumFractionDigits ?? 2;
+const money = (cents: number) => nf.format(cents / 10 ** digits);
+const decimal = (cents: number) => (cents / 10 ** digits).toFixed(digits);
+
+/** true / false when known, null when not. Untracked is always available. */
+const available = (v: Variation): boolean | null => (!v.tracked ? true : stock && typeof stock[v.id] === 'number' ? (stock[v.id] as number) > 0 : null);
+const many = product.variations.length > 1;
+const first = product.variations.find((v) => available(v) !== false) ?? product.variations[0];
+const allOut = product.variations.every((v) => available(v) === false);
+
+const images = product.images ?? [];
+const paragraphs = (product.description ?? '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const H = `h${headingLevel}` as 'h1' | 'h2' | 'h3';
+const uid = `pp-${product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+const pageUrl = urlProp ?? (Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined);
+const fulfil =
+  note ??
+  (() => {
+    const parts: string[] = [];
+    if (typeof flatShippingCents === 'number') {
+      parts.push(flatShippingCents === 0 ? 'Ships free.' : `Ships for ${money(flatShippingCents)}${freeShippingOverCents !== null ? `, free on orders over ${money(freeShippingOverCents)}` : ''} (estimated).`);
+    }
+    if (pickupPoints.length) {
+      const names = pickupPoints.map((p) => p.name);
+      const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+      parts.push(`${parts.length ? 'Or pick it up' : 'Pick it up'} at ${list}, with no shipping fee.`);
+    }
+    return parts.join(' ');
+  })();
+
+const AVAIL = (v: Variation) => {
+  const a = available(v);
+  return a === null ? undefined : a ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+};
+const ld = jsonLd
+  ? JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      ...(product.description ? { description: product.description } : {}),
+      ...(images.length ? { image: images } : {}),
+      productID: product.id,
+      ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
+      ...(pageUrl ? { url: pageUrl } : {}),
+      offers: product.variations.map((v) => ({
+        '@type': 'Offer',
+        sku: v.id,
+        name: many ? `${product.name}, ${v.name}` : product.name,
+        price: decimal(v.price_cents),
+        priceCurrency: currency,
+        ...(pageUrl ? { url: pageUrl } : {}),
+        ...(AVAIL(v) ? { availability: AVAIL(v) } : {}),
+      })),
+    }).replace(/</g, '\\u003c')
+  : null;
+const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.stringify({ api, shop, ids: product.variations.filter((v) => v.tracked).map((v) => v.id) }) : undefined;
+---
+
+<article class:list={['pp', className]} data-pp={live ?? ''}>
+  <div class="pp__media">
+    {images.length > 0 ? (
+      <img class="pp__img" src={images[0]} alt={imageAlt ?? product.name} width={imageWidth} height={imageHeight} decoding="async" fetchpriority="high" />
+    ) : (
+      <span class="pp__img pp__img--none" aria-hidden="true" />
+    )}
+    {images.length > 1 && (
+      <ul class="pp__more" role="list">
+        {images.slice(1).map((src, i) => (
+          <li><img class="pp__thumb" src={src} alt={`${product.name}, view ${i + 2}`} width={imageWidth} height={imageHeight} loading="lazy" decoding="async" /></li>
+        ))}
+      </ul>
+    )}
+  </div>
+  <div class="pp__info">
+    <H class="pp__name">{product.name}</H>
+    <p class="pp__price" data-pp-price>{money(first.price_cents)}</p>
+    {paragraphs.length > 0 && (
+      <div class="pp__desc">
+        {paragraphs.map((p) => <p>{p}</p>)}
+      </div>
+    )}
+    <form class="pp__form" data-cart-form data-cart-shop={shop}>
+      {many ? (
+        <fieldset class="pp__options">
+          <legend>{optionLabel}</legend>
+          {product.variations.map((v) => {
+            const out = available(v) === false;
+            return (
+              <label class="pp__option" data-pp-option={v.id}>
+                <input type="radio" name="variation" value={v.id} checked={v.id === first.id && !out} disabled={out} data-price={money(v.price_cents)} />
+                <span class="pp__option-name">{v.name}</span>{' '}
+                <span class="pp__option-price">{money(v.price_cents)}</span>{' '}
+                <span class="pp__option-sold" data-pp-sold hidden={!out}>Sold out</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      ) : (
+        <input type="hidden" name="variation" value={first.id} />
+      )}
+      <div class="pp__row">
+        <label class="pp__qty">
+          <span>Quantity</span>
+          <input type="number" name="quantity" min="1" max="20" step="1" value="1" inputmode="numeric" required />
+        </label>
+        <button class="pp__add" type="submit" data-cart-needs-js data-cart-shop={shop} data-pp-add disabled={allOut} hidden>{allOut ? 'Sold out' : 'Add to cart'}</button>
+      </div>
+      <p class="pp__note" data-cart-note hidden></p>
+      <noscript><p class="pp__fine">Ordering online needs JavaScript. Turn it on to add this to your cart.</p></noscript>
+    </form>
+    {fulfil && <p class="pp__fine">{fulfil}</p>}
+  </div>
+</article>
+<script is:inline>
+  (() => {
+    // The price line follows the chosen variation; with liveStock, sold-out variations are disabled.
+    const root = document.currentScript.previousElementSibling;
+    if (!root || !root.matches('[data-pp]')) return;
+    const price = root.querySelector('[data-pp-price]');
+    const button = root.querySelector('[data-pp-add]');
+    const follow = () => {
+      const r = root.querySelector('input[name="variation"]:checked');
+      if (r && price && r.dataset.price) price.textContent = r.dataset.price;
+    };
+    root.addEventListener('change', (e) => {
+      if (e.target.name === 'variation') follow();
+    });
+    follow();
+    if (!root.dataset.pp) return;
+    let cfg;
+    try {
+      cfg = JSON.parse(root.dataset.pp);
+    } catch {
+      return;
+    }
+    fetch(cfg.api + '/v1/shops/' + encodeURIComponent(cfg.shop) + '/stock?ids=' + cfg.ids.map(encodeURIComponent).join(','), { credentials: 'omit' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((stock) => {
+        if (!stock || typeof stock !== 'object') return;
+        const radios = [...root.querySelectorAll('input[name="variation"][type="radio"]')];
+        const isOut = (id) => cfg.ids.includes(id) && typeof stock[id] === 'number' && stock[id] <= 0;
+        radios.forEach((r) => {
+          const out = isOut(r.value);
+          r.disabled = out;
+          const tag = r.closest('label')?.querySelector('[data-pp-sold]');
+          if (tag) tag.hidden = !out;
+        });
+        if (radios.length) {
+          const checked = radios.find((r) => r.checked && !r.disabled);
+          if (!checked) {
+            const next = radios.find((r) => !r.disabled);
+            if (next) next.checked = true;
+          }
+          follow();
+        }
+        const hidden = root.querySelector('input[name="variation"][type="hidden"]');
+        const allOut = radios.length ? radios.every((r) => r.disabled) : !!(hidden && isOut(hidden.value));
+        if (button && allOut) {
+          button.disabled = true;
+          button.textContent = 'Sold out';
+        }
+      })
+      .catch(() => {});
+  })();
+</script>
+{ld && jsonLd === 'visible' && (
+  <details class="pp__ld" data-pp-ld>
+    <summary>The page's structured data (Product JSON-LD)</summary>
+    <pre><code>{ld}</code></pre>
+  </details>
+)}
+{ld && jsonLd !== 'visible' && <script type="application/ld+json" set:html={ld} />}
+
+<style>
+  .pp {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--pp-gap, clamp(1.5rem, 4vw, 3rem));
+    align-items: start;
+    color: var(--pp-fg, #1e283c);
+  }
+  .pp [hidden] {
+    display: none !important;
+  }
+  .pp__img,
+  .pp__thumb {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--pp-aspect, 1 / 1);
+    object-fit: cover;
+    border-radius: var(--pp-radius, 12px);
+    background: var(--pp-image-bg, #eef0f4);
+  }
+  .pp__more {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+    gap: 0.75rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pp__name {
+    margin: 0 0 0.25rem;
+    line-height: 1.15;
+  }
+  .pp__price {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .pp__desc p {
+    margin: 0 0 0.75rem;
+    white-space: pre-line;
+  }
+  .pp__form {
+    margin-top: 1.25rem;
+  }
+  .pp__options {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+  }
+  .pp__options legend {
+    margin-bottom: 0.5rem;
+    padding: 0;
+    font-weight: 600;
+  }
+  .pp__option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 2.75rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--pp-border, #8a94a6);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .pp__option:has(input:checked) {
+    border-color: var(--pp-accent, #5933d8);
+    box-shadow: inset 0 0 0 1px var(--pp-accent, #5933d8);
+  }
+  .pp__option:has(input:disabled) {
+    color: var(--pp-muted, #5b6577);
+    cursor: not-allowed;
+  }
+  .pp__option input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    accent-color: var(--pp-accent, #5933d8);
+  }
+  .pp__option-price {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .pp__option-sold {
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .pp__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem;
+  }
+  .pp__qty {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+  .pp__qty input {
+    width: 5rem;
+    min-height: 2.75rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--pp-border, #8a94a6);
+    border-radius: 8px;
+    font: inherit;
+  }
+  .pp__add {
+    min-height: 2.75rem;
+    padding: 0 1.4rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--pp-accent, #5933d8);
+    color: var(--pp-on-accent, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .pp__add:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .pp :focus-visible {
+    outline: 3px solid var(--pp-focus, var(--pp-accent, #5933d8));
+    outline-offset: 2px;
+  }
+  .pp__note {
+    margin: 0.5rem 0 0;
+    font-weight: 600;
+  }
+  .pp__fine {
+    margin: 0.75rem 0 0;
+    color: var(--pp-muted, #5b6577);
+    font-size: 0.9375rem;
+  }
+  .pp__ld {
+    margin-top: 1.5rem;
+    font-size: 0.875rem;
+  }
+  .pp__ld pre {
+    overflow: auto;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--pp-image-bg, #eef0f4);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  @media (forced-colors: active) {
+    .pp__option:has(input:checked) {
+      outline: 2px solid Highlight;
+    }
+  }
+</style>

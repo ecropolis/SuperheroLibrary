@@ -1,0 +1,23 @@
+---
+/**
+ * Demo for `product-list`: Neutral Goods' four products from public/demo/shop-catalog.json (the
+ * Superhero Shop Worker's catalogue shape), with abstract SVG images. The stock map
+ * (public/demo/shop-stock.json) is passed at build, so the canvas tote, whose two variations
+ * are both at 0, shows Sold out with no network. A real site gets its products from
+ * fetchCatalog at build; the cards link to its product pages, which here are #fragments.
+ */
+import ProductList from '../../library/product-list/ProductList.astro';
+import fixture from '../../../public/demo/shop-catalog.json';
+import stock from '../../../public/demo/shop-stock.json';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+  /** Unused: nothing here moves or opens by itself. */
+  quiet?: boolean;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+const products = fixture.products.map((p) => ({ ...p, images: p.images.map(asset) }));
+---
+<ProductList products={products} currency={fixture.currency} stock={stock} label="Neutral Goods products" href={(p) => `#demo-pl-${p.slug}`} />

@@ -1,0 +1,50 @@
+{
+  "site": "demo-shop",
+  "open": true,
+  "currency": "USD",
+  "products": [
+    {
+      "id": "ITEMMUG",
+      "slug": "enamel-mug",
+      "name": "Enamel mug",
+      "description": "A camp mug in steel with a glass enamel coat. Holds 12 oz (< 350 ml).\n\nHand wash only. The rim is rolled, so it stays cool to the lip.",
+      "images": ["shop-mug.svg", "shop-mug-side.svg"],
+      "variations": [
+        { "id": "VARMUGCREAM", "name": "Cream", "price_cents": 1800, "tracked": true },
+        { "id": "VARMUGSLATE", "name": "Slate", "price_cents": 2000, "tracked": true }
+      ]
+    },
+    {
+      "id": "ITEMNOTEBOOK",
+      "slug": "field-notebook",
+      "name": "Field notebook",
+      "description": "Forty-eight pages of dot grid, stitched, in a card cover that fits a back pocket.",
+      "images": ["shop-notebook.svg"],
+      "variations": [
+        { "id": "VARNOTEBOOK", "name": "Regular", "price_cents": 900, "tracked": false }
+      ]
+    },
+    {
+      "id": "ITEMCANDLE",
+      "slug": "beeswax-candle",
+      "name": "Beeswax candle",
+      "description": "Poured by hand from local beeswax, with a cotton wick.\nSmall burns for about 20 hours, large for about 45.",
+      "images": ["shop-candle.svg"],
+      "variations": [
+        { "id": "VARCANDLESM", "name": "Small", "price_cents": 1400, "tracked": true },
+        { "id": "VARCANDLELG", "name": "Large", "price_cents": 2600, "tracked": true }
+      ]
+    },
+    {
+      "id": "ITEMTOTE",
+      "slug": "canvas-tote",
+      "name": "Canvas tote",
+      "description": "Heavy cotton canvas with long handles and an inside pocket.",
+      "images": ["shop-tote.svg"],
+      "variations": [
+        { "id": "VARTOTENAT", "name": "Natural", "price_cents": 2400, "tracked": true },
+        { "id": "VARTOTEBLK", "name": "Black", "price_cents": 2400, "tracked": true }
+      ]
+    }
+  ]
+}
