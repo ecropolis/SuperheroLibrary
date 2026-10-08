@@ -1,0 +1,1260 @@
+---
+/**
+ * Cart — the Superhero Shop cart: a cart button with its count, and a drawer that lists the
+ * lines, asks ship-or-pickup and sends the buyer to Square's checkout page. It replaces the cart
+ * of WooCommerce, the Shopify Buy Button, Ecwid and Square Online on a static site whose shop is
+ * the Superhero Shop Worker (shop.superherotech.ai, ecropolis/SuperheroShop).
+ *
+ * THE CONTRACT WITH THE WORKER (its README, "The checkout contract")
+ *   GET  <api>/v1/shops/<shop>/stock?ids=a,b   -> { [variationId]: number | null }
+ *        null = untracked (always available); an id left out is no longer in the shop.
+ *   POST <api>/v1/shops/<shop>/checkout
+ *        { items: [{ variationId, quantity }], fulfillment: "ship" | "pickup",
+ *          pickupPoint?, idempotencyKey }                         -> 200 { url }
+ *        409 { error: "short", short: [{ variationId, available }] }, 503 { error: "shop_closed" },
+ *        400 { error: "unknown_variation", ids }, and the rest in the README.
+ *   The body carries ids and quantities and nothing else. The Worker refuses any other field,
+ *   `price` included, with 400 unexpected_field, and prices the order from Square. So the cart
+ *   NEVER SENDS A PRICE: the subtotal it shows is for display only, computed from the catalogue
+ *   the page was built with. Shipping is shown as an estimate from props for the same reason.
+ *   Every checkout attempt mints a fresh `idempotencyKey` (crypto.randomUUID), as the README
+ *   requires: a reused key gets the stored link back whatever the cart now says.
+ *
+ * THE CART is kept in localStorage under `superhero-cart:<shop>`, ids and quantities only:
+ * at most 20 lines, 1 to 20 of each (the Worker's own limits). On load it is cleaned: unknown
+ * ids, bad quantities and duplicates are dropped, clamped or merged. The drawer re-checks stock
+ * against /stock when it opens and again before checkout; a short line is clamped to what is
+ * left and says so on the line, a sold-out or withdrawn one is taken out with a sentence. The
+ * checkout's own 409 `short` is handled the same way. A 503 reads "This shop is closed for the
+ * moment." A network failure is one sentence. The cart is kept after the redirect (the buyer may
+ * come back without paying); the thanks page renders <Cart clear /> to empty it.
+ *
+ * ADD TO CART, from any markup (product-list and product-page use this; elements never import
+ * each other, so the contract is attributes):
+ *   <button type="button" data-cart-add="<variationId>" data-cart-shop="<shop>" hidden>Add to cart</button>
+ *     optional data-cart-qty="2". The button is `hidden` until a cart for that shop is on the
+ *     page and its script has run, so without JavaScript nothing that cannot work is shown.
+ *   <form data-cart-form data-cart-shop="<shop>"> with a field `variation` (radios or a hidden
+ *     input) and a field `quantity`; submitting adds. Give its submit button
+ *     `data-cart-needs-js data-cart-shop="<shop>" hidden`, which the cart reveals the same way.
+ *   An element `[data-cart-note]` inside the form (or right after the button) receives a refusal
+ *   ("Your cart holds up to 20 of each item.").
+ * Several <Cart>s for one shop on a page (a header button and a footer one) share one cart.
+ *
+ * EVENTS for hosts: `cart-checkout` (bubbles, cancelable, detail { url, shop }) right before the
+ * redirect; cancel it to handle the URL yourself (the demo does, so it never leaves the page).
+ * `cart-change` (bubbles, detail { shop, count }) after any change.
+ * window.__superheroCart: add(shop, variationId, qty), clear(shop), lines(shop), open(id).
+ *
+ * ACCESSIBILITY. The trigger is a <button> with aria-haspopup="dialog", aria-controls and
+ * aria-expanded, named "Cart, 2 items". The drawer is a native <dialog> opened with
+ * showModal(), so the page behind is inert and focus stays in the drawer; Escape, the 44px close
+ * button and a click on the backdrop close it, and focus returns to the trigger. ONE aria-live
+ * region per cart, for the count ("3 items in your cart") and refused adds; nothing in the
+ * drawer is live: after a checkout problem focus moves to the message, which is read on arrival.
+ * Every control has a name that says which line it acts on ("Remove Enamel mug, Slate").
+ * prefers-reduced-motion: no slide. Without JavaScript: the cart cannot work, so the trigger
+ * and every add button stay hidden and a <noscript> line says why.
+ *
+ * CSP. The site's Content-Security-Policy needs `connect-src https://shop.superherotech.ai`
+ * (the stock check and the checkout POST) and `img-src` for the catalogue's image host
+ * (Square's: https://items-images-production.s3.us-west-2.amazonaws.com). The redirect is a
+ * navigation, so form-action is not involved.
+ *
+ * Theming, from the host's tokens (each has a fallback):
+ *   --crt-accent / --crt-on-accent   checkout button, count badge     (#5933d8 / #fff, 7.27:1)
+ *   --crt-bg / --crt-fg              drawer and its text              (#fff / #1e283c, 14.75:1)
+ *   --crt-muted                      unit prices, notes              (#5b6577, 5.94:1)
+ *   --crt-line                       rules between lines             (#dfe3ea)
+ *   --crt-warn                       a line's stock message           (#9a3412, 7.07:1)
+ *   --crt-trigger-bg / -fg / -border the cart button                  (transparent / currentColor / currentColor)
+ *   --crt-backdrop, --crt-shadow, --crt-size (min(26rem, 92vw)), --crt-radius, --crt-focus,
+ *   --crt-duration (0.28s), --crt-z (110, a backstop: the open drawer is in the top layer)
+ */
+interface Variation {
+  id: string;
+  name: string;
+  price_cents: number;
+  tracked: boolean;
+}
+interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  images?: string[];
+  variations: Variation[];
+}
+/** GET /v1/shops/:site/catalog, as fetched at build. */
+export interface ShopCatalog {
+  site?: string;
+  open?: boolean;
+  currency: string | null;
+  products: Product[];
+}
+/** One of the shop's pickup points, as in its settings. `id` is what the checkout sends. */
+export interface PickupPoint {
+  id: string;
+  name: string;
+  details?: string;
+}
+interface Props {
+  /** The shop's site key on the Worker (`domino-works`). Required. Also keys the stored cart. */
+  shop: string;
+  /** The catalogue the page was built with (fetchCatalog). Names and display prices come from it. Required. */
+  catalog: ShopCatalog;
+  /** Element id; the drawer is `<id>-panel`. Default "cart". Unique on the page. */
+  id?: string;
+  /** The Worker's origin. Default https://shop.superherotech.ai. */
+  api?: string;
+  /** The shop's pickup points (its settings). Empty: no pickup option. */
+  pickupPoints?: PickupPoint[];
+  /** The shop's flat shipping, in cents. Absent or null: the shop does not ship. */
+  flatShippingCents?: number | null;
+  /** Free shipping from this subtotal, in cents (the Worker's rule is subtotal >= this). */
+  freeShippingOverCents?: number | null;
+  /** The drawer's title. Default "Your cart". */
+  title?: string;
+  /** The trigger's text. Default "Cart". */
+  label?: string;
+  /** Where product pages live: a line's name links to `<hrefBase><slug>/`. null: no links. Default "/shop/". */
+  hrefBase?: string | null;
+  /** Empty the cart on load: put this on the thanks page. */
+  clear?: boolean;
+  /** Open the drawer after an add. Default false (the count is announced instead). */
+  openOnAdd?: boolean;
+  class?: string;
+}
+
+const {
+  shop,
+  catalog,
+  id = 'cart',
+  api = 'https://shop.superherotech.ai',
+  pickupPoints = [],
+  flatShippingCents = null,
+  freeShippingOverCents = null,
+  title = 'Your cart',
+  label = 'Cart',
+  hrefBase = '/shop/',
+  clear = false,
+  openOnAdd = false,
+  class: className,
+} = Astro.props;
+
+if (!shop || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shop)) throw new Error(`Cart: \`shop\` "${shop}" is not a site key (lowercase words joined by single hyphens, as on the Worker).`);
+if (!catalog || !Array.isArray(catalog.products)) throw new Error(`Cart "${shop}": \`catalog\` is required, the catalogue fetched at build (fetchCatalog).`);
+if (!/^[A-Za-z][\w-]*$/.test(id)) throw new Error(`Cart: \`id\` "${id}" must start with a letter and hold only letters, digits, - and _.`);
+if (!/^https:\/\/[^/]+$/.test(api) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(api)) throw new Error(`Cart "${shop}": \`api\` "${api}" is an https origin with no path (https://shop.superherotech.ai).`);
+const ships = typeof flatShippingCents === 'number';
+if (ships && (!Number.isInteger(flatShippingCents) || flatShippingCents < 0)) throw new Error(`Cart "${shop}": flatShippingCents is a whole number of cents.`);
+if (freeShippingOverCents !== null && (!Number.isInteger(freeShippingOverCents) || freeShippingOverCents < 0)) throw new Error(`Cart "${shop}": freeShippingOverCents is a whole number of cents.`);
+for (const p of pickupPoints) {
+  if (!p || !/^[a-z0-9-]{1,40}$/.test(p.id) || !p.name) throw new Error(`Cart "${shop}": a pickup point needs an id (lowercase letters, digits and -, as in the shop's settings) and a name.`);
+}
+if (!ships && pickupPoints.length === 0) throw new Error(`Cart "${shop}": the shop neither ships (flatShippingCents) nor has a pickup point, so nothing could be checked out.`);
+
+const currency = catalog.currency || 'USD';
+/** Minor-unit digits for the currency, as the browser will compute them. */
+const digits = new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 10 ** digits);
+
+// What the browser needs to show a line: [product, variation (or "" when the product has one), price, tracked, slug, image].
+const variations: Record<string, [string, string, number, boolean, string, string]> = {};
+for (const p of catalog.products) {
+  for (const v of p.variations) {
+    variations[v.id] = [p.name, p.variations.length > 1 ? v.name : '', v.price_cents, v.tracked, p.slug, p.images?.[0] ?? ''];
+  }
+}
+const config = JSON.stringify({
+  shop,
+  api,
+  currency,
+  v: variations,
+  ship: ships ? flatShippingCents : null,
+  free: freeShippingOverCents,
+  pickup: pickupPoints.map((p) => p.id),
+  href: hrefBase,
+  clear,
+  openOnAdd,
+  label,
+});
+
+const panelId = `${id}-panel`;
+const titleId = `${id}-title`;
+const shipNote = ships
+  ? `${flatShippingCents === 0 ? 'Free' : money(flatShippingCents as number)}${freeShippingOverCents !== null && flatShippingCents !== 0 ? `, free over ${money(freeShippingOverCents)}` : ''} (estimated)`
+  : '';
+const onlyOne = ships !== pickupPoints.length > 0;
+
+/** The browser side, serialised into the inline script once per page. */
+function cartClient() {
+  // <cart-core> The cart's rules, with no DOM. npm run check runs this block from the built page.
+  const MAX_LINES = 20;
+  const MAX_QTY = 20;
+  const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+  const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
+  type Line = { id: string; q: number };
+  type Change = { id: string; kind: 'short' | 'sold_out' | 'gone'; available: number };
+
+  /** Stored data (anything) to clean lines: known ids, whole quantities 1..20, merged, at most 20 lines. */
+  function sanitize(raw: unknown, known: (id: string) => boolean) {
+    const lines: Line[] = [];
+    const dropped: string[] = [];
+    const list = raw && typeof raw === 'object' && Array.isArray((raw as { lines?: unknown }).lines) ? (raw as { lines: unknown[] }).lines : [];
+    for (const l of list) {
+      if (!l || typeof l !== 'object') continue;
+      const id = (l as { id?: unknown }).id;
+      const q = Math.floor(Number((l as { q?: unknown }).q));
+      if (typeof id !== 'string' || !ID_RE.test(id) || !Number.isFinite(q) || q < 1) continue;
+      if (!known(id)) {
+        dropped.push(id);
+        continue;
+      }
+      const same = lines.find((x) => x.id === id);
+      if (same) same.q = Math.min(MAX_QTY, same.q + q);
+      else if (lines.length < MAX_LINES) lines.push({ id, q: Math.min(MAX_QTY, q) });
+    }
+    return { lines, dropped };
+  }
+  /** Adds `qty` of a variation. Refuses a 21st line; clamps a line at 20 and says so. */
+  function addLine(lines: Line[], id: string, qty: number) {
+    const q = Math.max(1, Math.floor(Number(qty)) || 1);
+    const next = lines.map((l) => ({ ...l }));
+    const same = next.find((l) => l.id === id);
+    if (same) {
+      if (same.q >= MAX_QTY) return { lines: next, note: 'qty_cap' as const };
+      const want = same.q + q;
+      same.q = Math.min(MAX_QTY, want);
+      return { lines: next, note: want > MAX_QTY ? ('qty_cap' as const) : null };
+    }
+    if (next.length >= MAX_LINES) return { lines: next, note: 'line_cap' as const };
+    next.push({ id, q: Math.min(MAX_QTY, q) });
+    return { lines: next, note: q > MAX_QTY ? ('qty_cap' as const) : null };
+  }
+  /** Sets a line's quantity, clamped to 1..20. Anything that is not a number leaves it as it was. */
+  function setQty(lines: Line[], id: string, qty: unknown) {
+    const n = Math.floor(Number(qty));
+    return lines.map((l) => (l.id === id && Number.isFinite(n) && String(qty).trim() !== '' ? { id, q: Math.min(MAX_QTY, Math.max(1, n)) } : { ...l }));
+  }
+  const removeLine = (lines: Line[], id: string) => lines.filter((l) => l.id !== id).map((l) => ({ ...l }));
+  const count = (lines: Line[]) => lines.reduce((n, l) => n + l.q, 0);
+  /** Display only. Lines without a known price count nothing. */
+  const subtotal = (lines: Line[], price: (id: string) => number | undefined) => lines.reduce((s, l) => s + (price(l.id) ?? 0) * l.q, 0);
+  /** The estimate the drawer shows; the Worker computes the real fee with the same rule (free when subtotal >= freeOver). */
+  function shipping(sub: number, fulfillment: string | null, flat: number | null, freeOver: number | null) {
+    if (fulfillment !== 'ship' || flat === null) return { cents: null, free: false };
+    if (flat === 0 || (freeOver !== null && sub >= freeOver)) return { cents: 0, free: true };
+    return { cents: flat, free: false };
+  }
+  const minorDigits = (currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  const money = (cents: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 10 ** minorDigits(currency));
+  /** A new key for every checkout attempt, never one from an earlier attempt. */
+  function newKey(c: { randomUUID?: () => string; getRandomValues?: (a: Uint8Array) => Uint8Array } | undefined) {
+    if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+    const b = new Uint8Array(16);
+    if (c && typeof c.getRandomValues === 'function') c.getRandomValues(b);
+    else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+    return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  /** Exactly the four fields the Worker accepts. Nothing else, ever: no price, no name. */
+  function checkoutBody(lines: Line[], fulfillment: 'ship' | 'pickup', point: string | null, key: string) {
+    const body: { items: { variationId: string; quantity: number }[]; fulfillment: 'ship' | 'pickup'; pickupPoint?: string; idempotencyKey: string } = {
+      items: lines.map((l) => ({ variationId: l.id, quantity: l.q })),
+      fulfillment,
+      idempotencyKey: key,
+    };
+    if (fulfillment === 'pickup' && point) body.pickupPoint = point;
+    return body;
+  }
+  /** Lines against a stock map: clamp short ones, take out sold-out and withdrawn ones. */
+  function applyStock(lines: Line[], stock: Record<string, number | null | undefined>) {
+    const out: Line[] = [];
+    const changes: Change[] = [];
+    for (const l of lines) {
+      if (!(l.id in stock)) {
+        changes.push({ id: l.id, kind: 'gone', available: 0 });
+        continue;
+      }
+      const a = stock[l.id];
+      if (a === null || a === undefined || a >= l.q) {
+        out.push({ ...l });
+        continue;
+      }
+      const left = Math.max(0, Math.floor(a));
+      if (left === 0) changes.push({ id: l.id, kind: 'sold_out', available: 0 });
+      else {
+        changes.push({ id: l.id, kind: 'short', available: left });
+        out.push({ id: l.id, q: left });
+      }
+    }
+    return { lines: out, changes };
+  }
+  /** The checkout's 409: only the named lines change. */
+  function applyShort(lines: Line[], short: unknown) {
+    const map: Record<string, number | null> = {};
+    for (const l of lines) map[l.id] = null;
+    for (const s of Array.isArray(short) ? short : []) {
+      const id = s && (s as { variationId?: unknown }).variationId;
+      const a = Number(s && (s as { available?: unknown }).available);
+      if (typeof id === 'string' && id in map && Number.isFinite(a)) map[id] = a;
+    }
+    return applyStock(lines, map);
+  }
+  const MESSAGES = {
+    closed: 'This shop is closed for the moment.',
+    network: 'We could not reach the shop, so check your connection and try again.',
+    rate: 'There have been too many tries in a minute, so wait a moment and try again.',
+    pickup: 'That pickup point is no longer offered, so choose another and try again.',
+    noship: 'This shop is not shipping right now, so choose pickup.',
+    origin: 'This site is not set up to take orders yet.',
+    failed: 'The shop could not start the checkout, so please try again in a moment.',
+    changed: 'Some items in your cart changed, so check them and press Check out again.',
+    choose: 'Choose shipping or pickup first.',
+    choosePoint: 'Choose where you will pick up your order.',
+    empty: 'Your cart is empty.',
+  };
+  type Fetch = (url: string, init?: Record<string, unknown>) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+  /** GET /stock for the cart's ids. ok:false on any failure: the checkout re-checks anyway. */
+  async function recheck(o: { api: string; shop: string; lines: Line[]; fetch: Fetch }) {
+    if (!o.lines.length) return { ok: true, stock: {} as Record<string, number | null> };
+    const url = `${o.api}/v1/shops/${encodeURIComponent(o.shop)}/stock?ids=${o.lines.map((l) => encodeURIComponent(l.id)).join(',')}`;
+    try {
+      const res = await o.fetch(url, { method: 'GET', credentials: 'omit', cache: 'no-store' });
+      if (!res.ok) return { ok: false };
+      const data = await res.json();
+      if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false };
+      return { ok: true, stock: data as Record<string, number | null> };
+    } catch {
+      return { ok: false };
+    }
+  }
+  type Outcome =
+    | { kind: 'redirect'; url: string }
+    | { kind: 'changed'; lines: Line[]; changes: Change[] }
+    | { kind: 'error'; code: keyof typeof MESSAGES; message: string };
+  const fault = (code: keyof typeof MESSAGES): Outcome => ({ kind: 'error', code, message: MESSAGES[code] });
+  /** Stock re-check, then the POST with a fresh key, then what the answer means for the buyer. */
+  async function checkout(o: { api: string; shop: string; lines: Line[]; fulfillment: 'ship' | 'pickup'; point: string | null; fetch: Fetch; key: () => string }): Promise<Outcome> {
+    if (!o.lines.length) return fault('empty');
+    const st = await recheck(o);
+    if (st.ok) {
+      const r = applyStock(o.lines, st.stock as Record<string, number | null>);
+      if (r.changes.length) return { kind: 'changed', ...r };
+    }
+    const key = o.key();
+    if (!KEY_RE.test(key)) return fault('failed');
+    const body = checkoutBody(o.lines, o.fulfillment, o.point, key);
+    let res;
+    try {
+      res = await o.fetch(`${o.api}/v1/shops/${encodeURIComponent(o.shop)}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'omit',
+      });
+    } catch {
+      return fault('network');
+    }
+    let data: Record<string, unknown> | null = null;
+    try {
+      data = (await res.json()) as Record<string, unknown>;
+    } catch {
+      data = null;
+    }
+    const error = data && typeof data.error === 'string' ? data.error : '';
+    if (res.status === 200) {
+      const url = data && typeof data.url === 'string' ? data.url : '';
+      try {
+        if (new URL(url).protocol === 'https:') return { kind: 'redirect', url };
+      } catch {
+        /* not a URL */
+      }
+      return fault('failed');
+    }
+    if (res.status === 409 && error === 'short') return { kind: 'changed', ...applyShort(o.lines, data && data.short) };
+    if (res.status === 400 && error === 'unknown_variation') {
+      const ids = Array.isArray(data && data.ids) ? (data!.ids as unknown[]) : [];
+      const gone: Record<string, null> = {};
+      for (const l of o.lines) if (!ids.includes(l.id)) gone[l.id] = null;
+      return { kind: 'changed', ...applyStock(o.lines, gone) };
+    }
+    if (res.status === 503) return fault('closed');
+    if (res.status === 429) return fault('rate');
+    if (res.status === 403) return fault('origin');
+    if (error === 'bad_pickup_point') return fault('pickup');
+    if (error === 'shipping_unavailable') return fault('noship');
+    return fault('failed');
+  }
+  // </cart-core>
+
+  interface Cfg {
+    shop: string;
+    api: string;
+    currency: string;
+    v: Record<string, [string, string, number, boolean, string, string]>;
+    ship: number | null;
+    free: number | null;
+    pickup: string[];
+    href: string | null;
+    clear: boolean;
+    openOnAdd: boolean;
+    label: string;
+  }
+  interface Inst {
+    root: HTMLElement;
+    cfg: Cfg;
+    d: HTMLDialogElement;
+    trigger: HTMLButtonElement;
+    live: HTMLElement;
+    msg: HTMLElement;
+    lineMsgs: Record<string, string>;
+    busy: boolean;
+  }
+  interface Shop {
+    lines: Line[];
+    insts: Inst[];
+    cfg: Cfg;
+  }
+  const shops = new Map<string, Shop>();
+  const storeKey = (shop: string) => `superhero-cart:${shop}`;
+  const memory = new Map<string, string>(); // when localStorage throws (private mode, blocked storage)
+  const read = (shop: string) => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(storeKey(shop));
+    } catch {
+      raw = memory.get(shop) ?? null;
+    }
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+  const write = (shop: string, lines: Line[]) => {
+    const raw = JSON.stringify({ v: 1, lines });
+    try {
+      localStorage.setItem(storeKey(shop), raw);
+    } catch {
+      memory.set(shop, raw);
+    }
+  };
+  const itemWord = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`;
+  const nameOf = (cfg: Cfg, id: string) => {
+    const v = cfg.v[id];
+    return v ? (v[1] ? `${v[0]}, ${v[1]}` : v[0]) : 'An item';
+  };
+
+  // ---- scroll lock, as in off-canvas: keep the scrollbar's width so nothing shifts.
+  const html = document.documentElement;
+  let locked = 0;
+  let saved: [string, string] = ['', ''];
+  const lock = (on: boolean) => {
+    if (on) {
+      if (locked++) return;
+      saved = [html.style.overflow, html.style.paddingRight];
+      const bar = window.innerWidth - html.clientWidth;
+      html.style.overflow = 'hidden';
+      if (bar > 0) html.style.paddingRight = bar + 'px';
+    } else if (locked && !--locked) {
+      [html.style.overflow, html.style.paddingRight] = saved;
+    }
+  };
+
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  function announce(s: Shop, text: string) {
+    const inst = s.insts[0];
+    if (!inst) return;
+    // Clear first so the same words twice are still read.
+    inst.live.textContent = '';
+    setTimeout(() => (inst.live.textContent = text), 50);
+  }
+
+  function setLines(s: Shop, lines: Line[], opts: { announce?: string | false } = {}) {
+    const before = count(s.lines);
+    s.lines = lines;
+    write(s.cfg.shop, lines);
+    for (const inst of s.insts) render(inst, s);
+    const n = count(lines);
+    if (opts.announce !== false && (n !== before || opts.announce)) announce(s, opts.announce || `${itemWord(n)} in your cart.`);
+    s.insts[0]?.root.dispatchEvent(new CustomEvent('cart-change', { bubbles: true, detail: { shop: s.cfg.shop, count: n } }));
+  }
+
+  function showMsg(inst: Inst, text: string | string[], focus: boolean) {
+    const list = Array.isArray(text) ? text : [text];
+    inst.msg.textContent = '';
+    for (const t of list) inst.msg.append(el('span', 'crt__msg-line', t));
+    inst.msg.hidden = list.length === 0 || !list[0];
+    if (focus && !inst.msg.hidden) inst.msg.focus();
+  }
+
+  /** Changes to sentences: short lines say so on the line; removed ones in the message. */
+  function explain(inst: Inst, changes: Change[]) {
+    const out: string[] = [];
+    for (const c of changes) {
+      if (c.kind === 'short') inst.lineMsgs[c.id] = `Only ${c.available} left, so we changed your quantity to ${c.available}.`;
+      else if (c.kind === 'sold_out') out.push(`${nameOf(inst.cfg, c.id)} sold out, so we took it out of your cart.`);
+      else out.push(`${nameOf(inst.cfg, c.id)} is no longer sold here, so we took it out of your cart.`);
+    }
+    return out;
+  }
+
+  function render(inst: Inst, s: Shop) {
+    const { cfg } = inst;
+    const n = count(s.lines);
+    const badge = inst.trigger.querySelector<HTMLElement>('[data-crt-count]');
+    if (badge) badge.textContent = String(n);
+    inst.trigger.setAttribute('aria-label', `${cfg.label}, ${itemWord(n)}`);
+    inst.root.dataset.count = String(n);
+
+    // Keep focus where it was across the re-render.
+    const active = document.activeElement as HTMLElement | null;
+    const focusKey = active && inst.d.contains(active) ? active.getAttribute('data-crt-act') : null;
+    const focusLine = active?.closest<HTMLElement>('[data-line]')?.dataset.line ?? null;
+
+    const list = inst.d.querySelector<HTMLElement>('[data-crt-lines]')!;
+    list.textContent = '';
+    for (const l of s.lines) {
+      const v = cfg.v[l.id];
+      if (!v) continue;
+      const [product, variation, price, , slug, image] = v;
+      const name = nameOf(cfg, l.id);
+      const li = el('li', 'crt__line');
+      li.dataset.line = l.id;
+      if (image) {
+        const img = el('img', 'crt__img');
+        img.src = image;
+        img.alt = '';
+        img.width = 56;
+        img.height = 56;
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        li.append(img);
+      } else li.append(el('span', 'crt__img crt__img--none'));
+      const main = el('div', 'crt__line-main');
+      const title = el('p', 'crt__name');
+      if (cfg.href !== null && slug) {
+        const a = el('a', undefined, product);
+        a.href = `${cfg.href}${slug}/`;
+        title.append(a);
+      } else title.append(product);
+      if (variation) title.append(' ', el('span', 'crt__variation', variation));
+      main.append(title, el('p', 'crt__unit', `${money(price, cfg.currency)} each`));
+      const msgId = `${inst.root.id}-m-${l.id}`;
+      const note = inst.lineMsgs[l.id];
+      if (note) {
+        const p = el('p', 'crt__line-msg', note);
+        p.id = msgId;
+        main.append(p);
+      }
+      const qty = el('div', 'crt__qty');
+      const minus = el('button', 'crt__step', '−');
+      minus.type = 'button';
+      minus.setAttribute('aria-label', `One fewer ${name}`);
+      minus.setAttribute('data-crt-act', 'minus');
+      minus.disabled = l.q <= 1;
+      const input = el('input', 'crt__input');
+      input.type = 'number';
+      input.inputMode = 'numeric';
+      input.min = '1';
+      input.max = String(MAX_QTY);
+      input.value = String(l.q);
+      input.setAttribute('aria-label', `Quantity of ${name}`);
+      input.setAttribute('data-crt-act', 'qty');
+      if (note) input.setAttribute('aria-describedby', msgId);
+      const plus = el('button', 'crt__step', '+');
+      plus.type = 'button';
+      plus.setAttribute('aria-label', `One more ${name}`);
+      plus.setAttribute('data-crt-act', 'plus');
+      plus.disabled = l.q >= MAX_QTY;
+      qty.append(minus, input, plus);
+      const total = el('p', 'crt__line-total', money(price * l.q, cfg.currency));
+      const remove = el('button', 'crt__remove', 'Remove');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove ${name}`);
+      remove.setAttribute('data-crt-act', 'remove');
+      li.append(main, qty, total, remove);
+      list.append(li);
+    }
+    const empty = s.lines.length === 0;
+    inst.d.querySelector<HTMLElement>('[data-crt-empty]')!.hidden = !empty;
+    inst.d.querySelector<HTMLElement>('[data-crt-checkout-area]')!.hidden = empty;
+    updateSums(inst, s);
+
+    if (focusKey && focusLine) {
+      const again = list.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"] [data-crt-act="${focusKey}"]`);
+      if (again && !(again as HTMLButtonElement).disabled) again.focus();
+      else list.querySelector<HTMLElement>(`[data-line="${CSS.escape(focusLine)}"] [data-crt-act="qty"]`)?.focus();
+    }
+  }
+
+  const chosen = (inst: Inst) => {
+    const f = inst.d.querySelector<HTMLInputElement>('input[name$="-fulfillment"]:checked')?.value as 'ship' | 'pickup' | undefined;
+    const p = inst.d.querySelector<HTMLInputElement>('input[name$="-point"]:checked')?.value ?? null;
+    return { fulfillment: f ?? null, point: f === 'pickup' ? p : null };
+  };
+
+  function updateSums(inst: Inst, s: Shop) {
+    const { cfg } = inst;
+    const sub = subtotal(s.lines, (id) => cfg.v[id]?.[2]);
+    const { fulfillment } = chosen(inst);
+    const ship = shipping(sub, fulfillment, cfg.ship, cfg.free);
+    inst.d.querySelector<HTMLElement>('[data-crt-subtotal]')!.textContent = money(sub, cfg.currency);
+    const row = inst.d.querySelector<HTMLElement>('[data-crt-ship-row]')!;
+    row.hidden = fulfillment !== 'ship';
+    inst.d.querySelector<HTMLElement>('[data-crt-ship]')!.textContent = ship.cents === null ? '' : ship.free ? 'Free' : money(ship.cents, cfg.currency);
+    const points = inst.d.querySelector<HTMLElement>('[data-crt-points]');
+    if (points) points.hidden = fulfillment !== 'pickup';
+  }
+
+  function openPanel(inst: Inst) {
+    const s = shops.get(inst.cfg.shop)!;
+    if (inst.d.open) return;
+    shops.forEach((o) => o.insts.forEach((i) => i !== inst && i.d.open && i.d.close()));
+    inst.lineMsgs = {};
+    showMsg(inst, '', false);
+    render(inst, s);
+    inst.d.showModal();
+    lock(true);
+    inst.trigger.setAttribute('aria-expanded', 'true');
+    // Stock, fresh: a short line is clamped before the buyer reaches Check out.
+    recheck({ api: inst.cfg.api, shop: inst.cfg.shop, lines: s.lines, fetch: window.fetch.bind(window) as unknown as Fetch }).then((st) => {
+      if (!st.ok || !inst.d.open) return;
+      const r = applyStock(s.lines, st.stock as Record<string, number | null>);
+      if (!r.changes.length) return;
+      const said = explain(inst, r.changes);
+      setLines(s, r.lines);
+      if (said.length) showMsg(inst, said, true);
+    });
+  }
+
+  async function onCheckout(inst: Inst, button: HTMLButtonElement) {
+    const s = shops.get(inst.cfg.shop)!;
+    if (inst.busy) return;
+    const { fulfillment, point } = chosen(inst);
+    if (!fulfillment) return showMsg(inst, MESSAGES.choose, true);
+    if (fulfillment === 'pickup' && !point) return showMsg(inst, MESSAGES.choosePoint, true);
+    inst.busy = true;
+    const label = button.textContent;
+    button.setAttribute('aria-disabled', 'true');
+    button.textContent = 'Starting checkout…';
+    showMsg(inst, '', false);
+    inst.lineMsgs = {};
+    const done = () => {
+      inst.busy = false;
+      button.removeAttribute('aria-disabled');
+      button.textContent = label;
+    };
+    const out = await checkout({
+      api: inst.cfg.api,
+      shop: inst.cfg.shop,
+      lines: s.lines,
+      fulfillment,
+      point,
+      fetch: window.fetch.bind(window) as unknown as Fetch,
+      key: () => newKey(window.crypto),
+    });
+    if (out.kind === 'redirect') {
+      const go = inst.root.dispatchEvent(new CustomEvent('cart-checkout', { bubbles: true, cancelable: true, detail: { url: out.url, shop: inst.cfg.shop } }));
+      if (go) {
+        window.location.assign(out.url);
+        return; // the page is leaving; the button stays busy
+      }
+      done();
+      return;
+    }
+    done();
+    if (out.kind === 'changed') {
+      const said = explain(inst, out.changes);
+      setLines(s, out.lines);
+      showMsg(inst, [...said, MESSAGES.changed], true);
+      return;
+    }
+    showMsg(inst, out.message, true);
+  }
+
+  function add(shop: string, id: string, qty: number, from?: Element | null) {
+    const s = shops.get(shop);
+    if (!s) return false;
+    const noteEl = from ? (from.closest('form')?.querySelector<HTMLElement>('[data-cart-note]') ?? (from.nextElementSibling?.matches('[data-cart-note]') ? (from.nextElementSibling as HTMLElement) : null)) : null;
+    if (!s.cfg.v[id]) {
+      console.warn(`cart: ${id} is not in the catalogue this page was built with.`);
+      return false;
+    }
+    const r = addLine(s.lines, id, qty);
+    const refusal = r.note === 'line_cap' ? `Your cart holds up to ${MAX_LINES} different items, so this one was not added.` : r.note === 'qty_cap' ? `Your cart holds up to ${MAX_QTY} of each item.` : '';
+    if (noteEl) {
+      noteEl.textContent = refusal;
+      noteEl.hidden = !refusal;
+    }
+    if (r.note === 'line_cap') {
+      announce(s, refusal);
+      return false;
+    }
+    setLines(s, r.lines, refusal ? { announce: `${refusal} ${itemWord(count(r.lines))} in your cart.` } : {});
+    if (from instanceof HTMLButtonElement) {
+      const was = from.dataset.cartLabel ?? from.textContent ?? '';
+      from.dataset.cartLabel = was;
+      from.textContent = 'Added';
+      setTimeout(() => {
+        from.textContent = from.dataset.cartLabel ?? was;
+      }, 1600);
+    }
+    if (s.cfg.openOnAdd && s.insts[0]) openPanel(s.insts[0]);
+    return true;
+  }
+
+  const reveal = (shop: string) =>
+    document.querySelectorAll<HTMLElement>(`[data-cart-add][data-cart-shop="${CSS.escape(shop)}"], [data-cart-needs-js][data-cart-shop="${CSS.escape(shop)}"]`).forEach((b) => (b.hidden = false));
+
+  function mount(root: HTMLElement | null) {
+    if (!root || root.hasAttribute('data-crt-ready')) return;
+    let cfg: Cfg;
+    try {
+      cfg = JSON.parse(root.dataset.crt || '{}');
+    } catch {
+      return;
+    }
+    const d = root.querySelector<HTMLDialogElement>('dialog')!;
+    const trigger = root.querySelector<HTMLButtonElement>('[data-crt-trigger]')!;
+    const inst: Inst = { root, cfg, d, trigger, live: root.querySelector<HTMLElement>('[data-crt-live]')!, msg: d.querySelector<HTMLElement>('[data-crt-msg]')!, lineMsgs: {}, busy: false };
+    let s = shops.get(cfg.shop);
+    if (!s) {
+      const known = (id: string) => id in cfg.v;
+      const clean = sanitize(cfg.clear ? null : read(cfg.shop), known);
+      s = { lines: clean.lines, insts: [], cfg };
+      shops.set(cfg.shop, s);
+      write(cfg.shop, clean.lines);
+    }
+    s.insts.push(inst);
+    root.setAttribute('data-crt-ready', '');
+    trigger.hidden = false;
+    d.querySelector<HTMLButtonElement>('[data-crt-close]')!.hidden = false;
+    trigger.addEventListener('click', () => openPanel(inst));
+    d.querySelector('[data-crt-close]')!.addEventListener('click', () => d.close());
+    // Backdrop: a press AND release outside the drawer's box (a text selection dragged out does not close it).
+    const outside = (e: MouseEvent) => {
+      const r = d.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
+    let downOutside = false;
+    d.addEventListener('pointerdown', (e) => (downOutside = e.target === d && outside(e)));
+    d.addEventListener('click', (e) => {
+      if (e.target === d && downOutside && outside(e)) d.close();
+      downOutside = false;
+      const t = (e.target as Element).closest<HTMLElement>('[data-crt-act]');
+      const line = t?.closest<HTMLElement>('[data-line]')?.dataset.line;
+      const sh = shops.get(cfg.shop)!;
+      if (t && line && t.tagName === 'BUTTON') {
+        const act = t.getAttribute('data-crt-act');
+        const cur = sh.lines.find((l) => l.id === line);
+        if (!cur) return;
+        delete inst.lineMsgs[line];
+        if (act === 'remove') {
+          const i = sh.lines.indexOf(cur);
+          setLines(sh, removeLine(sh.lines, line));
+          // Focus: the next line's Remove, else the previous one's, else the drawer's heading.
+          const rows = d.querySelectorAll<HTMLElement>('[data-crt-lines] [data-crt-act="remove"]');
+          (rows[i] ?? rows[i - 1] ?? d.querySelector<HTMLElement>('.crt__title'))?.focus();
+        } else if (act === 'minus') setLines(sh, setQty(sh.lines, line, cur.q - 1));
+        else if (act === 'plus') setLines(sh, setQty(sh.lines, line, cur.q + 1));
+      }
+      if ((e.target as Element).closest('[data-crt-checkout]')) onCheckout(inst, (e.target as Element).closest('[data-crt-checkout]') as HTMLButtonElement);
+    });
+    d.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      const sh = shops.get(cfg.shop)!;
+      if (t.getAttribute('data-crt-act') === 'qty') {
+        const line = t.closest<HTMLElement>('[data-line]')?.dataset.line;
+        if (!line) return;
+        delete inst.lineMsgs[line];
+        setLines(sh, setQty(sh.lines, line, t.value));
+        const cur = sh.lines.find((l) => l.id === line);
+        if (cur) t.value = String(cur.q); // what the cart actually holds, after clamping
+      } else if (t.type === 'radio') {
+        updateSums(inst, sh);
+        if (inst.msg.textContent === MESSAGES.choose || inst.msg.textContent === MESSAGES.choosePoint) showMsg(inst, '', false);
+      }
+    });
+    d.addEventListener('close', () => {
+      lock(false);
+      trigger.setAttribute('aria-expanded', 'false');
+      if (trigger.isConnected) trigger.focus();
+    });
+    render(inst, s);
+    reveal(cfg.shop);
+  }
+
+  // ---- add-to-cart, from any markup.
+  document.addEventListener('click', (e) => {
+    const b = (e.target as Element).closest?.('[data-cart-add]') as HTMLElement | null;
+    if (!b) return;
+    e.preventDefault();
+    add(b.getAttribute('data-cart-shop') || '', b.getAttribute('data-cart-add') || '', Number(b.getAttribute('data-cart-qty') || 1), b);
+  });
+  document.addEventListener('submit', (e) => {
+    const f = (e.target as Element).closest?.('form[data-cart-form]') as HTMLFormElement | null;
+    if (!f) return;
+    e.preventDefault();
+    const data = new FormData(f);
+    const qty = Math.min(MAX_QTY, Math.max(1, Math.floor(Number(data.get('quantity') || 1)) || 1));
+    add(f.getAttribute('data-cart-shop') || '', String(data.get('variation') || ''), qty, (e as SubmitEvent).submitter ?? f.querySelector('[type="submit"]'));
+  });
+  // Another tab changed the cart.
+  window.addEventListener('storage', (e) => {
+    shops.forEach((s, shop) => {
+      if (e.key !== storeKey(shop)) return;
+      const clean = sanitize(read(shop), (id) => id in s.cfg.v);
+      s.lines = clean.lines;
+      s.insts.forEach((i) => render(i, s));
+    });
+  });
+  const boot = () => shops.forEach((_, shop) => reveal(shop));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+
+  return {
+    mount,
+    add: (shop: string, id: string, qty = 1) => add(shop, id, qty, null),
+    clear: (shop: string) => {
+      const s = shops.get(shop);
+      if (s) setLines(s, []);
+      else write(shop, []);
+    },
+    lines: (shop: string) => (shops.get(shop)?.lines ?? []).map((l) => ({ variationId: l.id, quantity: l.q })),
+    open: (id: string) => {
+      shops.forEach((s) => s.insts.forEach((i) => i.root.id === id && openPanel(i)));
+    },
+  };
+}
+
+const locals = Astro.locals as Record<string, unknown>;
+const firstOnPage = !locals.__crtScript;
+locals.__crtScript = true;
+const define = `window.__superheroCart=window.__superheroCart||(${cartClient.toString()})();`;
+const mountScript = `${firstOnPage ? define : ''}window.__superheroCart.mount(document.currentScript.previousElementSibling);`;
+const CART_ICON =
+  '<svg class="crt__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" aria-hidden="true" focusable="false"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc. --><path fill="currentColor" d="M24-16C10.7-16 0-5.3 0 8S10.7 32 24 32l45.3 0c3.9 0 7.2 2.8 7.9 6.6l52.1 286.3c6.2 34.2 36 59.1 70.8 59.1L456 384c13.3 0 24-10.7 24-24s-10.7-24-24-24l-255.9 0c-11.6 0-21.5-8.3-23.6-19.7l-5.1-28.3 303.6 0c30.8 0 57.2-21.9 62.9-52.2L568.9 69.9C572.6 50.2 557.5 32 537.4 32l-412.7 0-.4-2c-4.8-26.6-28-46-55.1-46L24-16zM208 512a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm224 0a48 48 0 1 0 0-96 48 48 0 1 0 0 96z"/></svg>';
+---
+
+<div id={id} class:list={['crt', className]} data-crt={config}>
+  <button type="button" class="crt__trigger" data-crt-trigger aria-haspopup="dialog" aria-controls={panelId} aria-expanded="false" aria-label={`${label}, 0 items`} hidden>
+    <Fragment set:html={CART_ICON} />
+    <span class="crt__label">{label}</span>
+    <span class="crt__count" data-crt-count aria-hidden="true">0</span>
+  </button>
+  <span class="crt__sr" aria-live="polite" data-crt-live></span>
+  <noscript><p class="crt__nojs">The cart needs JavaScript. Turn it on to order online.</p></noscript>
+  <dialog id={panelId} class="crt__panel" aria-labelledby={titleId}>
+    <div class="crt__head">
+      <h2 id={titleId} class="crt__title" tabindex="-1">{title}</h2>
+      <button class="crt__close" type="button" aria-label="Close the cart" data-crt-close hidden>
+        <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" /></svg>
+      </button>
+    </div>
+    <div class="crt__body">
+      <p class="crt__msg" data-crt-msg tabindex="-1" hidden></p>
+      <p class="crt__empty" data-crt-empty>Your cart is empty.</p>
+      <ul class="crt__lines" data-crt-lines role="list"></ul>
+      <div class="crt__checkout-area" data-crt-checkout-area hidden>
+        <fieldset class="crt__choice">
+          <legend>How would you like to get your order?</legend>
+          {ships && (
+            <label class="crt__radio">
+              <input type="radio" name={`${id}-fulfillment`} value="ship" checked={onlyOne} />
+              <span>Ship it to me <span class="crt__hint">{shipNote}</span></span>
+            </label>
+          )}
+          {pickupPoints.length > 0 && (
+            <label class="crt__radio">
+              <input type="radio" name={`${id}-fulfillment`} value="pickup" checked={onlyOne} />
+              <span>I'll pick it up <span class="crt__hint">No shipping fee</span></span>
+            </label>
+          )}
+        </fieldset>
+        {pickupPoints.length > 0 && (
+          <fieldset class="crt__choice" data-crt-points hidden={!onlyOne || ships}>
+            <legend>Where will you pick it up?</legend>
+            {pickupPoints.map((p) => (
+              <label class="crt__radio">
+                <input type="radio" name={`${id}-point`} value={p.id} checked={pickupPoints.length === 1} />
+                <span>{p.name}{p.details && <span class="crt__hint">{p.details}</span>}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <dl class="crt__sums">
+          <div><dt>Subtotal</dt><dd data-crt-subtotal></dd></div>
+          <div data-crt-ship-row hidden><dt>Shipping (estimated)</dt><dd data-crt-ship></dd></div>
+        </dl>
+        <p class="crt__fine">Tax, and the final shipping, are worked out on the checkout page.</p>
+        <button type="button" class="crt__checkout" data-crt-checkout>Check out</button>
+        <p class="crt__fine">You pay on Square's secure checkout page.</p>
+      </div>
+    </div>
+  </dialog>
+</div>
+<script is:inline set:html={mountScript} />
+
+<style>
+  .crt {
+    display: inline-block;
+  }
+  .crt [hidden] {
+    display: none !important;
+  }
+  .crt__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .crt__nojs {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  /* ---- the trigger */
+  .crt__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--crt-trigger-border, currentColor);
+    border-radius: var(--crt-radius, 999px);
+    background: var(--crt-trigger-bg, transparent);
+    color: var(--crt-trigger-fg, currentColor);
+    font: inherit;
+    cursor: pointer;
+  }
+  .crt__icon {
+    width: 1.25em;
+    height: 1em;
+  }
+  .crt__count {
+    min-width: 1.5em;
+    padding: 0 0.4em;
+    border-radius: 999px;
+    background: var(--crt-accent, #5933d8);
+    color: var(--crt-on-accent, #fff);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .crt__trigger:focus-visible,
+  .crt__panel :focus-visible {
+    outline: 3px solid var(--crt-focus, var(--crt-accent, #5933d8));
+    outline-offset: 2px;
+  }
+
+  /* ---- the drawer: off-canvas's right-hand panel */
+  .crt__panel {
+    --_crt-pad: clamp(1rem, 4vw, 1.5rem);
+    position: fixed;
+    inset: 0 0 0 auto;
+    box-sizing: border-box;
+    width: var(--crt-size, min(26rem, 92vw));
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    flex-direction: column;
+    background: var(--crt-bg, #fff);
+    color: var(--crt-fg, #1e283c);
+    box-shadow: var(--crt-shadow, 0 0 3rem rgb(0 0 0 / 0.25));
+    z-index: var(--crt-z, 110);
+    overscroll-behavior: contain;
+    translate: 100% 0;
+  }
+  .crt__panel[open] {
+    display: flex;
+    translate: none;
+  }
+  .crt__panel::backdrop {
+    background: var(--crt-backdrop, rgb(15 20 35 / 0.55));
+  }
+  .crt__head {
+    display: flex;
+    flex: none;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: calc(var(--_crt-pad) - 0.5rem) calc(var(--_crt-pad) - 0.5rem) 0 var(--_crt-pad);
+  }
+  .crt__title {
+    margin: 0.5rem 0 0;
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .crt__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .crt__close:hover {
+    background: rgb(0 0 0 / 0.06);
+  }
+  .crt__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem var(--_crt-pad) var(--_crt-pad);
+  }
+  .crt__msg {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border-left: 4px solid var(--crt-warn, #9a3412);
+    background: rgb(154 52 18 / 0.06);
+    color: var(--crt-fg, #1e283c);
+  }
+  .crt__msg:focus {
+    outline: none;
+  }
+  .crt__msg:focus-visible {
+    outline: 3px solid var(--crt-focus, var(--crt-accent, #5933d8));
+  }
+  .crt__empty {
+    margin: 0.5rem 0;
+    color: var(--crt-muted, #5b6577);
+  }
+  .crt__lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .crt__line {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr auto;
+    grid-template-areas: 'img main total' 'img qty remove';
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--crt-line, #dfe3ea);
+  }
+  .crt__img {
+    grid-area: img;
+    align-self: start;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--crt-line, #dfe3ea);
+  }
+  .crt__line-main {
+    grid-area: main;
+    min-width: 0;
+  }
+  .crt__name,
+  .crt__unit,
+  .crt__line-msg,
+  .crt__line-total {
+    margin: 0;
+  }
+  .crt__name {
+    font-weight: 600;
+  }
+  .crt__name a {
+    color: inherit;
+  }
+  .crt__variation,
+  .crt__unit {
+    color: var(--crt-muted, #5b6577);
+    font-weight: 400;
+  }
+  .crt__unit {
+    font-size: 0.875rem;
+  }
+  .crt__line-msg {
+    margin-top: 0.25rem;
+    color: var(--crt-warn, #9a3412);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .crt__line-total {
+    grid-area: total;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .crt__qty {
+    grid-area: qty;
+    display: inline-flex;
+    align-items: stretch;
+    width: max-content;
+    border: 1px solid var(--crt-line, #dfe3ea);
+    border-radius: 8px;
+  }
+  .crt__step {
+    width: 2.75rem;
+    min-height: 2.75rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 1.125rem;
+    cursor: pointer;
+  }
+  .crt__step:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .crt__input {
+    width: 3rem;
+    border: 0;
+    border-inline: 1px solid var(--crt-line, #dfe3ea);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  .crt__input::-webkit-inner-spin-button,
+  .crt__input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .crt__remove {
+    grid-area: remove;
+    min-height: 2.75rem;
+    padding: 0 0.25rem;
+    border: 0;
+    background: transparent;
+    color: var(--crt-muted, #5b6577);
+    font: inherit;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .crt__checkout-area {
+    margin-top: 1rem;
+  }
+  .crt__choice {
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+  }
+  .crt__choice legend {
+    margin-bottom: 0.4rem;
+    padding: 0;
+    font-weight: 600;
+  }
+  .crt__radio {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    min-height: 2.75rem;
+    padding: 0.5rem 0;
+    cursor: pointer;
+  }
+  .crt__radio input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0.15rem 0 0;
+    accent-color: var(--crt-accent, #5933d8);
+  }
+  .crt__hint {
+    display: block;
+    color: var(--crt-muted, #5b6577);
+    font-size: 0.875rem;
+  }
+  .crt__sums {
+    margin: 0 0 0.5rem;
+  }
+  .crt__sums div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.2rem 0;
+  }
+  .crt__sums dt {
+    font-weight: 600;
+  }
+  .crt__sums dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .crt__fine {
+    margin: 0.5rem 0;
+    color: var(--crt-muted, #5b6577);
+    font-size: 0.875rem;
+  }
+  .crt__checkout {
+    width: 100%;
+    min-height: 3rem;
+    margin-top: 0.5rem;
+    border: 0;
+    border-radius: 8px;
+    background: var(--crt-accent, #5933d8);
+    color: var(--crt-on-accent, #fff);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .crt__checkout[aria-disabled='true'] {
+    opacity: 0.7;
+    cursor: progress;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .crt__panel {
+      transition:
+        translate var(--crt-duration, 0.28s) cubic-bezier(0.2, 0.8, 0.2, 1),
+        display var(--crt-duration, 0.28s) allow-discrete,
+        overlay var(--crt-duration, 0.28s) allow-discrete;
+    }
+    .crt__panel::backdrop {
+      transition:
+        opacity var(--crt-duration, 0.28s) ease,
+        display var(--crt-duration, 0.28s) allow-discrete,
+        overlay var(--crt-duration, 0.28s) allow-discrete;
+    }
+    .crt__panel:not([open])::backdrop {
+      opacity: 0;
+    }
+    @starting-style {
+      .crt__panel[open] {
+        translate: 100% 0;
+      }
+      .crt__panel[open]::backdrop {
+        opacity: 0;
+      }
+    }
+  }
+  @media (forced-colors: active) {
+    .crt__count,
+    .crt__checkout {
+      border: 1px solid CanvasText;
+    }
+  }
+  @media print {
+    .crt {
+      display: none !important;
+    }
+  }
+</style>

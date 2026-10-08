@@ -1,0 +1,270 @@
+---
+/**
+ * ProductList — the shop's products as a grid of cards, built at deploy from the Superhero Shop
+ * catalogue (GET https://shop.superherotech.ai/v1/shops/<site>/catalog, fetched at build with
+ * fetchCatalog.ts beside this file). Each card is one link to the product's page: the image,
+ * the name and the price ("From $18.00" when the variations differ). Replaces the shop grid of
+ * WooCommerce, Ecwid, Square Online and the Shopify Buy Button's collection embed.
+ *
+ * Prices are the catalogue's, as Square had them when the site was built. Square sends
+ * `catalog.version.updated`, the Worker fires the site's deploy hook, and the next build
+ * shows the change, so there is no runtime price fetch, and nothing here can take an order.
+ *
+ * SOLD OUT. A product is sold out when every variation is tracked and has 0 in stock (an
+ * untracked variation is always available). Two ways to know, both optional:
+ *   - `stock`, a build-time map { [variationId]: number | null }, rendered into the HTML.
+ *     The Worker's /stock answers only the shop's own origins, so a build fetches it only with
+ *     a key the site does not have: in practice this is for fixtures and demos.
+ *   - `liveStock` (with `shop`): one GET /stock from the browser on load, for the tracked
+ *     variations on the page, which marks sold-out cards. A failure changes nothing: the cards
+ *     stay as built and the cart re-checks before checkout anyway.
+ * "Sold out" is a visible badge, and ", sold out" is in the card link's name, never colour alone.
+ *
+ * IMAGES. Square's images have no intrinsic size in the catalogue, so each card's image is
+ * drawn at `imageWidth` × `imageHeight` (default 600 × 600) with `object-fit: cover`: the box is
+ * reserved before the image arrives, so nothing shifts. `loading="lazy"`, `decoding="async"`,
+ * and alt="" because the card's name says what it is. A product without an image gets a
+ * neutral panel. The site's CSP needs `img-src` for Square's image host, and with `liveStock`,
+ * `connect-src https://shop.superherotech.ai`.
+ *
+ * ACCESSIBILITY. A <ul role="list"> named by `label`; each card one link, its name a heading
+ * at `headingLevel`, stretched over the card. Without JavaScript: all of it, minus the live
+ * sold-out marks. No motion but a hover lift, none under prefers-reduced-motion.
+ *
+ * Theming: --pl-min (15rem, the narrowest card), --pl-gap, --pl-bg, --pl-fg, --pl-muted,
+ * --pl-border, --pl-radius, --pl-image-bg, --pl-sold-bg, --pl-sold-fg, --pl-focus, --pl-aspect.
+ */
+interface Variation {
+  id: string;
+  name: string;
+  price_cents: number;
+  tracked: boolean;
+}
+interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  images?: string[];
+  variations: Variation[];
+}
+interface Props {
+  /** The catalogue's `products`, as fetched at build. Required. */
+  products: Product[];
+  /** The catalogue's `currency`. Default USD. */
+  currency?: string | null;
+  /** Product pages live at `<hrefBase><slug>/`. Default "/shop/". */
+  hrefBase?: string;
+  /** Names the list for screen readers. Default "Products". */
+  label?: string;
+  /** Level of each card's name. Default 3. */
+  headingLevel?: 2 | 3 | 4;
+  /** Build-time stock, { [variationId]: number | null }. */
+  stock?: Record<string, number | null>;
+  /** Check stock from the browser on load (needs `shop`). Default false. */
+  liveStock?: boolean;
+  /** The shop's site key, for `liveStock`. */
+  shop?: string;
+  /** The Worker's origin. Default https://shop.superherotech.ai. */
+  api?: string;
+  /** The image box, in px. Default 600 × 600. */
+  imageWidth?: number;
+  imageHeight?: number;
+  /** The words on a sold-out card. Default "Sold out". */
+  soldOutLabel?: string;
+  class?: string;
+}
+
+const {
+  products,
+  currency: cur = 'USD',
+  hrefBase = '/shop/',
+  label = 'Products',
+  headingLevel = 3,
+  stock,
+  liveStock = false,
+  shop,
+  api = 'https://shop.superherotech.ai',
+  imageWidth = 600,
+  imageHeight = 600,
+  soldOutLabel = 'Sold out',
+  class: className,
+} = Astro.props;
+
+if (!Array.isArray(products)) throw new Error('ProductList: `products` is required, the catalogue\'s products fetched at build (fetchCatalog).');
+if (liveStock && (!shop || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shop))) throw new Error('ProductList: `liveStock` needs `shop`, the site key on the Worker.');
+const currency = cur || 'USD';
+const nf = new Intl.NumberFormat('en-US', { style: 'currency', currency });
+const digits = nf.resolvedOptions().maximumFractionDigits ?? 2;
+const money = (cents: number) => nf.format(cents / 10 ** digits);
+
+/** "$18.00", or "From $18.00" when the variations are not all one price. */
+function priceText(p: Product) {
+  const prices = p.variations.map((v) => v.price_cents);
+  const low = Math.min(...prices);
+  return prices.every((c) => c === low) ? money(low) : `From ${money(low)}`;
+}
+/** Every variation tracked and at 0 (or below) in `map`. An untracked one is always available; an unknown count is not "sold out". */
+function soldOut(p: Product, map: Record<string, number | null> | undefined) {
+  if (!map || p.variations.length === 0) return false;
+  return p.variations.every((v) => v.tracked && typeof map[v.id] === 'number' && (map[v.id] as number) <= 0);
+}
+
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const tracked = products.flatMap((p) => p.variations.filter((v) => v.tracked).map((v) => v.id));
+const live = liveStock && tracked.length > 0 ? JSON.stringify({ api, shop, ids: tracked.slice(0, 100) }) : undefined;
+---
+
+<ul class:list={['pl', className]} role="list" aria-label={label} data-pl-live={live}>
+  {products.map((p) => {
+    const image = p.images?.[0];
+    const out = soldOut(p, stock);
+    return (
+      <li class="pl__card" data-pl-product={p.id} data-pl-variations={p.variations.map((v) => `${v.id}:${v.tracked ? 1 : 0}`).join(' ')} data-sold-out={out ? '' : undefined}>
+        {image ? (
+          <img class="pl__img" src={image} alt="" width={imageWidth} height={imageHeight} loading="lazy" decoding="async" />
+        ) : (
+          <span class="pl__img pl__img--none" aria-hidden="true" />
+        )}
+        <div class="pl__text">
+          <H class="pl__name">
+            <a class="pl__link" href={`${hrefBase}${p.slug}/`}>{p.name}<span class="pl__sr" data-pl-sold-sr hidden={!out}>, {soldOutLabel.toLowerCase()}</span></a>
+          </H>
+          <p class="pl__price">{priceText(p)}</p>
+          <p class="pl__sold" data-pl-sold aria-hidden="true" hidden={!out}>{soldOutLabel}</p>
+        </div>
+      </li>
+    );
+  })}
+</ul>
+{live && (
+  <script is:inline>
+    (() => {
+      // Live sold-out marks: one GET /stock for the list's tracked variations. A failure changes nothing.
+      const list = document.currentScript.previousElementSibling;
+      if (!list || !list.dataset.plLive) return;
+      let cfg;
+      try {
+        cfg = JSON.parse(list.dataset.plLive);
+      } catch {
+        return;
+      }
+      const url = cfg.api + '/v1/shops/' + encodeURIComponent(cfg.shop) + '/stock?ids=' + cfg.ids.map(encodeURIComponent).join(',');
+      fetch(url, { credentials: 'omit' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((stock) => {
+          if (!stock || typeof stock !== 'object') return;
+          list.querySelectorAll('[data-pl-product]').forEach((card) => {
+            const vs = (card.getAttribute('data-pl-variations') || '').split(' ').filter(Boolean).map((s) => s.split(':'));
+            const out = vs.length > 0 && vs.every(([id, t]) => t === '1' && typeof stock[id] === 'number' && stock[id] <= 0);
+            card.toggleAttribute('data-sold-out', out);
+            card.querySelectorAll('[data-pl-sold], [data-pl-sold-sr]').forEach((tag) => (tag.hidden = !out));
+          });
+        })
+        .catch(() => {});
+    })();
+  </script>
+)}
+
+<style>
+  .pl {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--pl-min, 15rem)), 1fr));
+    gap: var(--pl-gap, 1.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pl__card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--pl-border, #dfe3ea);
+    border-radius: var(--pl-radius, 12px);
+    background: var(--pl-bg, #fff);
+    color: var(--pl-fg, #1e283c);
+  }
+  .pl__img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--pl-aspect, 1 / 1);
+    object-fit: cover;
+    background: var(--pl-image-bg, #eef0f4);
+  }
+  .pl__card[data-sold-out] .pl__img {
+    opacity: 0.6;
+  }
+  .pl__text {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.9rem 1rem 1.1rem;
+  }
+  .pl__name {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+  }
+  .pl__link {
+    color: inherit;
+    text-decoration: none;
+  }
+  /* The whole card is the link. */
+  .pl__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .pl__link:hover {
+    text-decoration: underline;
+  }
+  .pl__link:focus-visible {
+    outline: none;
+  }
+  .pl__card:focus-within {
+    outline: 3px solid var(--pl-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .pl__price {
+    margin: 0;
+    color: var(--pl-muted, #5b6577);
+    font-variant-numeric: tabular-nums;
+  }
+  .pl__sold {
+    justify-self: start;
+    margin: 0.25rem 0 0;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    background: var(--pl-sold-bg, #1e283c);
+    color: var(--pl-sold-fg, #fff);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .pl__sold[hidden],
+  .pl__sr[hidden] {
+    display: none;
+  }
+  .pl__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pl__card {
+      transition: translate 0.15s ease;
+    }
+    .pl__card:hover {
+      translate: 0 -2px;
+    }
+  }
+  @media (forced-colors: active) {
+    .pl__sold {
+      border: 1px solid CanvasText;
+    }
+  }
+</style>
