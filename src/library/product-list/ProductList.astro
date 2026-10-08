@@ -55,6 +55,8 @@ interface Props {
   currency?: string | null;
   /** Product pages live at `<hrefBase><slug>/`. Default "/shop/". */
   hrefBase?: string;
+  /** Or name each product's page yourself; wins over hrefBase. */
+  href?: (product: Product) => string;
   /** Names the list for screen readers. Default "Products". */
   label?: string;
   /** Level of each card's name. Default 3. */
@@ -79,6 +81,7 @@ const {
   products,
   currency: cur = 'USD',
   hrefBase = '/shop/',
+  href,
   label = 'Products',
   headingLevel = 3,
   stock,
@@ -128,7 +131,7 @@ const live = liveStock && tracked.length > 0 ? JSON.stringify({ api, shop, ids: 
         )}
         <div class="pl__text">
           <H class="pl__name">
-            <a class="pl__link" href={`${hrefBase}${p.slug}/`}>{p.name}<span class="pl__sr" data-pl-sold-sr hidden={!out}>, {soldOutLabel.toLowerCase()}</span></a>
+            <a class="pl__link" href={href ? href(p) : `${hrefBase}${p.slug}/`}>{p.name}<span class="pl__sr" data-pl-sold-sr hidden={!out}>, {soldOutLabel.toLowerCase()}</span></a>
           </H>
           <p class="pl__price">{priceText(p)}</p>
           <p class="pl__sold" data-pl-sold aria-hidden="true" hidden={!out}>{soldOutLabel}</p>

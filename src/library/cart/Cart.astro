@@ -56,6 +56,9 @@
  * prefers-reduced-motion: no slide. Without JavaScript: the cart cannot work, so the trigger
  * and every add button stay hidden and a <noscript> line says why.
  *
+ * STYLES are global (every class prefixed `crt__`), because the lines are built by the script
+ * and never get Astro's scope attribute.
+ *
  * CSP. The site's Content-Security-Policy needs `connect-src https://shop.superherotech.ai`
  * (the stock check and the checkout POST) and `img-src` for the catalogue's image host
  * (Square's: https://items-images-production.s3.us-west-2.amazonaws.com). The redirect is a
@@ -64,9 +67,9 @@
  * Theming, from the host's tokens (each has a fallback):
  *   --crt-accent / --crt-on-accent   checkout button, count badge     (#5933d8 / #fff, 7.27:1)
  *   --crt-bg / --crt-fg              drawer and its text              (#fff / #1e283c, 14.75:1)
- *   --crt-muted                      unit prices, notes              (#5b6577, 5.94:1)
+ *   --crt-muted                      unit prices, notes              (#5b6577, 5.88:1)
  *   --crt-line                       rules between lines             (#dfe3ea)
- *   --crt-warn                       a line's stock message           (#9a3412, 7.07:1)
+ *   --crt-warn                       a line's stock message           (#9a3412, 7.31:1)
  *   --crt-trigger-bg / -fg / -border the cart button                  (transparent / currentColor / currentColor)
  *   --crt-backdrop, --crt-shadow, --crt-size (min(26rem, 92vw)), --crt-radius, --crt-focus,
  *   --crt-duration (0.28s), --crt-z (110, a backstop: the open drawer is in the top layer)
@@ -680,6 +683,7 @@ function cartClient() {
     showMsg(inst, out.message, true);
   }
 
+  const added = new Map<HTMLButtonElement, ChildNode[]>();
   function add(shop: string, id: string, qty: number, from?: Element | null) {
     const s = shops.get(shop);
     if (!s) return false;
@@ -699,12 +703,13 @@ function cartClient() {
       return false;
     }
     setLines(s, r.lines, refusal ? { announce: `${refusal} ${itemWord(count(r.lines))} in your cart.` } : {});
-    if (from instanceof HTMLButtonElement) {
-      const was = from.dataset.cartLabel ?? from.textContent ?? '';
-      from.dataset.cartLabel = was;
+    if (from instanceof HTMLButtonElement && !added.has(from)) {
+      // "Added" for a moment, then the button's own children back (markup and all).
+      added.set(from, [...from.childNodes]);
       from.textContent = 'Added';
       setTimeout(() => {
-        from.textContent = from.dataset.cartLabel ?? was;
+        from.replaceChildren(...(added.get(from) ?? []));
+        added.delete(from);
       }, 1600);
     }
     if (s.cfg.openOnAdd && s.insts[0]) openPanel(s.insts[0]);
@@ -868,13 +873,13 @@ const CART_ICON =
           {ships && (
             <label class="crt__radio">
               <input type="radio" name={`${id}-fulfillment`} value="ship" checked={onlyOne} />
-              <span>Ship it to me <span class="crt__hint">{shipNote}</span></span>
+              <span>Ship it to me{' '}<span class="crt__hint">{shipNote}</span></span>
             </label>
           )}
           {pickupPoints.length > 0 && (
             <label class="crt__radio">
               <input type="radio" name={`${id}-fulfillment`} value="pickup" checked={onlyOne} />
-              <span>I'll pick it up <span class="crt__hint">No shipping fee</span></span>
+              <span>I'll pick it up{' '}<span class="crt__hint">No shipping fee</span></span>
             </label>
           )}
         </fieldset>
@@ -884,7 +889,7 @@ const CART_ICON =
             {pickupPoints.map((p) => (
               <label class="crt__radio">
                 <input type="radio" name={`${id}-point`} value={p.id} checked={pickupPoints.length === 1} />
-                <span>{p.name}{p.details && <span class="crt__hint">{p.details}</span>}</span>
+                <span>{p.name}{p.details && <>{' '}<span class="crt__hint">{p.details}</span></>}</span>
               </label>
             ))}
           </fieldset>
@@ -902,7 +907,9 @@ const CART_ICON =
 </div>
 <script is:inline set:html={mountScript} />
 
-<style>
+<style is:global>
+  /* Global, like toast's: the lines are built by script, so they never carry Astro's scope
+     attribute and scoped rules would miss them. Every class is prefixed crt__. */
   .crt {
     display: inline-block;
   }

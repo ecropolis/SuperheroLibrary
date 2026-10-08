@@ -3041,6 +3041,232 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     file: 'src/library/sticker/Sticker.astro',
     added: '2026-09-26',
   },
+  {
+    id: 'cart',
+    category: 'conversion',
+    name: 'Cart',
+    aka: ['WooCommerce cart', 'Shopify Buy Button cart', 'Ecwid cart', 'Square Online cart', 'side cart', 'cart drawer', 'mini cart', 'add to cart button', 'slide-out cart', 'shopping cart'],
+    summary:
+      'A cart button with its count and a drawer (a native <dialog>) listing the lines, for a shop on the Superhero Shop Worker. Kept in the browser per shop (20 lines, 1 to 20 of each), it re-checks stock on open and before checkout, asks ship or pickup, then sends ids and quantities, never a price, to the Worker and the buyer on to Square’s checkout page.',
+    pitch: 'Let visitors fill a cart on your own site and pay on Square’s secure checkout, with the stock checked before they get there.',
+    // SE Ranking US, 2026-10-08: shopping cart for website 320/mo, difficulty 12 (website shopping
+    // cart 320/32 is the same searches); add to cart button 660/7 is developers asking for markup;
+    // side cart 480/20 and cart drawer 290/15 are Shopify theme vocabulary; add shopping cart to
+    // website 40/26.
+    search: { query: 'shopping cart for website', alsoRanks: ['website shopping cart', 'add shopping cart to website', 'cart drawer', 'side cart'] },
+    replaces: ['WooCommerce’s cart and mini cart', 'the Shopify Buy Button’s cart', 'Ecwid’s cart widget', 'Square Online’s cart', 'side-cart and cart-drawer plugins'],
+    goodFor:
+      'A seller with a handful to a few dozen products who already sells in person with Square: candles, prints, coffee, merch, a maker’s stock. Shipping at one flat rate (free over an amount) or pickup at a market or the shop.',
+    notFor:
+      'A catalogue of hundreds of products, products with several option sets (size and color), live carrier rates, subscriptions or digital downloads. Those are a store platform’s job, and Shopify is the honest answer. Not without the Superhero Shop Worker: the cart has no checkout of its own.',
+    asks: [
+      { key: 'square_account', label: 'Your Square account, connected to your site’s shop', hint: 'We send you a link; you approve it on Square. Products, prices, photos and stock are edited in Square from then on.', required: true },
+      { key: 'shipping', label: 'How you ship: one flat rate, and the order total that ships free', hint: 'Leave it out if buyers only pick up.' },
+      { key: 'pickup_points', label: 'Where buyers can pick up their order, if they can', hint: 'For example: the Saturday market, stall 14, 8 am to noon.' },
+    ],
+    props: [
+      { name: 'shop', type: 'string', note: 'Required. The shop’s site key on the Worker (domino-works). Also keys the stored cart, so two shops never share one.' },
+      { name: 'catalog', type: 'ShopCatalog', note: 'Required. The catalogue fetched at build (fetchCatalog). Names, images and display prices come from it; the cart sends none of them.' },
+      { name: 'id', type: 'string', default: "'cart'", note: 'The element’s id; the drawer is <id>-panel.' },
+      { name: 'api', type: 'string', default: "'https://shop.superherotech.ai'", note: 'The Worker’s origin.' },
+      { name: 'flatShippingCents', type: 'number | null', default: 'null', note: 'The shop’s flat rate, shown as an estimate. null: the shop does not ship.' },
+      { name: 'freeShippingOverCents', type: 'number | null', default: 'null', note: 'Free shipping from this subtotal (the Worker’s rule: subtotal ≥ this).' },
+      { name: 'pickupPoints', type: '{ id, name, details? }[]', default: '[]', note: 'The shop’s pickup points; `id` is what the checkout sends. With one point it is preselected.' },
+      { name: 'title', type: 'string', default: '“Your cart”', note: 'The drawer’s heading and name.' },
+      { name: 'label', type: 'string', default: '“Cart”', note: 'The button’s text; its name adds the count (“Cart, 2 items”).' },
+      { name: 'hrefBase', type: 'string | null', default: "'/shop/'", note: 'A line’s name links to <hrefBase><slug>/. null: no links.' },
+      { name: 'clear', type: 'boolean', default: 'false', note: 'Empty the cart on load. Put it on the thanks page, which never claims the payment went through.' },
+      { name: 'openOnAdd', type: 'boolean', default: 'false', note: 'Open the drawer after an add, instead of only announcing the count.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--crt-accent', fallback: '#5933d8', note: 'Checkout button and count badge (7.27:1 with --crt-on-accent).' },
+      { name: '--crt-on-accent', fallback: '#fff', note: 'Text on the accent.' },
+      { name: '--crt-bg', fallback: '#fff', note: 'The drawer (14.75:1 with its text).' },
+      { name: '--crt-fg', fallback: '#1e283c', note: 'Text in the drawer.' },
+      { name: '--crt-muted', fallback: '#5b6577', note: 'Unit prices and notes (5.88:1 on white).' },
+      { name: '--crt-line', fallback: '#dfe3ea', note: 'Rules between lines, the quantity box.' },
+      { name: '--crt-warn', fallback: '#9a3412', note: 'A line’s stock message and the message bar’s edge (7.31:1 on white).' },
+      { name: '--crt-trigger-bg', fallback: 'transparent', note: 'The cart button.' },
+      { name: '--crt-trigger-fg', fallback: 'currentColor', note: 'The cart button’s text and icon.' },
+      { name: '--crt-trigger-border', fallback: 'currentColor', note: 'The cart button’s border.' },
+      { name: '--crt-radius', fallback: '999px', note: 'The cart button’s corners.' },
+      { name: '--crt-size', fallback: 'min(26rem, 92vw)', note: 'The drawer’s width.' },
+      { name: '--crt-backdrop', fallback: 'rgb(15 20 35 / 0.55)', note: 'Behind the drawer.' },
+      { name: '--crt-shadow', fallback: '0 0 3rem rgb(0 0 0 / 0.25)', note: 'The drawer’s shadow.' },
+      { name: '--crt-focus', fallback: 'var(--crt-accent)', note: 'Focus ring.' },
+      { name: '--crt-duration', fallback: '0.28s', note: 'Slide time; none under reduced motion.' },
+      { name: '--crt-z', fallback: '110', note: 'A backstop: the open drawer is in the browser’s top layer.' },
+    ],
+    a11y: [
+      'The cart button is a real <button> with aria-haspopup="dialog", aria-controls and aria-expanded, named with its count (“Cart, 2 items”); the count badge is decoration.',
+      'The drawer is a native <dialog> opened with showModal(): the page behind is inert, focus stays in the drawer, and it lands on the drawer’s heading. Escape, the 44px close button and a click on the backdrop close it; focus returns to the cart button.',
+      'One polite live region per cart, for the count (“3 items in your cart”) and a refused add. Nothing in the drawer is live: after a checkout problem focus moves to the message, which is read on arrival.',
+      'Every line control names its line: “One more Enamel mug, Slate”, “Quantity of Enamel mug, Slate”, “Remove Enamel mug, Slate”. A short line’s message describes its quantity field. After a removal, focus goes to the next line’s Remove.',
+      'Ship or pickup and the pickup point are real radios in fieldsets with legends. The busy Check out button stays focusable (aria-disabled), so focus is never dropped.',
+      'Without JavaScript the cart cannot work, so its button and every add button stay hidden and a <noscript> line says so. prefers-reduced-motion: no slide.',
+    ],
+    usage: `---
+// src/layouts/Shop.astro
+import Cart from '../components/Cart.astro';
+import { fetchCatalog } from '../lib/fetchCatalog';
+const catalog = await fetchCatalog('domino-works');
+---
+<header>
+  …
+  <Cart shop="domino-works" catalog={catalog}
+        flatShippingCents={800} freeShippingOverCents={7500}
+        pickupPoints={[{ id: 'market', name: 'Saturday market', details: 'Stall 14, 8 am to noon' }]} />
+</header>
+
+<!-- Any button adds; it stays hidden until the cart's script has run. -->
+<button type="button" data-cart-add="VARSTEEL" data-cart-shop="domino-works" hidden>Add to cart</button>
+
+<!-- The thanks page empties the cart and claims nothing about the payment. -->
+<Cart shop="domino-works" catalog={catalog} clear … />
+
+<!-- The site's CSP:
+  connect-src https://shop.superherotech.ai
+  img-src https://items-images-production.s3.us-west-2.amazonaws.com -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/cart/ (demo)' }],
+    file: 'src/library/cart/Cart.astro',
+    added: '2026-10-08',
+  },
+  {
+    id: 'product-list',
+    category: 'conversion',
+    name: 'Product list',
+    aka: ['product grid', 'shop page', 'WooCommerce shop page', 'Shopify Buy Button collection', 'Ecwid product browser', 'Square Online shop', 'product catalog', 'collection grid'],
+    summary:
+      'The shop’s products as a grid of cards, built at deploy from the Superhero Shop catalogue: an image, the name, the price (“From $18.00” when variations differ) and one link to the product’s page per card. Sold out shows when every tracked variation is at 0, from stock passed at build or one optional stock check in the browser.',
+    pitch: 'Show everything you sell on one page, straight from your Square catalogue, updated every time you change a product.',
+    // SE Ranking US, 2026-10-08: product listing page 140/mo, difficulty 15; product grid 90/7;
+    // shop page 3,200/65 is mostly retailers' own shop pages, out of reach and off target.
+    search: { query: 'product listing page', alsoRanks: ['product grid'] },
+    replaces: ['WooCommerce’s shop and category pages', 'the Shopify Buy Button’s collection embed', 'Ecwid’s product browser', 'Square Online’s shop page'],
+    goodFor: 'A shop page or a “From the shop” band on the home page, for a handful to a few dozen products in one Square category.',
+    notFor: 'Filtering, sorting or searching hundreds of products, or a price that must be live to the minute: prices are the ones the site was built with, and the cart never sends them.',
+    asks: [
+      { key: 'website_category', label: 'Your products in Square, in a category named Website', hint: 'Only that category shows on the site. Each needs a price, a photo and a short description.', required: true },
+    ],
+    props: [
+      { name: 'products', type: 'ShopProduct[]', note: 'Required. The catalogue’s products, fetched at build (fetchCatalog).' },
+      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalogue’s currency; prices are in its minor unit.' },
+      { name: 'hrefBase', type: 'string', default: "'/shop/'", note: 'Each card links to <hrefBase><slug>/.' },
+      { name: 'href', type: '(product) => string', note: 'Or name each product’s page yourself; wins over hrefBase.' },
+      { name: 'label', type: 'string', default: '“Products”', note: 'The list’s accessible name.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '3', note: 'Level of each card’s name.' },
+      { name: 'stock', type: 'Record<string, number | null>', note: 'Stock known at build, for Sold out in the HTML. The Worker’s /stock answers only the shop’s own origins, so this is mostly for fixtures.' },
+      { name: 'liveStock', type: 'boolean', default: 'false', note: 'One GET /stock from the browser on load, which marks sold-out cards. Needs `shop`; a failure changes nothing.' },
+      { name: 'shop', type: 'string', note: 'The shop’s site key, for liveStock.' },
+      { name: 'api', type: 'string', default: "'https://shop.superherotech.ai'", note: 'The Worker’s origin.' },
+      { name: 'imageWidth / imageHeight', type: 'number', default: '600 / 600', note: 'The box each image is drawn in (object-fit: cover), reserved before it loads.' },
+      { name: 'soldOutLabel', type: 'string', default: '“Sold out”', note: 'The badge’s words.' },
+      { name: 'class', type: 'string', note: 'Class on the list.' },
+    ],
+    theming: [
+      { name: '--pl-min', fallback: '15rem', note: 'The narrowest card; the grid fits as many as it can.' },
+      { name: '--pl-gap', fallback: '1.5rem', note: 'Between cards.' },
+      { name: '--pl-bg', fallback: '#fff', note: 'Card.' },
+      { name: '--pl-fg', fallback: '#1e283c', note: 'Card text (14.75:1).' },
+      { name: '--pl-muted', fallback: '#5b6577', note: 'The price (5.88:1).' },
+      { name: '--pl-border', fallback: '#dfe3ea', note: 'Card border.' },
+      { name: '--pl-radius', fallback: '12px', note: 'Card corners.' },
+      { name: '--pl-image-bg', fallback: '#eef0f4', note: 'Behind an image, and a product with none.' },
+      { name: '--pl-aspect', fallback: '1 / 1', note: 'The image box’s shape.' },
+      { name: '--pl-sold-bg / --pl-sold-fg', fallback: '#1e283c / #fff', note: 'The Sold out badge (14.75:1).' },
+      { name: '--pl-focus', fallback: '#5933d8', note: 'Focus ring round the card.' },
+    ],
+    a11y: [
+      'A <ul role="list"> named by `label`. Each card is one link, its name, stretched over the card; the name is a heading at `headingLevel`. The focus ring goes round the whole card.',
+      'Images have alt="" because the card’s name says what it is; each has width, height, loading="lazy" and decoding="async", so nothing shifts.',
+      'Sold out is a visible badge and “, sold out” in the link’s name, never color alone.',
+      'Without JavaScript everything shows except a live sold-out mark. The only motion is a small hover lift, none under prefers-reduced-motion.',
+    ],
+    usage: `---
+import ProductList from '../components/ProductList.astro';
+import { fetchCatalog } from '../lib/fetchCatalog';   // src/library/product-list/fetchCatalog.ts
+const catalog = await fetchCatalog('domino-works');
+---
+<h1>Shop</h1>
+<ProductList products={catalog.products} currency={catalog.currency} liveStock shop="domino-works" />`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/product-list/ (demo)' }],
+    file: 'src/library/product-list/ProductList.astro',
+    added: '2026-10-08',
+  },
+  {
+    id: 'product-page',
+    category: 'conversion',
+    name: 'Product page',
+    aka: ['product detail page', 'single product page', 'WooCommerce product page', 'Shopify Buy Button product', 'Ecwid product page', 'Square Online product page', 'variation picker', 'product schema'],
+    summary:
+      'One product built at deploy from the Superhero Shop catalogue: images, name, description as plain text, a radio picker when it has more than one variation (the price follows it), quantity, Add to cart through the cart element, a shipping or pickup note, and Product JSON-LD with one Offer per variation.',
+    pitch: 'Give each product its own page, with its photos, options and price straight from Square, and a button that adds it to the cart.',
+    // SE Ranking US, 2026-10-08: product detail page 390/mo, difficulty 19; product page 260/27;
+    // product page design 260/28; product page template 90/14.
+    search: { query: 'product detail page', alsoRanks: ['product page', 'product page design', 'product page template'] },
+    replaces: ['WooCommerce’s single product page', 'the Shopify Buy Button’s product embed', 'Ecwid’s product page', 'Square Online’s item page', 'product schema plugins'],
+    goodFor: 'One page per product in a small shop, at /shop/<slug>/, built for every product by getStaticPaths.',
+    notFor: 'Products with several option sets (size and color) or bundles: Square variations give one option set per product, and the Worker sells exactly those. Live prices: prices are the build’s.',
+    asks: [
+      { key: 'product_details', label: 'Each product’s photos, description and options, entered in Square', hint: 'One option set per product (size, or color). We read them from Square; nothing is typed twice.', required: true },
+    ],
+    props: [
+      { name: 'product', type: 'ShopProduct', note: 'Required. One product from the catalogue fetched at build.' },
+      { name: 'shop', type: 'string', note: 'Required. The shop’s site key: the cart this page adds to. Put <Cart shop="…"> in the layout.' },
+      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalogue’s currency.' },
+      { name: 'url', type: 'string', default: 'Astro.site + path', note: 'This page’s absolute URL, for the JSON-LD.' },
+      { name: 'brand', type: 'string', note: 'The seller’s name, for the JSON-LD.' },
+      { name: 'jsonLd', type: "boolean | 'visible'", default: 'true', note: "Emit the Product JSON-LD. 'visible' shows it as text instead, for demos that must not publish it." },
+      { name: 'headingLevel', type: '1 | 2 | 3', default: '1', note: 'Level of the name.' },
+      { name: 'optionLabel', type: 'string', default: '“Choose one”', note: 'The picker’s legend (“Choose a size”).' },
+      { name: 'imageAlt', type: 'string', default: 'the name', note: 'The main image’s alt.' },
+      { name: 'imageWidth / imageHeight', type: 'number', default: '800 / 800', note: 'The image box.' },
+      { name: 'stock', type: 'Record<string, number | null>', note: 'Stock known at build: sold-out variations disabled, and availability in the JSON-LD.' },
+      { name: 'liveStock', type: 'boolean', default: 'false', note: 'One GET /stock from the browser on load, which disables sold-out variations.' },
+      { name: 'api', type: 'string', default: "'https://shop.superherotech.ai'", note: 'The Worker’s origin.' },
+      { name: 'flatShippingCents / freeShippingOverCents / pickupPoints', type: 'as the cart', note: 'The note under the button is written from these (“Ships for $8.00, free on orders over $75.00 (estimated). Or pick it up at…”).' },
+      { name: 'note', type: 'string', note: 'Your own note instead.' },
+      { name: 'class', type: 'string', note: 'Class on the article.' },
+    ],
+    theming: [
+      { name: '--pp-accent', fallback: '#5933d8', note: 'Add to cart, the chosen option’s border, focus.' },
+      { name: '--pp-on-accent', fallback: '#fff', note: 'Text on the button (7.27:1).' },
+      { name: '--pp-fg', fallback: '#1e283c', note: 'Text.' },
+      { name: '--pp-muted', fallback: '#5b6577', note: 'Notes, a sold-out option (5.88:1).' },
+      { name: '--pp-border', fallback: '#8a94a6', note: 'Option and quantity borders (3:1 on white).' },
+      { name: '--pp-radius', fallback: '12px', note: 'Image corners.' },
+      { name: '--pp-image-bg', fallback: '#eef0f4', note: 'Behind images.' },
+      { name: '--pp-aspect', fallback: '1 / 1', note: 'The image box’s shape.' },
+      { name: '--pp-gap', fallback: 'clamp(1.5rem, 4vw, 3rem)', note: 'Between images and text.' },
+      { name: '--pp-focus', fallback: 'var(--pp-accent)', note: 'Focus ring.' },
+    ],
+    a11y: [
+      'The name is a heading at `headingLevel` (1 on a product’s own page). The main image’s alt is the name; further images say “<name>, view 2”.',
+      'Variations are real radios in a fieldset with a legend, each labelled with its name and price; a sold-out one is disabled and says “Sold out”. Quantity is a labelled number input, 1 to 20.',
+      'Add to cart is a real submit button, hidden until a cart for the same shop has run; the cart announces its count, so this page has no live region of its own.',
+      'The description is Square’s plain text: anything that looks like markup is shown as typed.',
+      'Without JavaScript the page reads in full and a line says ordering online needs it. No motion.',
+    ],
+    usage: `---
+// src/pages/shop/[slug].astro
+import Shop from '../../layouts/Shop.astro';           // holds <Cart shop="domino-works" …>
+import ProductPage from '../../components/ProductPage.astro';
+import { fetchCatalog } from '../../lib/fetchCatalog';
+export async function getStaticPaths() {
+  const catalog = await fetchCatalog('domino-works');
+  return catalog.products.map((product) => ({ params: { slug: product.slug }, props: { product, currency: catalog.currency } }));
+}
+const { product, currency } = Astro.props;
+---
+<Shop title={product.name}>
+  <ProductPage product={product} currency={currency} shop="domino-works" brand="Domino Works"
+               optionLabel="Choose a metal" flatShippingCents={800} freeShippingOverCents={7500} liveStock />
+</Shop>`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/product-page/ (demo)' }],
+    file: 'src/library/product-page/ProductPage.astro',
+    added: '2026-10-08',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

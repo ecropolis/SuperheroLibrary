@@ -68,8 +68,9 @@ interface Props {
   url?: string;
   /** The seller's name, for the JSON-LD brand. */
   brand?: string;
-  /** Emit the Product JSON-LD. Default true. */
-  jsonLd?: boolean;
+  /** Emit the Product JSON-LD. Default true. 'visible' shows the same JSON as text in a <details>
+   * instead of emitting it: for demos, which must not publish structured data for a product nobody sells. */
+  jsonLd?: boolean | 'visible';
   /** Level of the name's heading. Default 1. */
   headingLevel?: 1 | 2 | 3;
   /** The picker's question. Default "Choose one". */
@@ -212,8 +213,8 @@ const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.strin
             return (
               <label class="pp__option" data-pp-option={v.id}>
                 <input type="radio" name="variation" value={v.id} checked={v.id === first.id && !out} disabled={out} data-price={money(v.price_cents)} />
-                <span class="pp__option-name">{v.name}</span>
-                <span class="pp__option-price">{money(v.price_cents)}</span>
+                <span class="pp__option-name">{v.name}</span>{' '}
+                <span class="pp__option-price">{money(v.price_cents)}</span>{' '}
                 <span class="pp__option-sold" data-pp-sold hidden={!out}>Sold out</span>
               </label>
             );
@@ -287,7 +288,13 @@ const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.strin
       .catch(() => {});
   })();
 </script>
-{ld && <script type="application/ld+json" set:html={ld} />}
+{ld && jsonLd === 'visible' && (
+  <details class="pp__ld" data-pp-ld>
+    <summary>The page's structured data (Product JSON-LD)</summary>
+    <pre><code>{ld}</code></pre>
+  </details>
+)}
+{ld && jsonLd !== 'visible' && <script type="application/ld+json" set:html={ld} />}
 
 <style>
   .pp {
@@ -425,6 +432,18 @@ const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.strin
     margin: 0.75rem 0 0;
     color: var(--pp-muted, #5b6577);
     font-size: 0.9375rem;
+  }
+  .pp__ld {
+    margin-top: 1.5rem;
+    font-size: 0.875rem;
+  }
+  .pp__ld pre {
+    overflow: auto;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--pp-image-bg, #eef0f4);
+    white-space: pre-wrap;
+    word-break: break-all;
   }
   @media (forced-colors: active) {
     .pp__option:has(input:checked) {

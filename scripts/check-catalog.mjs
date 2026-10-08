@@ -153,7 +153,7 @@ const NEEDS_INPUT = [
   'accordion', 'announcement-bar', 'before-after', 'business-hours', 'content-toggle', 'countdown',
   'flip-box', 'hotspot', 'info-circle', 'info-list', 'map', 'modal', 'news-ticker',
   'responsive-table', 'slide-box', 'social-grid', 'tabcordion', 'tabs', 'testimonial-carousel',
-  'video-background', 'video-gallery', 'video-player',
+  'video-background', 'video-gallery', 'video-player', 'cart', 'product-list', 'product-page',
 ];
 const plainText = (v) => typeof v === 'string' && v.trim() === v && v.length > 0;
 for (const e of catalog) {

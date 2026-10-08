@@ -76,6 +76,9 @@ const GOLDEN = {
   'content-toggle': 'conversion',
   'news-ticker': 'conversion',
   sticker: 'conversion',
+  cart: 'conversion',
+  'product-list': 'conversion',
+  'product-page': 'conversion',
 
   notice: 'feedback',
   toast: 'feedback',
