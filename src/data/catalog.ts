@@ -386,7 +386,7 @@ export const catalog: Element[] = [
   <a class="button" href="/about/">Our story</a>
 </ParallaxBand>
 <!-- :root { --pb-overlay: var(--navy); --pb-fg: var(--white); } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/parallax-band/ (demo)' }],
+    usedOn: [{ site: 'stbeautybar', where: 'Home, the “Confidence” band (speed 0.15, position top); ecropolis/stbeautybar-astro#2' }],
     file: 'src/library/parallax-band/ParallaxBand.astro',
     added: '2026-09-23',
   },
