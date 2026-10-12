@@ -253,7 +253,7 @@ function cartClient() {
   const minorDigits = (currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
   const money = (cents: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 10 ** minorDigits(currency));
   /** A new key for every checkout attempt, never one from an earlier attempt. */
-  function newKey(c: { randomUUID?: () => string; getRandomValues?: (a: Uint8Array) => Uint8Array } | undefined) {
+  function newKey(c: Crypto | undefined) {
     if (c && typeof c.randomUUID === 'function') return c.randomUUID();
     const b = new Uint8Array(16);
     if (c && typeof c.getRandomValues === 'function') c.getRandomValues(b);

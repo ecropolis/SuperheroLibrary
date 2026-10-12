@@ -1,6 +1,6 @@
 ---
 /**
- * ProductPage — one product of the Superhero Shop, built at deploy from the catalogue
+ * ProductPage — one product of the Superhero Shop, built at deploy from the catalog
  * (fetchCatalog, beside product-list): its images, name, description, a variation picker when
  * it has more than one variation, quantity, Add to cart, a shipping or pickup note, and the
  * page's Product structured data. Replaces the single-product page of WooCommerce, Ecwid and
@@ -17,7 +17,7 @@
  * the layout. Without JavaScript the page reads in full and a line says ordering needs it.
  *
  * VARIATIONS. One variation: no picker, the price is shown. More: a radio group (real radios in
- * a fieldset with a legend, `optionLabel`), each labelled with its name and price; the price
+ * a fieldset with a legend, `optionLabel`), each labeled with its name and price; the price
  * line follows the choice. A variation known to be sold out (build-time `stock`, or `liveStock`)
  * is disabled and says "Sold out"; when all are, the button says so and cannot be pressed.
  *
@@ -26,11 +26,11 @@
  * a decimal string, priceCurrency, url, and availability when stock is known: untracked means
  * InStock). It is the page's only Product node: delete any hand-written one. `<` is escaped, so a
  * description can never close the script. Prices are the build's; the next deploy (fired by the
- * Worker on a catalogue change) updates them.
+ * Worker on a catalog change) updates them.
  *
  * ACCESSIBILITY. The name is a heading at `headingLevel` (1 on a product's own page). The main
  * image's alt is the product name (`imageAlt` to say more); the others are "<name>, view 2".
- * Quantity is a labelled number input, 1 to 20 (the Worker's limit). No live region here: the
+ * Quantity is a labeled number input, 1 to 20 (the Worker's limit). No live region here: the
  * cart announces its count. No motion.
  *
  * CSP: `img-src` for Square's image host; with `liveStock`, `connect-src https://shop.superherotech.ai`.
@@ -58,9 +58,9 @@ interface PickupPoint {
   details?: string;
 }
 interface Props {
-  /** One product from the catalogue. Required. */
+  /** One product from the catalog. Required. */
   product: Product;
-  /** The catalogue's currency. Default USD. */
+  /** The catalog's currency. Default USD. */
   currency?: string | null;
   /** The shop's site key: the cart this page adds to. Required. */
   shop: string;
@@ -117,7 +117,7 @@ const {
   class: className,
 } = Astro.props;
 
-if (!product || !Array.isArray(product.variations) || product.variations.length === 0) throw new Error('ProductPage: `product` is required, one catalogue product with at least one variation.');
+if (!product || !Array.isArray(product.variations) || product.variations.length === 0) throw new Error('ProductPage: `product` is required, one catalog product with at least one variation.');
 if (!shop || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(shop)) throw new Error(`ProductPage "${product.name}": \`shop\` "${shop}" is not a site key.`);
 
 const currency = cur || 'USD';
@@ -129,11 +129,11 @@ const decimal = (cents: number) => (cents / 10 ** digits).toFixed(digits);
 /** true / false when known, null when not. Untracked is always available. */
 const available = (v: Variation): boolean | null => (!v.tracked ? true : stock && typeof stock[v.id] === 'number' ? (stock[v.id] as number) > 0 : null);
 const many = product.variations.length > 1;
-const first = product.variations.find((v) => available(v) !== false) ?? product.variations[0];
-const allOut = product.variations.every((v) => available(v) === false);
+const first = product.variations.find((v: Variation) => available(v) !== false) ?? product.variations[0];
+const allOut = product.variations.every((v: Variation) => available(v) === false);
 
 const images = product.images ?? [];
-const paragraphs = (product.description ?? '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const paragraphs = (product.description ?? '').split(/\n\s*\n/).map((p: string) => p.trim()).filter(Boolean);
 const H = `h${headingLevel}` as 'h1' | 'h2' | 'h3';
 const uid = `pp-${product.id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
@@ -146,7 +146,7 @@ const fulfil =
       parts.push(flatShippingCents === 0 ? 'Ships free.' : `Ships for ${money(flatShippingCents)}${freeShippingOverCents !== null ? `, free on orders over ${money(freeShippingOverCents)}` : ''} (estimated).`);
     }
     if (pickupPoints.length) {
-      const names = pickupPoints.map((p) => p.name);
+      const names = pickupPoints.map((p: PickupPoint) => p.name);
       const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
       parts.push(`${parts.length ? 'Or pick it up' : 'Pick it up'} at ${list}, with no shipping fee.`);
     }
@@ -167,7 +167,7 @@ const ld = jsonLd
       productID: product.id,
       ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
       ...(pageUrl ? { url: pageUrl } : {}),
-      offers: product.variations.map((v) => ({
+      offers: product.variations.map((v: Variation) => ({
         '@type': 'Offer',
         sku: v.id,
         name: many ? `${product.name}, ${v.name}` : product.name,
@@ -178,7 +178,7 @@ const ld = jsonLd
       })),
     }).replace(/</g, '\\u003c')
   : null;
-const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.stringify({ api, shop, ids: product.variations.filter((v) => v.tracked).map((v) => v.id) }) : undefined;
+const live = liveStock && product.variations.some((v: Variation) => v.tracked) ? JSON.stringify({ api, shop, ids: product.variations.filter((v: Variation) => v.tracked).map((v: Variation) => v.id) }) : undefined;
 ---
 
 <article class:list={['pp', className]} data-pp={live ?? ''}>
@@ -190,7 +190,7 @@ const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.strin
     )}
     {images.length > 1 && (
       <ul class="pp__more" role="list">
-        {images.slice(1).map((src, i) => (
+        {images.slice(1).map((src: string, i: number) => (
           <li><img class="pp__thumb" src={src} alt={`${product.name}, view ${i + 2}`} width={imageWidth} height={imageHeight} loading="lazy" decoding="async" /></li>
         ))}
       </ul>
@@ -201,14 +201,14 @@ const live = liveStock && product.variations.some((v) => v.tracked) ? JSON.strin
     <p class="pp__price" data-pp-price>{money(first.price_cents)}</p>
     {paragraphs.length > 0 && (
       <div class="pp__desc">
-        {paragraphs.map((p) => <p>{p}</p>)}
+        {paragraphs.map((p: string) => <p>{p}</p>)}
       </div>
     )}
     <form class="pp__form" data-cart-form data-cart-shop={shop}>
       {many ? (
         <fieldset class="pp__options">
           <legend>{optionLabel}</legend>
-          {product.variations.map((v) => {
+          {product.variations.map((v: Variation) => {
             const out = available(v) === false;
             return (
               <label class="pp__option" data-pp-option={v.id}>

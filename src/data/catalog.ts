@@ -3058,7 +3058,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     goodFor:
       'A seller with a handful to a few dozen products who already sells in person with Square: candles, prints, coffee, merch, a maker’s stock. Shipping at one flat rate (free over an amount) or pickup at a market or the shop.',
     notFor:
-      'A catalogue of hundreds of products, products with several option sets (size and color), live carrier rates, subscriptions or digital downloads. Those are a store platform’s job, and Shopify is the honest answer. Not without the Superhero Shop Worker: the cart has no checkout of its own.',
+      'A catalog of hundreds of products, products with several option sets (size and color), live carrier rates, subscriptions or digital downloads. Those are a store platform’s job, and Shopify is the honest answer. Not without the Superhero Shop Worker: the cart has no checkout of its own.',
     asks: [
       { key: 'square_account', label: 'Your Square account, connected to your site’s shop', hint: 'We send you a link; you approve it on Square. Products, prices, photos and stock are edited in Square from then on.', required: true },
       { key: 'shipping', label: 'How you ship: one flat rate, and the order total that ships free', hint: 'Leave it out if buyers only pick up.' },
@@ -3066,7 +3066,7 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
     ],
     props: [
       { name: 'shop', type: 'string', note: 'Required. The shop’s site key on the Worker (domino-works). Also keys the stored cart, so two shops never share one.' },
-      { name: 'catalog', type: 'ShopCatalog', note: 'Required. The catalogue fetched at build (fetchCatalog). Names, images and display prices come from it; the cart sends none of them.' },
+      { name: 'catalog', type: 'ShopCatalog', note: 'Required. The catalog fetched at build (fetchCatalog). Names, images and display prices come from it; the cart sends none of them.' },
       { name: 'id', type: 'string', default: "'cart'", note: 'The element’s id; the drawer is <id>-panel.' },
       { name: 'api', type: 'string', default: "'https://shop.superherotech.ai'", note: 'The Worker’s origin.' },
       { name: 'flatShippingCents', type: 'number | null', default: 'null', note: 'The shop’s flat rate, shown as an estimate. null: the shop does not ship.' },
@@ -3138,8 +3138,8 @@ const catalog = await fetchCatalog('domino-works');
     name: 'Product list',
     aka: ['product grid', 'shop page', 'WooCommerce shop page', 'Shopify Buy Button collection', 'Ecwid product browser', 'Square Online shop', 'product catalog', 'collection grid'],
     summary:
-      'The shop’s products as a grid of cards, built at deploy from the Superhero Shop catalogue: an image, the name, the price (“From $18.00” when variations differ) and one link to the product’s page per card. Sold out shows when every tracked variation is at 0, from stock passed at build or one optional stock check in the browser.',
-    pitch: 'Show everything you sell on one page, straight from your Square catalogue, updated every time you change a product.',
+      'The shop’s products as a grid of cards, built at deploy from the Superhero Shop catalog: an image, the name, the price (“From $18.00” when variations differ) and one link to the product’s page per card. Sold out shows when every tracked variation is at 0, from stock passed at build or one optional stock check in the browser.',
+    pitch: 'Show everything you sell on one page, straight from your Square catalog, updated every time you change a product.',
     // SE Ranking US, 2026-10-08: product listing page 140/mo, difficulty 15; product grid 90/7;
     // shop page 3,200/65 is mostly retailers' own shop pages, out of reach and off target.
     search: { query: 'product listing page', alsoRanks: ['product grid'] },
@@ -3150,8 +3150,8 @@ const catalog = await fetchCatalog('domino-works');
       { key: 'website_category', label: 'Your products in Square, in a category named Website', hint: 'Only that category shows on the site. Each needs a price, a photo and a short description.', required: true },
     ],
     props: [
-      { name: 'products', type: 'ShopProduct[]', note: 'Required. The catalogue’s products, fetched at build (fetchCatalog).' },
-      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalogue’s currency; prices are in its minor unit.' },
+      { name: 'products', type: 'ShopProduct[]', note: 'Required. The catalog’s products, fetched at build (fetchCatalog).' },
+      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalog’s currency; prices are in its minor unit.' },
       { name: 'hrefBase', type: 'string', default: "'/shop/'", note: 'Each card links to <hrefBase><slug>/.' },
       { name: 'href', type: '(product) => string', note: 'Or name each product’s page yourself; wins over hrefBase.' },
       { name: 'label', type: 'string', default: '“Products”', note: 'The list’s accessible name.' },
@@ -3200,7 +3200,7 @@ const catalog = await fetchCatalog('domino-works');
     name: 'Product page',
     aka: ['product detail page', 'single product page', 'WooCommerce product page', 'Shopify Buy Button product', 'Ecwid product page', 'Square Online product page', 'variation picker', 'product schema'],
     summary:
-      'One product built at deploy from the Superhero Shop catalogue: images, name, description as plain text, a radio picker when it has more than one variation (the price follows it), quantity, Add to cart through the cart element, a shipping or pickup note, and Product JSON-LD with one Offer per variation.',
+      'One product built at deploy from the Superhero Shop catalog: images, name, description as plain text, a radio picker when it has more than one variation (the price follows it), quantity, Add to cart through the cart element, a shipping or pickup note, and Product JSON-LD with one Offer per variation.',
     pitch: 'Give each product its own page, with its photos, options and price straight from Square, and a button that adds it to the cart.',
     // SE Ranking US, 2026-10-08: product detail page 390/mo, difficulty 19; product page 260/27;
     // product page design 260/28; product page template 90/14.
@@ -3212,9 +3212,9 @@ const catalog = await fetchCatalog('domino-works');
       { key: 'product_details', label: 'Each product’s photos, description and options, entered in Square', hint: 'One option set per product (size, or color). We read them from Square; nothing is typed twice.', required: true },
     ],
     props: [
-      { name: 'product', type: 'ShopProduct', note: 'Required. One product from the catalogue fetched at build.' },
+      { name: 'product', type: 'ShopProduct', note: 'Required. One product from the catalog fetched at build.' },
       { name: 'shop', type: 'string', note: 'Required. The shop’s site key: the cart this page adds to. Put <Cart shop="…"> in the layout.' },
-      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalogue’s currency.' },
+      { name: 'currency', type: 'string | null', default: "'USD'", note: 'The catalog’s currency.' },
       { name: 'url', type: 'string', default: 'Astro.site + path', note: 'This page’s absolute URL, for the JSON-LD.' },
       { name: 'brand', type: 'string', note: 'The seller’s name, for the JSON-LD.' },
       { name: 'jsonLd', type: "boolean | 'visible'", default: 'true', note: "Emit the Product JSON-LD. 'visible' shows it as text instead, for demos that must not publish it." },
@@ -3243,7 +3243,7 @@ const catalog = await fetchCatalog('domino-works');
     ],
     a11y: [
       'The name is a heading at `headingLevel` (1 on a product’s own page). The main image’s alt is the name; further images say “<name>, view 2”.',
-      'Variations are real radios in a fieldset with a legend, each labelled with its name and price; a sold-out one is disabled and says “Sold out”. Quantity is a labelled number input, 1 to 20.',
+      'Variations are real radios in a fieldset with a legend, each labeled with its name and price; a sold-out one is disabled and says “Sold out”. Quantity is a labeled number input, 1 to 20.',
       'Add to cart is a real submit button, hidden until a cart for the same shop has run; the cart announces its count, so this page has no live region of its own.',
       'The description is Square’s plain text: anything that looks like markup is shown as typed.',
       'Without JavaScript the page reads in full and a line says ordering online needs it. No motion.',
