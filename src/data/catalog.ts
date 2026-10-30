@@ -3634,6 +3634,102 @@ const { product, currency } = Astro.props;
     file: 'src/library/call-to-action/CallToAction.astro',
     added: '2026-10-30',
   },
+  {
+    id: 'image-effects',
+    category: 'media',
+    name: 'Image effects',
+    aka: ['image hover effects', 'photo effects', 'pixelate hover', 'Slider Revolution tile transition', 'Slider Revolution slideshow', 'image gallery hero', 'Ken Burns zoom', 'grayscale hover', 'duotone image', 'vanilla-tilt', 'imagehover.css', 'Elementor image hover', 'UABB image hover'],
+    summary:
+      'One element, several named effects for photographs, chosen with `effect`. On hover (and on keyboard focus when linked): pixelate, zoom, grayscale, duotone, tilt, shine, caption. For several photos: tiles (a slideshow whose photo flies in as a 7×7 grid of tiles) and gallery-open (a strip whose middle photo opens to the full width as it scrolls up). Every one is a plain image without JavaScript and holds still under reduced motion.',
+    pitch: 'Give your photos a moment of life when visitors point at them, scroll past them or land on your home page, without a slider plugin.',
+    // Not measured: SE Ranking's MCP server and Data API both timed out on 2026-10-30. The
+    // link-effects entry recorded "css hover effects" at 480/mo, difficulty 31 (2026-09-26) and
+    // left it unclaimed; this page takes the image-specific phrase. Measure it and revise.
+    search: { query: 'image hover effects', alsoRanks: ['css image hover effects', 'image hover effect', 'photo hover effects'] },
+    replaces: [
+      'Slider Revolution and Smart Slider tile and slice transitions on a hero',
+      'Elementor Pro and UABB image hover effects, image box hovers and “Ken Burns” zooms',
+      'theme gallery scripts (the Aine theme’s pixelate gallery and image gallery hero)',
+      'vanilla-tilt.js, imagehover.css and hover CSS pasted into a theme',
+    ],
+    goodFor:
+      'pixelate: a portfolio or gallery that wants one playful beat. zoom: the quiet default for linked cards. grayscale: calming a grid of mismatched photos. duotone: tying stock photos to a brand palette. tilt: a feature or product card. shine: a nudge on one call-to-action image. caption: a portfolio whose photos need a line each. tiles: a home-page hero of two to four photos with a headline each. gallery-open: a pause between sections where one photo deserves the full width.',
+    notFor:
+      'Photos that carry information people must read (a chart, a menu, a price): an effect only ever decorates. More than one or two hover effects on a site, or tilt on a grid of twenty. tiles on a page that already has a moving hero, or for a single photo (that is a plain hero image, which also paints sooner: tiles starts invisible and costs Largest Contentful Paint unless intro={false}). caption for a line people need on a phone without hovering: it shows there, but a visible caption under the photo is plainer.',
+    asks: [
+      { key: 'photos', label: 'The photos to use, at full size', hint: 'At least 1600 pixels across for tiles and gallery-open. Say which one should lead.' },
+      { key: 'slide_words', label: 'For a tiles slideshow, a headline, a line and a button for each photo', hint: 'Short: the headline is about eight words, the line one sentence.' },
+    ],
+    props: [
+      { name: 'effect', type: "'pixelate' | 'zoom' | 'grayscale' | 'duotone' | 'tilt' | 'shine' | 'caption' | 'tiles' | 'gallery-open'", note: 'Required. The first seven are on one image; tiles takes `slides`, gallery-open takes `images`.' },
+      { name: 'src / alt', type: 'string', note: 'Hover effects: the photo and its alt text, both required (alt="" only when the photo is decorative).' },
+      { name: 'width / height', type: 'number', note: 'Intrinsic size, so nothing shifts while it loads. Also the frame’s shape unless `ratio` is set.' },
+      { name: 'href', type: 'string', note: 'Hover effects: makes the frame a link; the effect then also shows on keyboard focus.' },
+      { name: 'caption', type: 'string', note: 'Hover effects: a caption under the photo. Required with effect="caption", where it slides up over the photo.' },
+      { name: 'ratio', type: 'string', default: 'width / height', note: 'Hover effects: the frame’s aspect-ratio, e.g. "4 / 3"; the photo is cropped to it (object-fit: cover).' },
+      { name: 'loading', type: "'lazy' | 'eager'", default: "'lazy'", note: 'Eager only in the first screen. tiles loads its first slide eagerly anyway.' },
+      { name: 'slides', type: '{ src, alt, width?, height?, title?, text?, cta?: { text, href } }[]', note: 'tiles: two or more. The words sit over the photo, centered, on a soft scrim.' },
+      { name: 'interval', type: 'number', default: '10000', note: 'tiles: ms per slide; at least 5000, since the entrance takes 3 s.' },
+      { name: 'autoplay', type: 'boolean', default: 'true', note: 'tiles: advance by itself, with a pause button. False: the arrows only.' },
+      { name: 'intro', type: 'boolean', default: 'true', note: 'tiles: the first slide flies in on load too, as Slider Revolution does. False shows it whole at once (better for LCP).' },
+      { name: 'grid', type: 'number', default: '7', note: 'tiles: tiles per side, 2 to 12.' },
+      { name: 'label', type: 'string', default: "'Slideshow'", note: 'tiles: the slideshow’s accessible name.' },
+      { name: 'headingLevel', type: '1 | 2 | 3', default: '2', note: 'tiles: level of the slide titles. 1 when the slideshow is the page’s hero.' },
+      { name: 'labels', type: '{ prev?, next?, pause?, play?, slide? }', note: 'tiles: button names and the slide name ("{n} of {total}"), for a non-English site.' },
+      { name: 'images', type: '{ src, alt, width?, height? }[]', note: 'gallery-open: three or five photos; the middle one opens.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme or size it (with :global() from a scoped style).' },
+    ],
+    theming: [
+      { name: '--ie-radius', fallback: '0', note: 'Frame corners.' },
+      { name: '--ie-bg', fallback: '#1e283c', note: 'Behind a photo while it loads.' },
+      { name: '--ie-duration', fallback: '0.6s', note: 'Hover transitions (zoom takes twice as long, shine 1.5×).' },
+      { name: '--ie-zoom', fallback: '1.08', note: 'zoom’s scale.' },
+      { name: '--ie-duo-dark', fallback: '#1e283c', note: 'duotone: the color the shadows take.' },
+      { name: '--ie-duo-light', fallback: '#9b85f0', note: 'duotone: the color the highlights take.' },
+      { name: '--ie-tilt-max', fallback: '10', note: 'tilt: the largest lean, in degrees (a number, no unit).' },
+      { name: '--ie-shine', fallback: 'rgb(255 255 255 / 0.45)', note: 'shine: the band of light.' },
+      { name: '--ie-caption-bg', fallback: 'rgb(20 24 40 / 0.86)', note: 'caption: the panel.' },
+      { name: '--ie-caption-fg', fallback: '#fff', note: 'caption: the text. Keep 4.5:1 on the panel over the lightest photo.' },
+      { name: '--ie-focus', fallback: '#5933d8', note: 'Focus ring on a linked frame.' },
+      { name: '--ie-tiles-height', fallback: 'min(80vh, 44rem)', note: 'tiles: the slideshow’s height.' },
+      { name: '--ie-scrim', fallback: 'rgb(10 12 24 / 0.45)', note: 'tiles: the soft tint behind the slide’s words.' },
+      { name: '--ie-fg', fallback: '#fff', note: 'tiles: the slide’s words.' },
+      { name: '--ie-accent', fallback: '#5933d8', note: 'tiles: the slide’s button.' },
+      { name: '--ie-on-accent', fallback: '#fff', note: 'tiles: the button’s text (7.27:1) and the focus ring on the photo.' },
+      { name: '--ie-control-bg', fallback: 'rgb(0 0 0 / 0.45)', note: 'tiles: arrows and pause button.' },
+      { name: '--ie-control-fg', fallback: '#fff', note: 'tiles: their icons.' },
+      { name: '--ie-gallery-height', fallback: 'clamp(16rem, 50vh, 36rem)', note: 'gallery-open: the strip’s height.' },
+      { name: '--ie-gallery-width', fallback: '22cqi', note: 'gallery-open: one photo’s width in the strip, as a share of the strip’s own width.' },
+      { name: '--ie-gallery-gap', fallback: '2cqi', note: 'gallery-open: the gap between photos in the strip.' },
+    ],
+    a11y: [
+      'Without JavaScript every effect is a plain image: the CSS-only effects (zoom, grayscale, duotone, shine, caption) need none at all, and a page of only those ships no script. tiles shows its first slide, still, with its words; gallery-open shows the strip.',
+      'prefers-reduced-motion, tracked live: nothing moves. pixelate, zoom, tilt and shine do nothing; grayscale, duotone and caption change at once; tiles shows each slide whole, never advances by itself and has no pause button; gallery-open stays a strip.',
+      'A linked photo shows on :focus-visible what it shows on hover, and keeps a visible focus ring. An unlinked photo is not focusable, so its effect is hover only and never carries meaning.',
+      'Every photo keeps its alt text. Canvases, tiles and glare are made by the script, aria-hidden and ignore the pointer. pixelate and tilt answer a mouse or pen only, so a tap never flashes.',
+      'caption shows at rest wherever nothing can hover, and on focus inside, so a touch or keyboard visitor never loses the line.',
+      'tiles (WCAG 2.2.2): while it can advance by itself it has a visible 44px pause button named for what it will do, and it also waits on hover, on keyboard focus inside, off screen and in a hidden tab. Slides are groups named “2 of 3”; the ones not showing are inert and hidden from screen readers. No live region: a turn is never announced.',
+    ],
+    usage: `<ImageEffects effect="zoom" src="/images/kitchen.webp" alt="The new kitchen, oak and brass"
+              width={1600} height={1067} ratio="4 / 3" href="/projects/kitchen/" />
+
+<ImageEffects effect="tiles" headingLevel={1} label="Introduction" slides={[
+  { src: '/images/hero-1.webp', alt: '…', width: 2400, height: 1350,
+    title: 'Meeting today’s threats', text: 'With tomorrow’s innovation', cta: { text: 'Contact us', href: '/contact/' } },
+  { src: '/images/hero-2.webp', alt: '…', width: 2400, height: 1350, title: '…' },
+]} />
+
+<ImageEffects effect="gallery-open" images={[side1, side2, centre, side3, side4]} />
+<!-- .site { --ie-accent: var(--brand); --ie-duo-dark: var(--navy); --ie-duo-light: var(--sky); } -->`,
+    license:
+      'Our own code. pixelate, tiles and gallery-open were rebuilt by hand for the MLP Technologies site from what its theme and Slider Revolution did on the page, no code copied. tilt follows the pattern of vanilla-tilt.js (micku7zu, MIT) and caption, zoom and shine that of imagehover.css (ciar4n, MIT); both reimplemented, no code copied. The demo’s scenes are our own drawings.',
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/image-effects/ (demo)' },
+      { site: 'MLP Technologies (pitch, mlptechnologies.gohero.us)', where: 'Home hero (tiles), photo strip (gallery-open), slideshow and marquee photos (pixelate); the site’s own copies predate this element' },
+    ],
+    file: 'src/library/image-effects/ImageEffects.astro',
+    added: '2026-10-30',
+  },
 ];
 
 export const byId = (id: string) => catalog.find((e) => e.id === id);

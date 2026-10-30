@@ -72,6 +72,7 @@ const GOLDEN = {
   icon: 'media',
   'logo-grid': 'media',
   'photo-gallery': 'media',
+  'image-effects': 'media',
 
   countdown: 'conversion',
   'announcement-bar': 'conversion',

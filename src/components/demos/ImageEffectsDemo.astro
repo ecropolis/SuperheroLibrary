@@ -1,0 +1,115 @@
+---
+/**
+ * Demo for `image-effects`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * Every effect with its name. The seven hover effects are links to this demo, so Tab shows
+ * each one as hover does and following one goes nowhere. The scenes are our own drawings
+ * (public/demo/scene-*.svg, generated), never a client's photos. `quiet` (the hub, where every
+ * demo shares a page): the tile slideshow neither flies in on load nor advances by itself.
+ */
+import ImageEffects from '../../library/image-effects/ImageEffects.astro';
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+  quiet?: boolean;
+}
+const { assetBase = '/demo/', quiet = false } = Astro.props;
+const asset = (name: string) => assetBase + name;
+const href = '#image-effects-demo';
+const W = 1600;
+const H = 1000;
+
+const hover = [
+  { effect: 'pixelate', scene: 'city', alt: 'Drawing of a city skyline at night, lit windows', note: 'Breaks into blocks and resolves. For a portfolio or gallery that wants one playful beat.' },
+  { effect: 'zoom', scene: 'forest', alt: 'Drawing of layered pine forest in morning light', note: 'A slow push in. The quiet default for cards that link somewhere.' },
+  { effect: 'grayscale', scene: 'harbor', alt: 'Drawing of sailboats in a harbor at dusk', note: 'Color on hover. Calms a grid of mismatched photos.' },
+  { effect: 'duotone', scene: 'peaks', alt: 'Drawing of snowy peaks above green hills', note: 'Brand colors at rest, the photo on hover. Ties stock photos to a palette.' },
+  { effect: 'tilt', scene: 'lavender', alt: 'Drawing of a lavender field and a farmhouse at sunset', note: 'Leans toward the pointer, with glare. For a feature or product card, not a grid of twenty.' },
+  { effect: 'shine', scene: 'dunes', alt: 'Drawing of desert dunes and a camel caravan', note: 'A band of light sweeps across once. A nudge on a call-to-action image.' },
+  { effect: 'caption', scene: 'forest', alt: 'Drawing of layered pine forest in morning light', caption: 'Pine Ridge trail, 4.2 miles', note: 'The caption slides up. Always shown on touch screens.' },
+] as const;
+
+const slides = [
+  { src: asset('scene-peaks.svg'), alt: 'Drawing of snowy peaks above green hills', width: W, height: H, title: 'Built for the long climb', text: 'Each slide arrives as a grid of tiles.', cta: { text: 'See the routes', href } },
+  { src: asset('scene-harbor.svg'), alt: 'Drawing of sailboats in a harbor at dusk', width: W, height: H, title: 'Home before dark', text: 'Ten seconds a slide, with a pause button.', cta: { text: 'Plan a sail', href } },
+  { src: asset('scene-city.svg'), alt: 'Drawing of a city skyline at night, lit windows', width: W, height: H, title: 'The city after hours', text: 'The title skews in, the words fade, the button rises.' },
+];
+const strip = ['dunes', 'forest', 'harbor', 'peaks', 'lavender'].map((s) => ({ src: asset(`scene-${s}.svg`), alt: '', width: W, height: H }));
+strip[2] = { ...strip[2], alt: 'Drawing of sailboats in a harbor at dusk' };
+---
+<div class="demo-ie" id="image-effects-demo">
+  <h3 class="demo-ie__h">On hover</h3>
+  <ul class="demo-ie__grid" role="list">
+    {
+      hover.map((h) => (
+        <li class="demo-ie__cell">
+          <ImageEffects
+            effect={h.effect}
+            src={asset(`scene-${h.scene}.svg`)}
+            alt={h.alt}
+            width={W}
+            height={H}
+            ratio="4 / 3"
+            href={href}
+            caption={'caption' in h ? h.caption : undefined}
+          />
+          <code class="demo-ie__name">effect="{h.effect}"</code>
+          <p class="demo-ie__note">{h.note}</p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h3 class="demo-ie__h">tiles</h3>
+  <p class="demo-ie__note">A hero slideshow whose photo flies in as a 7×7 grid of tiles. Use the arrows{quiet ? '' : ', or wait ten seconds'}.</p>
+  <ImageEffects effect="tiles" slides={slides} label="Demo slideshow" headingLevel={3} autoplay={!quiet} intro={!quiet} class="demo-ie__tiles" />
+
+  <h3 class="demo-ie__h">gallery-open</h3>
+  <p class="demo-ie__note">Scroll: as the strip rises past the middle of the screen, the middle photo opens to the full width and the others slide away.</p>
+  <ImageEffects effect="gallery-open" images={strip} class="demo-ie__gallery" />
+</div>
+<style>
+  .demo-ie {
+    --ie-radius: var(--radius, 14px);
+    --ie-bg: var(--navy, #1e283c);
+    --ie-focus: var(--purple, #5933d8);
+    --ie-accent: var(--purple, #5933d8);
+    --ie-duo-dark: var(--navy, #1e283c);
+    --ie-duo-light: #9b85f0;
+  }
+  .demo-ie__h {
+    margin: 2rem 0 0.6rem;
+    font-size: 1.1rem;
+  }
+  .demo-ie__h:first-child {
+    margin-top: 0;
+  }
+  .demo-ie__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .demo-ie__cell {
+    min-width: 0;
+  }
+  .demo-ie__name {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+  }
+  .demo-ie__note {
+    margin: 0.3rem 0 0.8rem;
+    font-size: 0.92rem;
+    color: var(--ink, #1e283c);
+  }
+  .demo-ie :global(.demo-ie__tiles) {
+    --ie-tiles-height: clamp(20rem, 60vh, 32rem);
+  }
+  .demo-ie :global(.demo-ie__gallery) {
+    --ie-gallery-height: clamp(14rem, 45vh, 26rem);
+  }
+</style>

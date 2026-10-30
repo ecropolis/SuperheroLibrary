@@ -10,7 +10,8 @@
  * many on a page: nothing may open, move, play sound or steal focus by itself. A demo without
  * automatic behaviour ignores it. This gallery's index and superherotech.ai's /elements/ hub pass
  * it; an element's own page does not, since there the automatic behaviour is the point. Today
- * only ModalDemo acts on it (its delay/scroll and exit-intent modals open on a press instead).
+ * ModalDemo acts on it (its delay/scroll and exit-intent modals open on a press instead), and
+ * ImageEffectsDemo (its tile slideshow neither flies in on load nor advances by itself).
  *
  * `npm run check` reads the `'<id>': Component` lines below, so keep one entry per line.
  */
@@ -65,6 +66,7 @@ import LogoGridDemo from './LogoGridDemo.astro';
 import PhotoGalleryDemo from './PhotoGalleryDemo.astro';
 import SeparatorDemo from './SeparatorDemo.astro';
 import CallToActionDemo from './CallToActionDemo.astro';
+import ImageEffectsDemo from './ImageEffectsDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -122,4 +124,5 @@ export const demos: Record<string, AstroComponent> = {
   'photo-gallery': PhotoGalleryDemo,
   separator: SeparatorDemo,
   'call-to-action': CallToActionDemo,
+  'image-effects': ImageEffectsDemo,
 };
