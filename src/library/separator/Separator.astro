@@ -1,0 +1,253 @@
+---
+/**
+ * Separator — a line between sections, plain or with a short text or an icon in the middle:
+ * solid, dashed, dotted or double, full width or a short accent bar, aligned start, centre or
+ * end. Replaces UABB's Advanced Separator, Beaver Builder's Separator, Elementor's Divider and
+ * the <hr> styled by a theme. It is HTML and CSS; the only script is the optional `reveal`.
+ *
+ * Semantics. A line with nothing in it is decoration: `aria-hidden`, so a screen reader does
+ * not hear "separator" between every block (UABB renders empty divs; Elementor a bare <hr>).
+ * Pass `semantic` for a real thematic break (`<hr>`), as between two parts of an article. With
+ * `text`, the text is real text and the lines are decoration; `as="h2"` makes it the heading
+ * of what follows ("Our services"), so the outline keeps it. An `icon` is decorative unless it
+ * has `iconLabel`.
+ *
+ * `reveal`. The line grows from the middle (or from its aligned edge) the first time it
+ * scrolls into view, as the old Beaver Builder "slide in" did. Only the script hides it, so
+ * without JavaScript, under prefers-reduced-motion (tracked live) and in print it is simply
+ * there. One script per page.
+ *
+ * Theming (each has a fallback):
+ *   --sep-color      line, icon and text colour          (#c9cedb lines; text inherits)
+ *   --sep-accent     the text / icon colour              (currentColor)
+ *   --sep-thickness  line thickness                      (1px; 3px for `width` shorter than 100%)
+ *   --sep-gap        space between line and text / icon  (1rem)
+ *   --sep-space      margin above and below              (2rem)
+ *   --sep-icon-size  icon size                           (1.5rem)
+ *   --sep-duration   reveal                              (700ms)
+ */
+interface Props {
+  /** Short text in the middle ("or", "Our services"). Real text. */
+  text?: string;
+  /** Inline SVG markup in the middle. Decorative unless `iconLabel`. Ignored with `text`. */
+  icon?: string;
+  iconLabel?: string;
+  /** The line's style. */
+  line?: 'solid' | 'dashed' | 'dotted' | 'double';
+  /** Any CSS width for the whole separator: '100%' (default), '6rem' for an accent bar. */
+  width?: string;
+  align?: 'start' | 'center' | 'end';
+  /** Element for the text: a heading keeps it in the outline. Default 'span'. */
+  as?: 'span' | 'p' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  /** A plain line as a real thematic break (<hr>), not decoration. */
+  semantic?: boolean;
+  /** Grow into view once, the first time it scrolls into view. */
+  reveal?: boolean;
+  class?: string;
+}
+const {
+  text,
+  icon,
+  iconLabel,
+  line = 'solid',
+  width = '100%',
+  align = 'center',
+  as: Tag = 'span',
+  semantic = false,
+  reveal = false,
+  class: className,
+} = Astro.props;
+if (!['solid', 'dashed', 'dotted', 'double'].includes(line)) throw new Error(`Separator: \`line\` is solid, dashed, dotted or double; got "${line}".`);
+if (!['start', 'center', 'end'].includes(align)) throw new Error(`Separator: \`align\` is start, center or end; got "${align}".`);
+const middle = text ? 'text' : icon ? 'icon' : null;
+const bar = width !== '100%' && !middle;
+const style = `--sep-w:${width}`;
+const classes = ['sep', `sep--${line}`, `sep--${align}`, { 'sep--bar': bar, 'sep--mid': !!middle }, className];
+const locals = Astro.locals as Record<string, unknown>;
+const firstReveal = reveal && !locals.__separatorScript;
+if (reveal) locals.__separatorScript = true;
+---
+
+{
+  middle ? (
+    <div class:list={classes} style={style} data-sep-reveal={reveal ? '' : undefined}>
+      <span class="sep__line" aria-hidden="true" />
+      {middle === 'text' ? (
+        <Tag class="sep__text">{text}</Tag>
+      ) : iconLabel ? (
+        <span class="sep__icon" role="img" aria-label={iconLabel} set:html={icon} />
+      ) : (
+        <span class="sep__icon" aria-hidden="true" set:html={icon} />
+      )}
+      <span class="sep__line" aria-hidden="true" />
+    </div>
+  ) : semantic ? (
+    <hr class:list={classes} style={style} data-sep-reveal={reveal ? '' : undefined} />
+  ) : (
+    <div class:list={classes} style={style} aria-hidden="true" data-sep-reveal={reveal ? '' : undefined}>
+      <span class="sep__line" />
+    </div>
+  )
+}
+{
+  reveal &&
+    (firstReveal ? (
+      <script is:inline>
+        (() => {
+          const boot = (window.__superheroSeparator ||= (() => {
+            const still = matchMedia('(prefers-reduced-motion: reduce)');
+            const io =
+              'IntersectionObserver' in window &&
+              new IntersectionObserver(
+                (entries) => {
+                  for (const e of entries) {
+                    if (!e.isIntersecting) continue;
+                    e.target.setAttribute('data-sep-in', '');
+                    io.unobserve(e.target);
+                  }
+                },
+                { threshold: 0.6 },
+              );
+            return () => {
+              if (!io || still.matches) return;
+              document.querySelectorAll('[data-sep-reveal]:not([data-sep-armed])').forEach((el) => {
+                el.setAttribute('data-sep-armed', '');
+                io.observe(el);
+              });
+            };
+          })());
+          boot();
+          // If the visitor turns reduced motion on, show everything at once.
+          matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+            if (e.matches) document.querySelectorAll('[data-sep-armed]').forEach((el) => el.setAttribute('data-sep-in', ''));
+          });
+        })();
+      </script>
+    ) : (
+      <script is:inline>window.__superheroSeparator && window.__superheroSeparator();</script>
+    ))
+}
+
+<style>
+  .sep {
+    --sep-t: var(--sep-thickness, 1px);
+    display: flex;
+    align-items: center;
+    gap: var(--sep-gap, 1rem);
+    width: min(100%, var(--sep-w, 100%));
+    margin-block: var(--sep-space, 2rem);
+    margin-inline: auto;
+    color: var(--sep-accent, currentColor);
+  }
+  .sep--start {
+    margin-inline-start: 0;
+  }
+  .sep--end {
+    margin-inline-end: 0;
+  }
+  .sep--bar {
+    --sep-t: var(--sep-thickness, 3px);
+  }
+  hr.sep {
+    height: 0;
+    border: 0;
+    border-top: var(--sep-t) solid var(--sep-color, #c9cedb);
+  }
+  hr.sep--dashed {
+    border-top-style: dashed;
+  }
+  hr.sep--dotted {
+    border-top-style: dotted;
+  }
+  hr.sep--double {
+    border-top-style: double;
+    border-top-width: calc(var(--sep-t) * 3 + 2px);
+  }
+  .sep__line {
+    flex: 1 1 0;
+    min-width: 1.5rem;
+    border-top: var(--sep-t) solid var(--sep-color, #c9cedb);
+    transform-origin: center;
+  }
+  .sep--dashed .sep__line {
+    border-top-style: dashed;
+  }
+  .sep--dotted .sep__line {
+    border-top-style: dotted;
+  }
+  .sep--double .sep__line {
+    border-top-style: double;
+    border-top-width: calc(var(--sep-t) * 3 + 2px);
+  }
+  /* With something in the middle, start / end alignment puts it near that edge. */
+  .sep--mid.sep--start .sep__line:first-child,
+  .sep--mid.sep--end .sep__line:last-child {
+    flex: 0 0 1.5rem;
+  }
+  .sep__text {
+    flex: 0 1 auto;
+    margin: 0;
+    color: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+  :is(h2, h3, h4, h5, h6).sep__text {
+    font-size: 1.25rem;
+  }
+  .sep__icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    line-height: 0;
+  }
+  .sep__icon :global(svg) {
+    width: var(--sep-icon-size, 1.5rem);
+    height: var(--sep-icon-size, 1.5rem);
+  }
+
+  /* Reveal: armed (hidden) only by the script, shown once in view. */
+  @media (prefers-reduced-motion: no-preference) {
+    .sep[data-sep-armed] .sep__line,
+    hr.sep[data-sep-armed] {
+      transform: scaleX(0);
+      transition: transform var(--sep-duration, 700ms) cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .sep--start[data-sep-armed] .sep__line,
+    hr.sep--start[data-sep-armed] {
+      transform-origin: left;
+    }
+    .sep--end[data-sep-armed] .sep__line,
+    hr.sep--end[data-sep-armed] {
+      transform-origin: right;
+    }
+    .sep[data-sep-armed] :is(.sep__text, .sep__icon) {
+      opacity: 0;
+      transition: opacity var(--sep-duration, 700ms) ease;
+    }
+    .sep[data-sep-in] .sep__line,
+    hr.sep[data-sep-in] {
+      transform: none;
+    }
+    .sep[data-sep-in] :is(.sep__text, .sep__icon) {
+      opacity: 1;
+    }
+  }
+  @media print {
+    .sep .sep__line,
+    hr.sep {
+      transform: none !important;
+    }
+    .sep :is(.sep__text, .sep__icon) {
+      opacity: 1 !important;
+    }
+  }
+  @media (forced-colors: active) {
+    .sep__line,
+    hr.sep {
+      border-top-color: CanvasText;
+    }
+  }
+</style>

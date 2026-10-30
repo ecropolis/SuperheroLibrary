@@ -60,6 +60,11 @@ import StickerDemo from './StickerDemo.astro';
 import CartDemo from './CartDemo.astro';
 import ProductListDemo from './ProductListDemo.astro';
 import ProductPageDemo from './ProductPageDemo.astro';
+import CounterDemo from './CounterDemo.astro';
+import LogoGridDemo from './LogoGridDemo.astro';
+import PhotoGalleryDemo from './PhotoGalleryDemo.astro';
+import SeparatorDemo from './SeparatorDemo.astro';
+import CallToActionDemo from './CallToActionDemo.astro';
 
 // Astro components have no exported public type; this is the shape both callers need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,4 +117,9 @@ export const demos: Record<string, AstroComponent> = {
   cart: CartDemo,
   'product-list': ProductListDemo,
   'product-page': ProductPageDemo,
+  counter: CounterDemo,
+  'logo-grid': LogoGridDemo,
+  'photo-gallery': PhotoGalleryDemo,
+  separator: SeparatorDemo,
+  'call-to-action': CallToActionDemo,
 };

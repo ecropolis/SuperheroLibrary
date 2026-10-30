@@ -22,6 +22,12 @@
  * sliding; the panels crossfade. Without JavaScript the button is never shown and both panels
  * render, the back below the front, link included. Keep links off the front: it is the button.
  *
+ * Variants. `variant="card"` (default) puts the image, if any, across the top. `variant="image"`
+ * makes the photo the whole card, the title over a scrim at its foot, and the back a tint that
+ * slides in over the photo: UABB's Interactive Banner. `shape="circle"` makes the card a circle
+ * (with JavaScript; without it the panels stack as rounded boxes): UABB's iHover. Keep a
+ * circle's back to about 20 words; it clips what does not fit.
+ *
  * Sizing. Both panels share one grid cell, so the card is as tall as the taller panel and
  * neither is cut off; there is no fixed height. The host's grid sets the width.
  *
@@ -34,6 +40,8 @@
  *   --slb-radius 14px  --slb-padding 1.75rem 1.5rem  --slb-shadow (box-shadow)  --slb-min-height 14rem
  *   --slb-title-size 1.2rem  --slb-duration 450ms  --slb-easing cubic-bezier(0.2, 0.7, 0.2, 1)
  *   --slb-fade 200ms  --slb-focus var(--slb-accent)
+ *   --slb-image-fg #fff  --slb-scrim (foot of an image card)  --slb-image-back-bg rgb(20 24 40 / 0.86)
+ *   --slb-image-height 16rem (an image card's floor)
  */
 interface Props {
   title?: string;
@@ -55,6 +63,10 @@ interface Props {
   /** ms. Overrides --slb-duration. */
   duration?: number;
   headingLevel?: 2 | 3 | 4 | 5 | 6;
+  /** 'card' (default): image across the top. 'image': the photo is the card (Interactive Banner). */
+  variant?: 'card' | 'image';
+  /** 'circle': a round card, the iHover look. */
+  shape?: 'rect' | 'circle';
   /** Accessible name of the card's button. Default: `title`, else the front's first heading. */
   label?: string;
   class?: string;
@@ -72,6 +84,8 @@ const {
   trigger = 'both',
   duration,
   headingLevel = 3,
+  variant = 'card',
+  shape = 'rect',
   label,
   class: className,
 } = Astro.props;
@@ -80,6 +94,9 @@ const who = `SlideBox${title ? ` "${title}"` : ''}`;
 if (image && typeof imageAlt !== 'string') {
   throw new Error(`${who}: \`image\` needs \`imageAlt\` — describe the image, or pass imageAlt="" if it is decorative on purpose.`);
 }
+if (!['card', 'image'].includes(variant)) throw new Error(`${who}: \`variant\` is card or image; got "${variant}".`);
+if (!['rect', 'circle'].includes(shape)) throw new Error(`${who}: \`shape\` is rect or circle; got "${shape}".`);
+if (variant === 'image' && !image) throw new Error(`${who}: \`variant="image"\` needs an \`image\`; the photo is the card.`);
 if (!['up', 'down', 'left', 'right'].includes(direction)) throw new Error(`${who}: \`direction\` is up, down, left or right; got "${direction}".`);
 
 const uid = 'slb-' + Math.random().toString(36).slice(2, 8);
@@ -93,7 +110,7 @@ locals.__slideBoxScript = true;
 ---
 
 <div
-  class:list={['slb', className]}
+  class:list={['slb', `slb--${variant}`, { 'slb--circle': shape === 'circle' }, className]}
   data-slb
   data-direction={direction}
   data-trigger={trigger}
@@ -450,6 +467,83 @@ locals.__slideBoxScript = true;
     bottom: auto;
     color: inherit;
     rotate: 45deg;
+  }
+
+  /* variant="image": the photo is the card; the back is a tint over it. */
+  .slb--image .slb__front {
+    min-height: var(--slb-image-height, 16rem);
+    align-content: end;
+    border: 0;
+    background: var(--slb-back-bg, #1e283c);
+    color: var(--slb-image-fg, #fff);
+  }
+  .slb--image .slb__front .slb__image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+  }
+  .slb--image .slb__front .slb__body {
+    position: relative;
+    padding-top: 4rem;
+    background: var(--slb-scrim, linear-gradient(to top, rgb(20 24 40 / 0.85), rgb(20 24 40 / 0.55) 60%, transparent));
+  }
+  .slb--image .slb__front .slb__hint {
+    color: var(--slb-image-fg, #fff);
+  }
+  .slb--image .slb__back {
+    background: var(--slb-image-back-bg, rgb(20 24 40 / 0.86));
+    color: var(--slb-image-fg, #fff);
+  }
+  .slb--image .slb__cta {
+    --slb-back-bg: #1e283c;
+  }
+
+  /* shape="circle": a round card (the iHover look), once the script has made it one cell. */
+  .slb--circle[data-ready],
+  .slb--circle[data-ready] .slb__card {
+    border-radius: 50%;
+  }
+  .slb--circle[data-ready] .slb__card {
+    aspect-ratio: 1;
+  }
+  .slb--circle[data-ready] .slb__panel {
+    min-height: 0;
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+  }
+  .slb--circle[data-ready] .slb__front {
+    border-radius: 50%;
+  }
+  .slb--circle[data-ready] .slb__panel .slb__body,
+  .slb--circle[data-ready].slb--image .slb__front .slb__body {
+    justify-items: center;
+    padding: 16% 14%;
+    background: none;
+  }
+  .slb--circle[data-ready].slb--image .slb__front {
+    align-content: center;
+  }
+  .slb--circle[data-ready].slb--image .slb__front::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgb(20 24 40 / 0.35);
+  }
+  .slb--circle[data-ready] .slb__front .slb__body {
+    position: relative;
+    z-index: 1;
+  }
+  .slb--circle[data-ready] .slb__hint {
+    right: calc(50% - 1rem);
+    bottom: 7%;
+    z-index: 1;
+  }
+  .slb--circle[data-ready] .slb__hint--close {
+    top: 7%;
+    bottom: auto;
   }
 
   /* No sliding: the panels crossfade. */

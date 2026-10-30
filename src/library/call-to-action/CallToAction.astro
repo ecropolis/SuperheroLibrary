@@ -1,0 +1,200 @@
+---
+/**
+ * CallToAction — a band that asks for the next step: a heading, a line or two, and one or two
+ * buttons (Get a quote, Call us). Stacked and centred, or inline with the text at the start and
+ * the buttons at the end. Replaces UABB's Call to Action, Beaver Builder's Call to Action
+ * ("cta"), Elementor's Call to Action and PowerPack's CTA box. HTML and CSS only.
+ *
+ * Semantics. A <section> named by its heading (a region landmark a screen reader can jump to),
+ * or a plain <div> with `landmark={false}` when a page has several. The heading is at
+ * `headingLevel` (2): UABB renders the title as an <h1>, which gives a page a second h1.
+ * Buttons are real links; a `tel:` href is a phone link. The first is the primary; at most two,
+ * because three choices is no call.
+ *
+ * Layout. `layout="inline"` puts the buttons beside the text from 40rem of the band's OWN
+ * width (a container query), so a CTA in a sidebar stacks by itself; below that, and always
+ * for `stacked`, the buttons sit under the text. A full-width band is the host's: put it in a
+ * full-bleed wrapper, or use parallax-band for one over a photo.
+ *
+ * Theming (each has a fallback; the three tones' fallbacks clear 4.5:1 for text and buttons):
+ *   --cta-accent-bg / --cta-accent-fg   tone="accent"    (#5933d8 / #fff, 7.27:1)
+ *   --cta-dark-bg   / --cta-dark-fg     tone="dark"      (#1e283c / #fff, 14.75:1)
+ *   --cta-light-bg  / --cta-light-fg    tone="light"     (#f4f1fe / #1e283c, 13.55:1)
+ *   --cta-btn-bg / --cta-btn-fg         primary button   (the tone's fg / the tone's bg)
+ *   --cta-radius --cta-padding --cta-gap --cta-max (text measure) --cta-title-size --cta-focus
+ */
+interface Button {
+  text: string;
+  href: string;
+}
+interface Props {
+  title: string;
+  /** A line or two under the title. Plain text; or use the default slot for links. */
+  text?: string;
+  /** One or two; the first is the primary. */
+  buttons?: Button[];
+  layout?: 'stacked' | 'inline';
+  /** For `stacked`: centre (default) or start. */
+  align?: 'center' | 'start';
+  tone?: 'accent' | 'dark' | 'light';
+  headingLevel?: 2 | 3 | 4;
+  /** A <section> region named by the title. Turn off when a page has several. */
+  landmark?: boolean;
+  class?: string;
+}
+const {
+  title,
+  text,
+  buttons = [],
+  layout = 'stacked',
+  align = 'center',
+  tone = 'accent',
+  headingLevel = 2,
+  landmark = true,
+  class: className,
+} = Astro.props;
+if (!title || !title.trim()) throw new Error('CallToAction: `title` is required; it is the band’s heading and its name.');
+if (buttons.length > 2) throw new Error(`CallToAction "${title}": at most two buttons; got ${buttons.length}. Three choices is not a call to action.`);
+for (const b of buttons) {
+  if (!b?.text || !b?.href) throw new Error(`CallToAction "${title}": every button needs \`text\` and \`href\`.`);
+}
+if (!['stacked', 'inline'].includes(layout)) throw new Error(`CallToAction "${title}": \`layout\` is stacked or inline; got "${layout}".`);
+const uid = 'cta-' + Math.random().toString(36).slice(2, 8);
+const H = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const Tag = landmark ? 'section' : 'div';
+const hasSlot = Astro.slots.has('default');
+---
+
+<Tag
+  class:list={['cta', `cta--${layout}`, `cta--${align}`, `cta--${tone}`, className]}
+  aria-labelledby={landmark ? `${uid}-t` : undefined}
+>
+  <div class="cta__inner">
+    <div class="cta__text">
+      <H class="cta__title" id={`${uid}-t`}>{title}</H>
+      {hasSlot ? <div class="cta__body"><slot /></div> : text && <p class="cta__body">{text}</p>}
+    </div>
+    {
+      buttons.length > 0 && (
+        <div class="cta__actions">
+          {buttons.map((b, i) => (
+            <a class:list={['cta__btn', i === 0 ? 'cta__btn--primary' : 'cta__btn--secondary']} href={b.href}>
+              {b.text}
+            </a>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</Tag>
+
+<style>
+  .cta {
+    --cta-bg: var(--cta-accent-bg, #5933d8);
+    --cta-fg: var(--cta-accent-fg, #fff);
+    container-type: inline-size;
+    border-radius: var(--cta-radius, 16px);
+    background: var(--cta-bg);
+    color: var(--cta-fg);
+  }
+  .cta--dark {
+    --cta-bg: var(--cta-dark-bg, #1e283c);
+    --cta-fg: var(--cta-dark-fg, #fff);
+  }
+  .cta--light {
+    --cta-bg: var(--cta-light-bg, #f4f1fe);
+    --cta-fg: var(--cta-light-fg, #1e283c);
+  }
+  .cta__inner {
+    display: grid;
+    gap: var(--cta-gap, 1.25rem 2rem);
+    padding: var(--cta-padding, clamp(1.75rem, 5cqi, 3rem) clamp(1.25rem, 5cqi, 3rem));
+  }
+  .cta--center .cta__inner {
+    justify-items: center;
+    text-align: center;
+  }
+  .cta__text {
+    max-width: var(--cta-max, 40rem);
+  }
+  .cta__title {
+    margin: 0;
+    color: inherit;
+    font-size: var(--cta-title-size, clamp(1.4rem, 1rem + 2.5cqi, 2rem));
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  .cta__body {
+    margin: 0.6rem 0 0;
+    line-height: 1.55;
+  }
+  .cta__body :global(p) {
+    margin: 0 0 0.5rem;
+  }
+  .cta__body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .cta__body :global(a) {
+    color: inherit;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  .cta__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .cta--center .cta__actions {
+    justify-content: center;
+  }
+  .cta__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.6rem 1.5rem;
+    border: 2px solid var(--cta-btn-bg, var(--cta-fg));
+    border-radius: 999px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+  }
+  .cta__btn--primary {
+    background: var(--cta-btn-bg, var(--cta-fg));
+    color: var(--cta-btn-fg, var(--cta-bg));
+  }
+  .cta__btn--secondary {
+    background: transparent;
+    color: inherit;
+  }
+  .cta__btn:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .cta__btn:focus-visible,
+  .cta__body :global(a:focus-visible) {
+    outline: 3px solid var(--cta-focus, var(--cta-fg));
+    outline-offset: 3px;
+  }
+  /* Inline from 40rem of its own width: text at the start, buttons at the end. */
+  @container (min-width: 40rem) {
+    .cta--inline .cta__inner {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      justify-items: start;
+      text-align: start;
+    }
+    .cta--inline .cta__actions {
+      justify-content: flex-end;
+    }
+  }
+  @media (forced-colors: active) {
+    .cta {
+      border: 1px solid CanvasText;
+    }
+    .cta__btn {
+      border-color: LinkText;
+    }
+  }
+</style>

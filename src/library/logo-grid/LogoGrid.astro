@@ -1,0 +1,350 @@
+---
+/**
+ * LogoGrid — the logos of clients, partners, certifications or press, in an even grid (each
+ * logo fitted into the same box, so a wide wordmark and a square badge read as equals), or
+ * scrolling past in a slow marquee with a pause button. Optionally grey until pointed at.
+ * Replaces PowerPack's Logo Grid and Logos Carousel, UABB's and Elementor's logo carousels,
+ * and "client logos" sliders.
+ *
+ * Semantics. A list (<ul role="list">) named by `label` ("Some of the clients we have flown
+ * for"). Each logo is an <img> whose alt is the organisation's name, required: PowerPack sets
+ * the image URL as alt, so a screen reader reads a file path. A logo with `href` is a link
+ * named by that alt. Links open in the same tab unless `newTab`.
+ *
+ * Marquee (layout="marquee"). The list scrolls sideways on a loop, at `speed` px/s. The script
+ * makes the second copy that closes the loop (inert and aria-hidden); the HTML holds one list.
+ * WCAG 2.2.2: a visible Pause / Play button sits before the strip, named for what it will do;
+ * hover and keyboard focus inside hold it; it waits off screen and in a hidden tab. Under
+ * prefers-reduced-motion (tracked live), without JavaScript, or when the logos fit the width
+ * anyway, it is the grid. Every logo stays in the tab order and focusing one holds the strip.
+ *
+ * Theming (each has a fallback):
+ *   --lg-height     logo box height                          (3.5rem)
+ *   --lg-min        grid cell minimum width                  (9rem)
+ *   --lg-gap        between logos                            (2rem 2.5rem)
+ *   --lg-tile-bg    behind each logo                         (transparent)
+ *   --lg-tile-pad / --lg-radius / --lg-border                (0.75rem / 10px / none)
+ *   --lg-rest-opacity  a grey logo's opacity                 (0.7)
+ *   --lg-focus      focus ring                               (#5933d8)
+ *   --lg-control-bg / --lg-control-fg / --lg-control-border  the pause button
+ *   --lg-fade       edge fade width in the marquee           (3rem)
+ */
+export interface Logo {
+  src: string;
+  /** The organisation's name. Required: it is what a screen reader says. */
+  alt: string;
+  href?: string;
+  /** Intrinsic size, so the box is reserved before the image loads. */
+  width?: number;
+  height?: number;
+}
+interface Props {
+  logos: Logo[];
+  /** Names the list. Write what the logos are: "Clients", "As featured in". */
+  label: string;
+  layout?: 'grid' | 'marquee';
+  /** Grid: fixed columns per breakpoint (md ≥ 48rem, lg ≥ 64rem). Default: as many as fit. */
+  columns?: { base?: number; md?: number; lg?: number };
+  /** Grey and dimmed until hovered or focused. */
+  grayscale?: boolean;
+  /** Marquee speed, px per second. */
+  speed?: number;
+  newTab?: boolean;
+  pauseLabel?: string;
+  playLabel?: string;
+  class?: string;
+}
+const {
+  logos,
+  label,
+  layout = 'grid',
+  columns,
+  grayscale = false,
+  speed = 40,
+  newTab = false,
+  pauseLabel = 'Pause the logos',
+  playLabel = 'Play the logos',
+  class: className,
+} = Astro.props;
+if (!label || !label.trim()) throw new Error('LogoGrid: `label` is required; it names the list ("Clients", "As featured in").');
+if (!Array.isArray(logos) || logos.length === 0) throw new Error(`LogoGrid "${label}": \`logos\` is empty.`);
+for (const [i, l] of logos.entries()) {
+  if (!l?.src) throw new Error(`LogoGrid "${label}": logo #${i + 1} has no \`src\`.`);
+  if (typeof l.alt !== 'string' || !l.alt.trim() || /^(https?:)?\/\/|\.(png|jpe?g|webp|svg|gif|avif)$/i.test(l.alt.trim())) {
+    throw new Error(`LogoGrid "${label}": logo #${i + 1} (${l.src}) needs \`alt\`, the organisation's name, not a file name or URL.`);
+  }
+}
+if (!['grid', 'marquee'].includes(layout)) throw new Error(`LogoGrid "${label}": \`layout\` is grid or marquee; got "${layout}".`);
+const cols = columns ? { b: columns.base, m: columns.md ?? columns.base, l: columns.lg ?? columns.md ?? columns.base } : null;
+const colStyle = cols
+  ? [cols.b && `--lg-cols-b:${cols.b}`, cols.m && `--lg-cols-m:${cols.m}`, cols.l && `--lg-cols-l:${cols.l}`].filter(Boolean).join(';')
+  : undefined;
+const uid = 'lg-' + Math.random().toString(36).slice(2, 8);
+const target = newTab ? { target: '_blank', rel: 'noopener' } : {};
+---
+
+<div
+  class:list={['lg', `lg--${layout}`, { 'lg--grey': grayscale, 'lg--cols': !!cols }, className]}
+  style={colStyle}
+  data-lg={layout}
+  data-speed={speed}
+>
+  {
+    layout === 'marquee' && (
+      <button class="lg__toggle" type="button" aria-controls={`${uid}-list`} hidden data-lg-toggle data-pause={pauseLabel} data-play={playLabel}>
+        <span class="lg__icon" aria-hidden="true" />
+        <span class="lg__sr">{pauseLabel}</span>
+      </button>
+    )
+  }
+  <div class="lg__viewport" data-lg-viewport>
+    <div class="lg__track" data-lg-track>
+      <ul class="lg__list" role="list" aria-label={label} id={`${uid}-list`}>
+        {
+          logos.map((l) => {
+            const img = <img class="lg__img" src={l.src} alt={l.alt} width={l.width} height={l.height} loading="lazy" decoding="async" />;
+            return (
+              <li class="lg__item">
+                {l.href ? (
+                  <a class="lg__tile" href={l.href} {...target}>
+                    {img}
+                  </a>
+                ) : (
+                  <span class="lg__tile">{img}</span>
+                )}
+              </li>
+            );
+          })
+        }
+      </ul>
+    </div>
+  </div>
+</div>
+{
+  layout === 'marquee' && (
+    <script is:inline>
+      (() => {
+        const root = document.currentScript && document.currentScript.previousElementSibling;
+        if (!root || !root.matches('[data-lg="marquee"]') || root.hasAttribute('data-ready')) return;
+        root.setAttribute('data-ready', '');
+        const viewport = root.querySelector('[data-lg-viewport]');
+        const track = root.querySelector('[data-lg-track]');
+        const list = track.querySelector('ul');
+        const toggle = root.querySelector('[data-lg-toggle]');
+        const word = toggle.querySelector('.lg__sr');
+        const still = matchMedia('(prefers-reduced-motion: reduce)');
+        const speed = Math.max(5, Number(root.dataset.speed) || 40);
+        let copy = null;
+        let paused = false; // the visitor pressed Pause
+        let hold = 0; // hover / focus inside
+        let visible = true;
+
+        const state = () => {
+          const running = !!copy && !paused && hold === 0 && visible && !document.hidden;
+          root.toggleAttribute('data-running', running);
+        };
+        const setup = () => {
+          // Fits already, or the visitor asked for stillness: the grid, no copy, no button.
+          // Measured as one row (the moving layout), whatever is showing now.
+          root.setAttribute('data-moving', '');
+          const fits = list.offsetWidth <= viewport.clientWidth + 1;
+          const want = !still.matches && !fits;
+          if (want && !copy) {
+            copy = list.cloneNode(true);
+            copy.removeAttribute('id');
+            copy.removeAttribute('aria-label');
+            copy.setAttribute('aria-hidden', 'true');
+            copy.inert = true;
+            track.append(copy);
+          } else if (!want && copy) {
+            copy.remove();
+            copy = null;
+          }
+          root.toggleAttribute('data-moving', !!copy);
+          toggle.hidden = !copy;
+          if (copy) root.style.setProperty('--lg-duration', `${list.offsetWidth / speed}s`);
+          state();
+        };
+        toggle.addEventListener('click', () => {
+          paused = !paused;
+          word.textContent = paused ? toggle.dataset.play : toggle.dataset.pause;
+          root.toggleAttribute('data-paused', paused);
+          state();
+        });
+        const add = (n) => () => {
+          hold = Math.max(0, hold + n);
+          state();
+        };
+        viewport.addEventListener('pointerenter', add(1));
+        viewport.addEventListener('pointerleave', add(-1));
+        viewport.addEventListener('focusin', add(1));
+        viewport.addEventListener('focusout', add(-1));
+        document.addEventListener('visibilitychange', state);
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(([e]) => {
+            visible = e.isIntersecting;
+            state();
+          }).observe(root);
+        }
+        still.addEventListener('change', setup);
+        if ('ResizeObserver' in window) new ResizeObserver(() => setup()).observe(viewport);
+        setup();
+      })();
+    </script>
+  )
+}
+
+<style>
+  .lg {
+    position: relative;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .lg__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--lg-min, 9rem)), 1fr));
+    gap: var(--lg-gap, 2rem 2.5rem);
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .lg--cols .lg__list {
+    grid-template-columns: repeat(var(--lg-cols-b, 2), minmax(0, 1fr));
+  }
+  @media (min-width: 48rem) {
+    .lg--cols .lg__list {
+      grid-template-columns: repeat(var(--lg-cols-m, var(--lg-cols-b, 3)), minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 64rem) {
+    .lg--cols .lg__list {
+      grid-template-columns: repeat(var(--lg-cols-l, var(--lg-cols-m, var(--lg-cols-b, 4))), minmax(0, 1fr));
+    }
+  }
+  .lg__item {
+    display: grid;
+    min-width: 0;
+  }
+  .lg__tile {
+    display: grid;
+    place-items: center;
+    height: calc(var(--lg-height, 3.5rem) + 2 * var(--lg-tile-pad, 0.75rem));
+    padding: var(--lg-tile-pad, 0.75rem);
+    border: var(--lg-border, none);
+    border-radius: var(--lg-radius, 10px);
+    background: var(--lg-tile-bg, transparent);
+  }
+  .lg__img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: var(--lg-height, 3.5rem);
+    object-fit: contain;
+  }
+  a.lg__tile:focus-visible {
+    outline: 3px solid var(--lg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .lg--grey .lg__img {
+    filter: grayscale(1);
+    opacity: var(--lg-rest-opacity, 0.7);
+  }
+  .lg--grey .lg__tile:is(:hover, :focus-visible) .lg__img {
+    filter: none;
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .lg--grey .lg__img {
+      transition:
+        filter 200ms ease,
+        opacity 200ms ease;
+    }
+  }
+
+  /* Marquee: one row that scrolls; the grid until the script says it moves. */
+  .lg--marquee[data-moving] .lg__viewport {
+    overflow: hidden;
+    padding-block: 4px; /* room for focus rings */
+    mask-image: linear-gradient(90deg, transparent, #000 var(--lg-fade, 3rem), #000 calc(100% - var(--lg-fade, 3rem)), transparent);
+  }
+  .lg--marquee[data-moving] .lg__track {
+    display: flex;
+    width: max-content;
+  }
+  .lg--marquee[data-moving] .lg__list {
+    display: flex;
+    flex: none;
+    gap: 0;
+  }
+  .lg--marquee[data-moving] .lg__item {
+    width: var(--lg-min, 9rem);
+    margin-inline-end: var(--lg-col-gap, 2.5rem);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .lg--marquee[data-moving] .lg__track {
+      animation: lg-scroll var(--lg-duration, 30s) linear infinite;
+      animation-play-state: paused;
+    }
+    .lg--marquee[data-running] .lg__track {
+      animation-play-state: running;
+    }
+  }
+  @keyframes lg-scroll {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .lg__toggle {
+    justify-self: end;
+    display: inline-grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid var(--lg-control-border, #6b7280);
+    border-radius: 50%;
+    background: var(--lg-control-bg, #fff);
+    color: var(--lg-control-fg, #1e283c);
+    cursor: pointer;
+  }
+  .lg__toggle[hidden] {
+    display: none;
+  }
+  .lg__toggle:focus-visible {
+    outline: 3px solid var(--lg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  /* Two bars for Pause; a triangle for Play. */
+  .lg__icon {
+    width: 0.8rem;
+    height: 0.9rem;
+    background:
+      linear-gradient(currentColor, currentColor) left / 0.27rem 100% no-repeat,
+      linear-gradient(currentColor, currentColor) right / 0.27rem 100% no-repeat;
+  }
+  .lg[data-paused] .lg__icon {
+    background: currentColor;
+    clip-path: polygon(10% 0, 100% 50%, 10% 100%);
+  }
+  .lg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  @media print {
+    .lg__toggle {
+      display: none !important;
+    }
+  }
+  @media (forced-colors: active) {
+    .lg__icon {
+      forced-color-adjust: none;
+      color: ButtonText;
+    }
+  }
+</style>

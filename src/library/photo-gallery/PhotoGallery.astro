@@ -1,0 +1,550 @@
+---
+/**
+ * PhotoGallery — a grid of photos with optional category filter chips; a click opens the photo
+ * large in one lightbox <dialog>, with Previous / Next, the arrow keys, a "3 of 12" count and
+ * the caption. Replaces UABB's Photo Gallery (its filterable grid and lightbox), Beaver
+ * Builder's Gallery, PowerPack's Image Gallery, Elementor's Gallery, and the Envira, FooGallery,
+ * NextGEN, Modula and Magnific Popup / Fancybox lightboxes.
+ *
+ * Without JavaScript every tile is a link to the large photo, and every photo shows (no chips).
+ * The script keeps the links (Cmd/Ctrl-click and middle-click still open the file) and makes a
+ * plain click open the dialog instead.
+ *
+ * Filter chips (when photos carry a `category` and there are two or more): a named group of
+ * aria-pressed buttons, "All" first, with a polite status ("Scenic: 4 photos."). The lightbox
+ * steps only through the photos the filter shows.
+ *
+ * Lightbox: one native modal <dialog> per gallery, showModal(): focus trapped, Escape closes,
+ * the page inert and not scrolling. It opens with focus on the close button; ← → (and the
+ * buttons) step, wrapping at the ends, and a polite status says "Photo 3 of 12" with the alt
+ * text. A press on the dark backdrop closes it; so does a swipe down on a touch screen. Focus
+ * returns to the tile. Reduced motion: no fade, no hover zoom.
+ *
+ * Images. `alt` is required on every photo (`""` only when the caption already says it all);
+ * width and height reserve the space; tiles are lazy. `full` is the large file for the
+ * lightbox (default: `src`). `aspect` crops the tiles to one shape (object-fit: cover) or keeps
+ * each photo's own (`natural`, a masonry-like column flow).
+ *
+ * Theming (each has a fallback):
+ *   --pg-min / --pg-gap / --pg-radius        tile minimum width, gap, corners  (14rem / 0.75rem / 10px)
+ *   --pg-tile-bg                             behind a loading tile             (#e6e8ef)
+ *   --pg-focus                               focus ring                        (#5933d8)
+ *   --pg-chip-bg / --pg-chip-fg / --pg-chip-border                             (#fff / #1e283c / #c9cedb)
+ *   --pg-chip-on-bg / --pg-chip-on-fg        the pressed chip                  (#1e283c / #fff)
+ *   --pg-backdrop / --pg-ui-bg / --pg-ui-fg  lightbox backdrop and buttons     (rgb(0 0 0 / 0.9) / rgb(255 255 255 / 0.15) / #fff)
+ *   --pg-caption                             caption under a tile              (inherit)
+ */
+export interface Photo {
+  src: string;
+  /** Required. Describe the photo; "" only when `caption` says everything. */
+  alt: string;
+  width?: number;
+  height?: number;
+  /** The large file for the lightbox. Default `src`. */
+  full?: string;
+  caption?: string;
+  /** One category, or several; the chips are made from these. */
+  category?: string | string[];
+}
+interface Props {
+  photos: Photo[];
+  /** Tile shape: 'square', '4/3' (default), '3/2', '16/9', or 'natural' (each photo's own). */
+  aspect?: 'square' | '4/3' | '3/2' | '16/9' | 'natural';
+  /** Show the category chips. Default: when the photos carry two or more categories. */
+  filter?: boolean;
+  allLabel?: string;
+  filterLabel?: string;
+  /** Captions under the tiles too (they always show in the lightbox). */
+  captions?: boolean;
+  /** Open the lightbox on click. Off: tiles are plain links to the file. */
+  lightbox?: boolean;
+  /** Names the gallery (its list and its dialog). */
+  label?: string;
+  closeLabel?: string;
+  prevLabel?: string;
+  nextLabel?: string;
+  /** "{n} of {total}" in the dialog. */
+  countLabel?: string;
+  class?: string;
+}
+const {
+  photos,
+  aspect = '4/3',
+  filter,
+  allLabel = 'All',
+  filterLabel = 'Filter photos',
+  captions = false,
+  lightbox = true,
+  label = 'Photo gallery',
+  closeLabel = 'Close',
+  prevLabel = 'Previous photo',
+  nextLabel = 'Next photo',
+  countLabel = 'Photo {n} of {total}',
+  class: className,
+} = Astro.props;
+if (!Array.isArray(photos) || photos.length === 0) throw new Error('PhotoGallery: `photos` is empty.');
+for (const [i, p] of photos.entries()) {
+  if (!p?.src) throw new Error(`PhotoGallery: photo #${i + 1} has no \`src\`.`);
+  if (typeof p.alt !== 'string') throw new Error(`PhotoGallery: photo #${i + 1} (${p.src}) needs \`alt\`: describe it, or "" when its caption says it all.`);
+  if (p.alt === '' && !p.caption) throw new Error(`PhotoGallery: photo #${i + 1} (${p.src}) has an empty \`alt\` and no caption, so nothing names it.`);
+}
+const ratios: Record<string, string> = { square: '1', '4/3': '4 / 3', '3/2': '3 / 2', '16/9': '16 / 9' };
+if (aspect !== 'natural' && !ratios[aspect]) throw new Error(`PhotoGallery: \`aspect\` is square, 4/3, 3/2, 16/9 or natural; got "${aspect}".`);
+const slug = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '') || 'x';
+const catMap = new Map<string, string>();
+const items = photos.map((p) => {
+  const cats = (Array.isArray(p.category) ? p.category : p.category ? [p.category] : []).map((c) => String(c).trim()).filter(Boolean);
+  for (const c of cats) if (!catMap.has(slug(c))) catMap.set(slug(c), c);
+  return { ...p, keys: cats.map(slug) };
+});
+const categories = [...catMap].map(([key, name]) => ({ key, name, n: items.filter((it) => it.keys.includes(key)).length }));
+const showFilter = (filter ?? categories.length >= 2) && categories.length > 0;
+const uid = 'pg-' + Math.random().toString(36).slice(2, 8);
+---
+
+<div
+  id={uid}
+  class:list={['pg', aspect === 'natural' ? 'pg--natural' : 'pg--crop', className]}
+  style={aspect === 'natural' ? undefined : `--pg-ratio:${ratios[aspect]}`}
+  data-pg={lightbox ? 'lightbox' : 'links'}
+  data-count={countLabel}
+>
+  {
+    showFilter && (
+      <div class="pg__filters" role="group" aria-label={filterLabel} hidden data-pg-filters>
+        <button class="pg__chip" type="button" aria-pressed="true" data-pg-filter="" data-pg-name={allLabel}>
+          {allLabel}
+        </button>
+        {categories.map((c) => (
+          <button class="pg__chip" type="button" aria-pressed="false" data-pg-filter={c.key} data-pg-name={c.name}>
+            {c.name}
+          </button>
+        ))}
+      </div>
+    )
+  }
+  {showFilter && <p class="pg__sr" role="status" data-pg-status />}
+  <ul class="pg__grid" role="list" aria-label={label}>
+    {
+      items.map((p) => (
+        <li class="pg__item" data-pg-item data-pg-cats={p.keys.join(' ')}>
+          <figure class="pg__figure">
+            <a
+              class="pg__link"
+              href={p.full ?? p.src}
+              data-pg-open
+              data-full={p.full ?? p.src}
+              data-alt={p.alt}
+              data-caption={p.caption}
+              data-w={p.width}
+              data-h={p.height}
+            >
+              <img class="pg__img" src={p.src} alt={p.alt || p.caption} width={p.width} height={p.height} loading="lazy" decoding="async" />
+            </a>
+            {captions && p.caption && <figcaption class="pg__caption">{p.caption}</figcaption>}
+          </figure>
+        </li>
+      ))
+    }
+  </ul>
+  {
+    lightbox && (
+      <dialog class="pg__dialog" aria-label={label} data-pg-dialog>
+        <div class="pg__bar">
+          <p class="pg__count" data-pg-count aria-hidden="true" />
+          <button class="pg__btn pg__close" type="button" data-pg-close>
+            <span class="pg__x" aria-hidden="true" />
+            <span class="pg__sr">{closeLabel}</span>
+          </button>
+        </div>
+        <figure class="pg__stage" data-pg-stage>
+          <img class="pg__big" alt="" data-pg-big />
+          <figcaption class="pg__dcaption" data-pg-dcaption hidden />
+        </figure>
+        <button class="pg__btn pg__nav pg__prev" type="button" data-pg-step="-1">
+          <span class="pg__chev" aria-hidden="true" />
+          <span class="pg__sr">{prevLabel}</span>
+        </button>
+        <button class="pg__btn pg__nav pg__next" type="button" data-pg-step="1">
+          <span class="pg__chev" aria-hidden="true" />
+          <span class="pg__sr">{nextLabel}</span>
+        </button>
+        <p class="pg__sr" role="status" data-pg-live />
+      </dialog>
+    )
+  }
+</div>
+<script is:inline>
+  (() => {
+    const root = document.currentScript && document.currentScript.previousElementSibling;
+    if (!root || !root.matches('[data-pg]') || root.hasAttribute('data-ready')) return;
+    root.setAttribute('data-ready', '');
+    const tiles = [...root.querySelectorAll('[data-pg-item]')];
+
+    const bar = root.querySelector('[data-pg-filters]');
+    if (bar) {
+      bar.hidden = false;
+      const chips = [...bar.querySelectorAll('[data-pg-filter]')];
+      const status = root.querySelector('[data-pg-status]');
+      bar.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-pg-filter]');
+        if (!chip || chip.getAttribute('aria-pressed') === 'true') return;
+        const key = chip.dataset.pgFilter;
+        chips.forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
+        let shown = 0;
+        tiles.forEach((li) => {
+          const on = !key || li.dataset.pgCats.split(' ').includes(key);
+          li.hidden = !on;
+          if (on) shown++;
+        });
+        if (status) status.textContent = `${chip.dataset.pgName}: ${shown} ${shown === 1 ? 'photo' : 'photos'}.`;
+      });
+    }
+
+    const dialog = root.querySelector('[data-pg-dialog]');
+    if (!dialog || typeof dialog.showModal !== 'function') return;
+    const big = dialog.querySelector('[data-pg-big]');
+    const cap = dialog.querySelector('[data-pg-dcaption]');
+    const count = dialog.querySelector('[data-pg-count]');
+    const live = dialog.querySelector('[data-pg-live]');
+    const closeBtn = dialog.querySelector('[data-pg-close]');
+    const words = root.dataset.count || '{n} of {total}';
+    let list = [];
+    let at = 0;
+    let opener = null;
+    let scrollY = 0;
+
+    const lock = (on) => {
+      const html = document.documentElement;
+      if (on) {
+        scrollY = window.scrollY;
+        const gap = window.innerWidth - html.clientWidth;
+        html.style.overflow = 'hidden';
+        if (gap > 0) html.style.paddingInlineEnd = `${gap}px`;
+      } else {
+        html.style.overflow = '';
+        html.style.paddingInlineEnd = '';
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      }
+    };
+    const show = (i, say) => {
+      at = (i + list.length) % list.length;
+      const a = list[at];
+      big.removeAttribute('src');
+      if (a.dataset.w && a.dataset.h) {
+        big.width = Number(a.dataset.w);
+        big.height = Number(a.dataset.h);
+      } else {
+        big.removeAttribute('width');
+        big.removeAttribute('height');
+      }
+      big.src = a.dataset.full;
+      big.alt = a.dataset.alt || '';
+      const c = a.dataset.caption || '';
+      cap.textContent = c;
+      cap.hidden = !c;
+      const n = words.replace('{n}', String(at + 1)).replace('{total}', String(list.length));
+      count.textContent = n;
+      dialog.toggleAttribute('data-single', list.length < 2);
+      if (say) live.textContent = `${n}: ${a.dataset.alt || c}`;
+      // Warm the neighbours so stepping feels instant.
+      for (const d of [1, -1]) {
+        const nb = list[(at + d + list.length) % list.length];
+        if (nb && nb !== a) new Image().src = nb.dataset.full;
+      }
+    };
+
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-pg-open]');
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      list = tiles.filter((li) => !li.hidden).map((li) => li.querySelector('[data-pg-open]'));
+      opener = a;
+      live.textContent = '';
+      show(list.indexOf(a), false);
+      dialog.showModal();
+      lock(true);
+      closeBtn.focus();
+    });
+    root.querySelectorAll('[data-pg-open]').forEach((a) => a.setAttribute('aria-haspopup', 'dialog'));
+
+    dialog.addEventListener('click', (e) => {
+      const step = e.target.closest('[data-pg-step]');
+      if (step) show(at + Number(step.dataset.pgStep), true);
+    });
+    closeBtn.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        show(at + (e.key === 'ArrowRight' ? 1 : -1) * (getComputedStyle(dialog).direction === 'rtl' ? -1 : 1), true);
+      }
+    });
+    // A press and release on the backdrop (the dialog itself, outside the photo and buttons).
+    let downOnBackdrop = false;
+    dialog.addEventListener('pointerdown', (e) => (downOnBackdrop = e.target === dialog || e.target.matches('[data-pg-stage]')));
+    dialog.addEventListener('pointerup', (e) => {
+      if (downOnBackdrop && (e.target === dialog || e.target.matches('[data-pg-stage]'))) dialog.close();
+      downOnBackdrop = false;
+    });
+    // Touch: swipe sideways to step, down to close.
+    let touch = null;
+    dialog.addEventListener('touchstart', (e) => (touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null), { passive: true });
+    dialog.addEventListener(
+      'touchend',
+      (e) => {
+        if (!touch) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touch.x;
+        const dy = t.clientY - touch.y;
+        touch = null;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && list.length > 1) show(at + (dx < 0 ? 1 : -1), true);
+        else if (dy > 80 && Math.abs(dy) > Math.abs(dx) * 1.5) dialog.close();
+      },
+      { passive: true },
+    );
+    dialog.addEventListener('close', () => {
+      lock(false);
+      big.removeAttribute('src');
+      if (opener && opener.isConnected) opener.focus({ preventScroll: true });
+      opener = null;
+    });
+  })();
+</script>
+
+<style>
+  .pg {
+    display: grid;
+    gap: 1rem;
+  }
+  .pg__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .pg__filters[hidden] {
+    display: none;
+  }
+  .pg__chip {
+    min-height: 2.75rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--pg-chip-border, #c9cedb);
+    border-radius: 999px;
+    background: var(--pg-chip-bg, #fff);
+    color: var(--pg-chip-fg, #1e283c);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .pg__chip[aria-pressed='true'] {
+    border-color: var(--pg-chip-on-bg, #1e283c);
+    background: var(--pg-chip-on-bg, #1e283c);
+    color: var(--pg-chip-on-fg, #fff);
+  }
+  .pg__chip:focus-visible,
+  .pg__link:focus-visible,
+  .pg__btn:focus-visible {
+    outline: 3px solid var(--pg-focus, #5933d8);
+    outline-offset: 2px;
+  }
+  .pg__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--pg-min, 14rem)), 1fr));
+    gap: var(--pg-gap, 0.75rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* Natural: columns, each photo its own shape. */
+  .pg--natural .pg__grid {
+    display: block;
+    columns: var(--pg-min, 14rem);
+    column-gap: var(--pg-gap, 0.75rem);
+  }
+  .pg--natural .pg__item {
+    break-inside: avoid;
+    margin-bottom: var(--pg-gap, 0.75rem);
+  }
+  .pg__item[hidden] {
+    display: none;
+  }
+  .pg__figure {
+    margin: 0;
+  }
+  .pg__link {
+    display: block;
+    overflow: hidden;
+    border-radius: var(--pg-radius, 10px);
+    background: var(--pg-tile-bg, #e6e8ef);
+  }
+  .pg__img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .pg--crop .pg__img {
+    aspect-ratio: var(--pg-ratio, 4 / 3);
+    object-fit: cover;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pg__img {
+      transition: transform 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .pg__link:is(:hover, :focus-visible) .pg__img {
+      transform: scale(1.05);
+    }
+  }
+  .pg__caption {
+    margin: 0.4rem 0 0;
+    color: var(--pg-caption, inherit);
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+  .pg__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Lightbox: the dialog is the backdrop and fills the viewport. */
+  .pg__dialog {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: clamp(0.5rem, 2vw, 1.5rem);
+    border: 0;
+    background: var(--pg-backdrop, rgb(0 0 0 / 0.9));
+    color: var(--pg-ui-fg, #fff);
+    overscroll-behavior: contain;
+  }
+  .pg__dialog[open] {
+    display: grid;
+    grid-template: auto minmax(0, 1fr) / auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .pg__dialog::backdrop {
+    background: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pg__dialog[open] {
+      animation: pg-in 180ms ease-out;
+    }
+  }
+  @keyframes pg-in {
+    from {
+      opacity: 0;
+    }
+  }
+  .pg__bar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .pg__count {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+  }
+  .pg__stage {
+    grid-row: 2;
+    grid-column: 2;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 0.5rem;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+  }
+  .pg__big {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100dvh - 9rem);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+  .pg__dcaption {
+    max-width: 60ch;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .pg__btn {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--pg-ui-bg, rgb(255 255 255 / 0.15));
+    color: var(--pg-ui-fg, #fff);
+    cursor: pointer;
+  }
+  .pg__btn:focus-visible {
+    outline-color: var(--pg-ui-fg, #fff);
+  }
+  .pg__prev {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .pg__next {
+    grid-row: 2;
+    grid-column: 3;
+  }
+  .pg__dialog[data-single] .pg__nav {
+    visibility: hidden;
+  }
+  .pg__x {
+    width: 1rem;
+    height: 1rem;
+    background:
+      linear-gradient(45deg, transparent calc(50% - 1px), currentColor calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(-45deg, transparent calc(50% - 1px), currentColor calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px));
+  }
+  .pg__chev {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-top: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    rotate: 45deg;
+    translate: -15% 0;
+  }
+  .pg__prev .pg__chev {
+    rotate: -135deg;
+    translate: 15% 0;
+  }
+  /* On a phone the arrows sit under the photo, either side. */
+  @media (max-width: 40rem) {
+    .pg__dialog[open] {
+      grid-template: auto minmax(0, 1fr) auto / 1fr 1fr;
+    }
+    .pg__stage {
+      grid-column: 1 / -1;
+    }
+    .pg__prev,
+    .pg__next {
+      grid-row: 3;
+      grid-column: auto;
+    }
+    .pg__next {
+      justify-self: end;
+    }
+  }
+  @media print {
+    .pg__dialog {
+      display: none !important;
+    }
+  }
+</style>

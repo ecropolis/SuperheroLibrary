@@ -1,0 +1,38 @@
+---
+/**
+ * Demo for `call-to-action`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * Three bands: stacked and centred on the accent (UABB's Call to Action as latlonguas.com's
+ * home page has it), inline on dark with a phone link in the text (Beaver Builder's "cta" on
+ * its DC-FRZ page), and a light one with two buttons. Only the first is a region landmark.
+ */
+import CallToAction from '../../library/call-to-action/CallToAction.astro';
+---
+<div class="demo-cta" id="call-to-action-demo">
+  <CallToAction
+    title="Looking for pricing, or just exploring?"
+    text="Either way, it takes a minute to get in touch, and we answer the same day."
+    buttons={[{ text: 'Drop us a line', href: '#call-to-action-demo' }]}
+  />
+  <CallToAction title="Ready to find out more?" layout="inline" tone="dark" landmark={false} buttons={[{ text: 'Request a call back', href: '#call-to-action-demo' }]}>
+    <p>Read the questions people often ask below, or call us on <a href="tel:+15555550123">(555) 555-0123</a>.</p>
+  </CallToAction>
+  <CallToAction
+    title="Book a free site visit"
+    text="We come to you, look at the job and send a written price within two days."
+    tone="light"
+    landmark={false}
+    buttons={[
+      { text: 'Book a visit', href: '#call-to-action-demo' },
+      { text: 'See our prices', href: '#call-to-action-demo' },
+    ]}
+  />
+</div>
+<style>
+  .demo-cta {
+    --cta-accent-bg: var(--purple, #5933d8);
+    display: grid;
+    gap: 1.5rem;
+  }
+</style>

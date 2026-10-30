@@ -27,6 +27,12 @@
  * row when they are on top, stopping at the end of each row. Inline with markers at the left
  * and more than one column draws no connector (a line would cross the text).
  *
+ * Boxed (`boxed`): each item is a card (background, border, padding, radius), which is UABB's
+ * and PowerPack's Info Box: put several in `layout="inline"` for a row of info boxes, or one
+ * alone for a single box. `align="center"` centres the marker and text (the usual info-box
+ * look; it implies the marker on top). A linked boxed item's hit area is the whole card. Boxed
+ * items draw no connector.
+ *
  * Sizing: it fills its container's width; the marker is `size` (sm 2.25rem, md 3rem,
  * lg 4rem, or --il-marker-size). Items stretch to the tallest in their row. No positioning
  * beyond the items' own (for the link overlay and the connector), no z-index.
@@ -39,6 +45,8 @@
  *   --il-title / --il-text / --il-meta     text colours                         (inherit / inherit / inherit)
  *   --il-gap / --il-col-gap      space between rows / columns                   (1.75rem / 1.5rem)
  *   --il-focus                   focus ring of a linked item                    (currentColor)
+ *   --il-box-bg / --il-box-border / --il-box-radius / --il-box-pad / --il-box-shadow
+ *                                boxed items                                    (#fff / 1px solid rgb(0 0 0 / 0.1) / 14px / 1.5rem / none)
  */
 export interface InfoItem {
   title: string;
@@ -76,6 +84,10 @@ interface Props {
   markerPosition?: 'left' | 'top';
   headingLevel?: 2 | 3 | 4 | 5;
   size?: 'sm' | 'md' | 'lg';
+  /** Each item a card: the Info Box look. */
+  boxed?: boolean;
+  /** `center` centres marker and text (marker on top). Default `start`. */
+  align?: 'start' | 'center';
   class?: string;
 }
 const {
@@ -84,9 +96,11 @@ const {
   marker = 'icon',
   connector = false,
   columns = { base: 1, md: 2, lg: 4 },
-  markerPosition = layout === 'inline' ? 'top' : 'left',
+  markerPosition = layout === 'inline' || Astro.props.align === 'center' ? 'top' : 'left',
   headingLevel = 3,
   size = 'md',
+  boxed = false,
+  align = 'start',
   class: className,
 } = Astro.props;
 const Tag = connector || marker === 'number' ? 'ol' : 'ul';
@@ -105,7 +119,12 @@ const colClasses = layout === 'inline' ? [`il--b${b}`, `il--m${m}`, `il--l${l}`]
     `il--${layout}`,
     `il--${marker}`,
     `il--${size}`,
-    { 'il--connector': connector && marker !== 'none', 'il--top': markerPosition === 'top' },
+    {
+      'il--connector': connector && marker !== 'none' && !boxed,
+      'il--top': markerPosition === 'top' || align === 'center',
+      'il--boxed': boxed,
+      'il--center': align === 'center',
+    },
     ...colClasses,
     className,
   ]}
@@ -433,4 +452,32 @@ const colClasses = layout === 'inline' ? [`il--b${b}`, `il--m${m}`, `il--l${l}`]
     }
   }
   /* </il-columns> */
+
+  /* Boxed: each item a card (the Info Box look). The link's hit area is the card. */
+  .il--boxed > .il__item {
+    padding: var(--il-box-pad, 1.5rem);
+    border: var(--il-box-border, 1px solid rgb(0 0 0 / 0.1));
+    border-radius: var(--il-box-radius, 14px);
+    background: var(--il-box-bg, #fff);
+    box-shadow: var(--il-box-shadow, none);
+  }
+  .il--boxed .il__link::after {
+    inset: 0;
+    border-radius: var(--il-box-radius, 14px);
+  }
+  .il--boxed .il__link:focus-visible::after {
+    outline-offset: 2px;
+  }
+  /* Centred: marker above, everything centred, at every width. */
+  .il.il--center > .il__item {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+  .il.il--center .il__content {
+    padding-top: 0;
+  }
+  .il.il--center > .il__item::before {
+    display: none;
+  }
 </style>

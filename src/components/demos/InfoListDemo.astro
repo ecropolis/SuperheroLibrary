@@ -4,8 +4,9 @@
  * superherotech.ai"), so every host token has a fallback. It uses no assets; the icons are
  * inline SVG.
  *
- * Three lists: stacked with icons (two items linked), inline four-across numbered steps with
- * the connector ("how it works"), and a stacked numbered timeline with the connector.
+ * Four lists: stacked with icons (two items linked), inline four-across numbered steps with
+ * the connector ("how it works"), a stacked numbered timeline with the connector, and a row of
+ * boxed, centred info boxes (UABB's and PowerPack's Info Box), one of them linked.
  */
 import InfoList from '../../library/info-list/InfoList.astro';
 
@@ -48,6 +49,11 @@ const history = [
   { meta: '2021', title: 'A team of six', text: 'Two crews, a designer and an office that answers the phone.' },
   { meta: '2025', title: 'Water-wise gardens', text: 'Drip irrigation and drought-tolerant planting become a service of their own.' },
 ];
+const boxes = [
+  { title: 'Free site visit', text: 'We walk the garden with you and listen before we draw anything.', icon: services[0].icon },
+  { title: 'Fixed written quote', text: 'One price, in writing, within two working days of the visit.', icon: services[1].icon, href: '#quote' },
+  { title: 'Two-year guarantee', text: 'Any plant we put in that fails in its first two years, we replace.', icon: services[3].icon },
+];
 ---
 <div class="demo-il">
   <section>
@@ -64,6 +70,11 @@ const history = [
     <h2 class="demo-il__h">Our story</h2>
     <InfoList items={history} marker="number" connector size="sm" class="demo-il__story" />
   </section>
+
+  <section>
+    <h2 class="demo-il__h">Why people choose us</h2>
+    <InfoList items={boxes} layout="inline" boxed align="center" columns={{ base: 1, md: 3 }} class="demo-il__boxes" />
+  </section>
 </div>
 <style>
   .demo-il {
@@ -79,6 +90,12 @@ const history = [
     --il-marker-bg: color-mix(in srgb, var(--purple, #5933d8) 10%, transparent);
     --il-marker-fg: var(--purple, #5933d8);
     --il-focus: var(--purple, #5933d8);
+  }
+  .demo-il :global(.demo-il__boxes) {
+    --il-marker-bg: color-mix(in srgb, var(--purple, #5933d8) 10%, transparent);
+    --il-marker-fg: var(--purple, #5933d8);
+    --il-focus: var(--purple, #5933d8);
+    --il-box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px rgb(0 0 0 / 0.06);
   }
   .demo-il :global(.demo-il__steps),
   .demo-il :global(.demo-il__story) {

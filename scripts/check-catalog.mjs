@@ -154,6 +154,7 @@ const NEEDS_INPUT = [
   'flip-box', 'hotspot', 'info-circle', 'info-list', 'map', 'modal', 'news-ticker',
   'responsive-table', 'slide-box', 'social-grid', 'tabcordion', 'tabs', 'testimonial-carousel',
   'video-background', 'video-gallery', 'video-player', 'cart', 'product-list', 'product-page',
+  'counter', 'logo-grid', 'photo-gallery', 'call-to-action',
 ];
 const plainText = (v) => typeof v === 'string' && v.trim() === v && v.length > 0;
 for (const e of catalog) {
