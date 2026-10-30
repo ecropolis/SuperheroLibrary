@@ -56,6 +56,20 @@ const Demo = demos[e.id];
       </>
     )}
 
+    {e.reference && e.reference.length > 0 && (
+      <>
+        <h2 id="reference">Reference example</h2>
+        <p>A live page that still runs the WordPress module this element replaces. It is a client’s site: look, change nothing.</p>
+        <ul>
+          {e.reference.map((r) => (
+            <li>
+              <code>{r.module}</code> on <a href={r.url} rel="noopener">{r.url}</a>{r.note && <>: {r.note}</>}
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+
     <h2>Used on</h2>
     <ul>{e.usedOn.map((u) => <li><strong>{u.site}</strong>: {u.where}</li>)}</ul>
 

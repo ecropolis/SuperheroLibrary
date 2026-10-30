@@ -5,7 +5,9 @@
  *
  * Four cards, one per `direction`: the back rises from the bottom (up, the default), comes in
  * from the right (left), drops from the top (down, on an image card) and comes in from the left
- * (right, on a card that ignores hover). The cards live in public/demo/slide-box-cards.json,
+ * (right, on a card that ignores hover); then an image card, where the photo is the card
+ * (variant="image", UABB's Interactive Banner), and a round one (shape="circle", UABB's iHover).
+ * The cards live in public/demo/slide-box-cards.json,
  * which scripts/check-reveal-cards.mjs reads to pin the built page against.
  *
  * The icons are Font Awesome Free (CC BY 4.0), pasted with their attribution comment exactly as
@@ -37,6 +39,8 @@ type Card = {
   cta: { text: string; href: string };
   direction: 'up' | 'down' | 'left' | 'right';
   trigger?: 'both' | 'click';
+  variant?: 'card' | 'image';
+  shape?: 'rect' | 'circle';
 };
 const cards = (fixture.cards as Card[]).map(({ icon, image, ...c }) => ({
   ...c,

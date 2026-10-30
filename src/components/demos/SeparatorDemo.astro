@@ -1,0 +1,42 @@
+---
+/**
+ * Demo for `separator`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets; the icon is
+ * inline SVG.
+ *
+ * Six separators: a plain line, a short accent bar that grows into view (the slide-in the old
+ * Beaver Builder pages used), dashed with a word, a heading between two lines, dotted with an
+ * icon, and a double line as a real thematic break.
+ */
+import Separator from '../../library/separator/Separator.astro';
+
+const star = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z"/></svg>`;
+---
+<div class="demo-sep">
+  <p class="demo-sep__note">A plain line</p>
+  <Separator />
+  <p class="demo-sep__note">A short accent bar, growing into view</p>
+  <Separator width="6rem" reveal class="demo-sep__bar" />
+  <p class="demo-sep__note">Dashed, with a word</p>
+  <Separator line="dashed" text="or" />
+  <p class="demo-sep__note">A heading between two lines</p>
+  <Separator text="Our services" as="h3" reveal />
+  <p class="demo-sep__note">Dotted, with an icon, aligned to the start</p>
+  <Separator line="dotted" icon={star} align="start" width="20rem" />
+  <p class="demo-sep__note">Double, as a real thematic break</p>
+  <Separator line="double" semantic />
+</div>
+<style>
+  .demo-sep {
+    --sep-accent: var(--purple, #5933d8);
+    color: var(--ink, #16192a);
+  }
+  .demo-sep__note {
+    margin: 1.5rem 0 0;
+    font-size: 0.9rem;
+    color: var(--body, #4b5563);
+  }
+  .demo-sep :global(.demo-sep__bar) {
+    --sep-color: var(--purple, #5933d8);
+  }
+</style>

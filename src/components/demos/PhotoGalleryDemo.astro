@@ -1,0 +1,47 @@
+---
+/**
+ * Demo for `photo-gallery`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * Eight aerial-style illustrations in public/demo/gallery-*.svg, in the four categories
+ * latlonguas.com's gallery filters by. Press a photo for the lightbox: ← → or the buttons
+ * step through what the filter shows.
+ */
+import PhotoGallery from '../../library/photo-gallery/PhotoGallery.astro';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+const p = (file: string, alt: string, category: string, caption?: string) => ({
+  src: asset(file),
+  alt,
+  category,
+  caption,
+  width: 1200,
+  height: 800,
+});
+const photos = [
+  p('gallery-roofs.svg', 'Rooftops of a town centre from above, with the main road crossing it', 'Buildings', 'Roof survey, town centre'),
+  p('gallery-tower.svg', 'A telecom mast seen from directly above, its three guy lines spread out', 'Structures'),
+  p('gallery-pylons.svg', 'Power lines crossing green fields between three pylons', 'Power lines', 'Line inspection, after the storm'),
+  p('gallery-coast.svg', 'A sandy coastline with surf breaking along it', 'Scenic'),
+  p('gallery-campus.svg', 'A business park of low buildings and car parks', 'Buildings'),
+  p('gallery-quarry.svg', 'The terraced pit of a quarry, a haul road along its edge', 'Structures', 'Stockpile volumes, quarterly'),
+  p('gallery-substation.svg', 'Lines running into a rural substation', 'Power lines'),
+  p('gallery-ridge.svg', 'Layered mountain ridges under a pale sun', 'Scenic'),
+];
+---
+<div class="demo-pg">
+  <PhotoGallery photos={photos} label="Recent aerial work" captions />
+</div>
+<style>
+  .demo-pg {
+    --pg-focus: var(--purple, #5933d8);
+    --pg-chip-on-bg: var(--purple, #5933d8);
+    --pg-chip-on-fg: #fff;
+    color: var(--ink, #16192a);
+  }
+</style>

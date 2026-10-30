@@ -122,6 +122,13 @@ export interface Element {
    * licensed third-party material (so far: `icon`, on Font Awesome) carry one. */
   license?: string;
   usedOn: { site: string; where: string }[];
+  /**
+   * A live page that still runs the WordPress / page-builder module this element replaces, to
+   * look at before rebuilding one: `module` is the module as the page names it (the
+   * `fl-module-<slug>` class on a Beaver Builder page). These are clients' production sites:
+   * read them, never change anything there.
+   */
+  reference?: { module: string; url: string; note?: string }[];
   /** Path of the component in this repo — the file to copy into a client build. */
   /** Where the file is really maintained, when this repo only holds a synced copy. */
   source?: { repo: string; sync: string };
@@ -287,7 +294,7 @@ export const catalog: Element[] = [
     id: 'video-background',
     category: 'motion',
     name: 'Video background',
-    aka: ['video hero', 'background video', 'Elementor video background', 'autoplay muted loop video', 'Beaver Builder video row', 'hero video'],
+    aka: ['video hero', 'background video', 'Elementor video background', 'autoplay muted loop video', 'Beaver Builder video row', 'hero video', 'fl-bg-video'],
     summary: 'A muted, looping video behind a hero, over a poster, with an optional tint and a visible pause button. Only the poster loads on small screens, under reduced motion and without JavaScript.',
     pitch: 'Open your home page with moving footage of your work, without making visitors wait for it or wrestle with it.',
     // 320/mo, difficulty 21 (SE Ranking US, 2026-09-23).
@@ -339,6 +346,9 @@ export const catalog: Element[] = [
 </VideoBackground>
 <!-- .hero { --vb-min-height: 80vh; --vb-overlay: var(--navy); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/video-background/ (demo)' }],
+    reference: [
+      { module: 'Beaver Builder row video (fl-bg-video)', url: 'https://latlonguas.com/', note: 'The hero on every page. The footage plays from Cloudflare Stream through video.latlonguas.com, the superhero-video Worker.' },
+    ],
     file: 'src/library/video-background/VideoBackground.astro',
     added: '2026-09-23',
   },
@@ -754,7 +764,7 @@ const feed = social as SocialFeed;
     id: 'accordion',
     category: 'navigation',
     name: 'Accordion / FAQ',
-    aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible'],
+    aka: ['PowerPack FAQ Module', 'PowerPack Advanced Accordions', 'UABB Advanced Accordion', 'Elementor Accordion', 'FAQ accordion', 'FAQ schema', 'toggle', 'collapsible', 'pp-advanced-accordion'],
     summary:
       'Questions (or any titles) that open to show their answer, on native <details>/<summary>: keyboard, screen readers and find-in-page work with no script. One open at a time or several, numbered, chevron or plus, deep-linkable by #id. With jsonLd on, the same items become the page’s FAQPage structured data, so the FAQ and the accordion are one element.',
     pitch: 'FAQ page design that gets people their answer fast: each question opens with a tap, every answer is findable with Ctrl+F, and search engines and AI assistants can read them as questions and answers.',
@@ -823,6 +833,9 @@ const faqs: AccordionItem[] = [
     usedOn: [
       { site: 'jwalktours.com', where: '/faqs/ and the tour pages: its own FaqList.astro (<details>, FAQPage JSON-LD from the same array); moves to this element on its next FAQ request' },
       { site: 'stbeautybar.com', where: '/about-us/ FAQ: its own Faqs.astro (exclusive, first open, rotating icon, FAQPage JSON-LD); moves to this element on its next FAQ request' },
+    ],
+    reference: [
+      { module: 'pp-advanced-accordion', url: 'https://latlonguas.com/dc-frz/', note: 'The FRZ questions at the foot of the page.' },
     ],
     file: 'src/library/accordion/Accordion.astro',
     added: '2026-09-23',
@@ -958,14 +971,14 @@ const faqs: AccordionItem[] = [
     id: 'info-list',
     category: 'content',
     name: 'Info list',
-    aka: ['PowerPack Info List', 'UABB Info List', 'Elementor Icon List', 'icon list', 'steps list', 'process steps', 'vertical timeline', 'feature list'],
+    aka: ['PowerPack Info List', 'UABB Info List', 'Elementor Icon List', 'icon list', 'steps list', 'process steps', 'vertical timeline', 'feature list', 'UABB Info Box', 'PowerPack Info Box', 'info box', 'info-box'],
     summary:
       'Items with a marker (icon, image, number or dot), a title, a line of text and an optional link, stacked or inline in columns. With the connector the markers are joined by a line: a steps list or a vertical timeline. HTML and CSS only; there is no script.',
     pitch: 'Lay out your services, how you work step by step, or your story year by year, each with an icon or a number, in a list that reads on any screen.',
     // vertical timeline 500/mo, difficulty 21 (rising); icon list 660/45; timeline design website
     // 170/25 (SE Ranking US, 2026-09-23).
     search: { query: 'vertical timeline', alsoRanks: ['icon list', 'timeline design website'] },
-    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists'],
+    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists', 'UABB and PowerPack “Info Box” modules (boxed and centred)'],
     goodFor: 'Services, “how it works”, process steps, milestones and feature lists.',
     notFor: 'Navigation (that is a menu) and long prose (write paragraphs).',
     asks: [
@@ -980,6 +993,8 @@ const faqs: AccordionItem[] = [
       { name: 'markerPosition', type: '“left” | “top”', default: 'left for stack, top for inline', note: 'Top applies where inline has more than one column.' },
       { name: 'headingLevel', type: '2 | 3 | 4 | 5', default: '3', note: 'Level of each title.' },
       { name: 'size', type: '“sm” | “md” | “lg”', default: '“md”', note: 'Marker size: 2.25, 3 or 4rem. A dot is 1rem.' },
+      { name: 'boxed', type: 'boolean', default: 'false', note: 'Each item a card: the UABB / PowerPack Info Box. With `href` the whole card is the link. No connector.' },
+      { name: 'align', type: '“start” | “center”', default: '“start”', note: 'center: marker on top and everything centred, at every width (the usual info-box look).' },
       { name: 'class', type: 'string', note: 'Class on the list, for the host to theme it.' },
     ],
     theming: [
@@ -993,6 +1008,11 @@ const faqs: AccordionItem[] = [
       { name: '--il-title / --il-text / --il-meta', fallback: 'inherit', note: 'Text colors.' },
       { name: '--il-gap / --il-col-gap', fallback: '1.75rem / 1.5rem', note: 'Space between rows / columns. The connector spans the row gap.' },
       { name: '--il-focus', fallback: 'currentColor', note: 'Focus ring around a linked item.' },
+      { name: '--il-box-bg', fallback: '#fff', note: '`boxed`: card background.' },
+      { name: '--il-box-border', fallback: '1px solid rgb(0 0 0 / 0.1)', note: '`boxed`: card border (a whole border shorthand).' },
+      { name: '--il-box-radius', fallback: '14px', note: '`boxed`: card corners, and the linked card’s focus ring.' },
+      { name: '--il-box-pad', fallback: '1.5rem', note: '`boxed`: inside each card.' },
+      { name: '--il-box-shadow', fallback: 'none', note: '`boxed`: card box-shadow.' },
     ],
     a11y: [
       'A real list: <ol> when the order matters (connector or numbers), <ul> otherwise, with role="list" so Safari keeps announcing it with list-style removed.',
@@ -1014,6 +1034,9 @@ const faqs: AccordionItem[] = [
 <InfoList items={history.map((h) => ({ meta: h.year, title: h.title, text: h.text }))} marker="dot" connector />
 <!-- .steps { --il-accent: var(--brand); --il-connector: var(--line); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/info-list/ (demo)' }],
+    reference: [
+      { module: 'info-box', url: 'https://latlonguas.com/', note: 'The two-up “From the strictly functional…” boxes: boxed, centred, no icon.' },
+    ],
     file: 'src/library/info-list/InfoList.astro',
     added: '2026-09-23',
   },
@@ -1021,7 +1044,7 @@ const faqs: AccordionItem[] = [
     id: 'video-player',
     category: 'media',
     name: 'Video player',
-    aka: ['PowerPack Video', 'UABB Video', 'Elementor Video', 'YouTube embed', 'Vimeo embed', 'video lightbox', 'lite YouTube embed'],
+    aka: ['PowerPack Video', 'UABB Video', 'Elementor Video', 'YouTube embed', 'Vimeo embed', 'video lightbox', 'lite YouTube embed', 'pp-video'],
     summary:
       'A YouTube, Vimeo or self-hosted video behind your own poster and play button, in place or in a lightbox. Nothing is requested from YouTube or Vimeo until the button is pressed; then a privacy-enhanced iframe is created and focus moves into it.',
     pitch: 'Your video, your thumbnail, and nothing loads from YouTube until someone presses play.',
@@ -1091,6 +1114,9 @@ const faqs: AccordionItem[] = [
 />
 <!-- .video { --vp-play-bg: var(--brand); --vp-radius: var(--radius); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/video-player/ (demo)' }],
+    reference: [
+      { module: 'pp-video', url: 'https://latlonguas.com/services/', note: 'Two videos on the services page.' },
+    ],
     file: 'src/library/video-player/VideoPlayer.astro',
     added: '2026-09-23',
   },
@@ -1211,7 +1237,7 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
     id: 'animated-text',
     category: 'motion',
     name: 'Animated text',
-    aka: ['animated headline', 'Elementor Animated Headline', 'text rotator', 'word rotator', 'rotating text', 'typewriter effect', 'typing animation', 'Typed.js', 'fancy text', 'word reveal', 'highlighted headline'],
+    aka: ['animated headline', 'Elementor Animated Headline', 'text rotator', 'word rotator', 'rotating text', 'typewriter effect', 'typing animation', 'Typed.js', 'fancy text', 'word reveal', 'highlighted headline', 'UABB Fancy Text', 'fancy-text'],
     summary:
       'One line of text in one of six effects: build (word by word), typewriter, rotate (one slot turns over), distil (words fall away to a shorter phrase), highlight (a marker or underline sweeps), strike (a word is struck and replaced). Speed, cadence, hold, repeat, entrance and type are set per use. Nothing reflows, a screen reader hears the sentence once, and it rests whole under reduced motion or with no script.',
     pitch: 'Let your most important line arrive the way you would say it out loud, in your own type and at your own pace.',
@@ -1292,6 +1318,9 @@ import AnimatedText from '../components/AnimatedText.astro';
       { site: 'nicolelawton.com', where: 'Home, the "Let Go. Let Be. Let Me." band over the deep water (pre-launch on nicolelawton.gohero.us). It is the distil original, LetGo.astro, built before this element and not yet swapped for it' },
       { site: 'nicolelawton.com', where: 'Resources, the closing tagline "Cultivate Empower Connect": build, word by word, gap 600, once. A copy of this file; her phoenix between the words is drawn by the page, on .at__piece + .at__piece::before (pre-launch on nicolelawton.gohero.us)' },
       { site: 'superherotech.ai', where: '/elements/animated-text/ (demo): all six effects' },
+    ],
+    reference: [
+      { module: 'fancy-text', url: 'https://latlonguas.com/', note: '“Where above meets beyond!” under the hero; typed text on /services/ and /our-story/ too.' },
     ],
     file: 'src/library/animated-text/AnimatedText.astro',
     added: '2026-09-23',
@@ -1736,7 +1765,7 @@ import { analytics } from '../data/site';
     id: 'slide-box',
     category: 'content',
     name: 'Slide box',
-    aka: ['UABB Slide Box', 'slide box', 'reveal card', 'sliding card', 'hover reveal box', 'info box with slide-up detail', 'card overlay'],
+    aka: ['UABB Slide Box', 'slide box', 'reveal card', 'sliding card', 'hover reveal box', 'info box with slide-up detail', 'card overlay', 'UABB Interactive Banner', 'interactive-banner-1', 'UABB iHover', 'ihover', 'image hover effects'],
     summary:
       'A card whose back panel slides in over the front from a chosen direction (up, down, left, right): on hover where there is a mouse, and on click, tap, Enter or Space everywhere, through a real button with aria-expanded. The front is a teaser (icon or image, title, a line), the back its detail (text and a link). Both panels share one height; the one out of view is inert.',
     pitch: 'A card that shows the headline first and slides up the detail when someone wants it, on a phone as well as with a mouse.',
@@ -1744,7 +1773,7 @@ import { analytics } from '../data/site';
     // hover effects 30/12; card overlay 50/10. "slide box" itself is 1,300/55, but its results
     // are microscope-slide storage boxes and toolbox drawer slides, not websites, so it stays an aka.
     search: { query: 'reveal card', alsoRanks: ['sliding card', 'card hover effects', 'card overlay'] },
-    replaces: ['UABB “Slide Box” module (Beaver Builder), overlay style', 'hover-reveal info boxes in Elementor and Divi', 'hand-rolled CSS slide-up card overlays'],
+    replaces: ['UABB “Slide Box” module (Beaver Builder), overlay style', 'hover-reveal info boxes in Elementor and Divi', 'hand-rolled CSS slide-up card overlays', 'UABB “Interactive Banner 1 / 2” (variant="image")', 'UABB “iHover” (variant="image" shape="circle")'],
     goodFor:
       'A grid of teasers whose detail is worth one more gesture: services that each need three lines of explanation and a link, job openings (title on the front, what the job is and Apply on the back), products with ingredients or specifications, team members with a short bio.',
     notFor:
@@ -1766,6 +1795,8 @@ import { analytics } from '../data/site';
       { name: 'trigger', type: "'both' | 'click'", default: "'both'", note: 'Whether hover ALSO slides it in. Click, tap, Enter and Space always do; a hover-only card would lock out touch screens and keyboards.' },
       { name: 'duration', type: 'number (ms)', note: 'The slide. Overrides `--slb-duration` (450ms).' },
       { name: 'headingLevel', type: '2 | 3 | 4 | 5 | 6', default: '3', note: 'Level of the headings; match the page outline.' },
+      { name: 'variant', type: "'card' | 'image'", default: "'card'", note: 'image: the photo fills the card, the title sits on a scrim at its foot and the back is a tint that slides in over the photo (UABB Interactive Banner). Needs `image`.' },
+      { name: 'shape', type: "'rect' | 'circle'", default: "'rect'", note: 'circle: a round card (UABB iHover), once the script runs; without it the panels stack as rounded boxes. Keep the back to about 20 words.' },
       { name: 'label', type: 'string', note: 'Accessible name of the card’s button. Default: `title`, else the front’s first heading.' },
       { name: 'class', type: 'string', note: 'Class on the root, for theming one card.' },
       { name: 'slot front / slot back', type: 'slot', note: 'Any HTML for a panel; wins over the props for that panel. Keep links off the front: the whole front is the button.' },
@@ -1791,6 +1822,10 @@ import { analytics } from '../data/site';
       { name: '--slb-easing', fallback: 'cubic-bezier(0.2, 0.7, 0.2, 1)', note: 'Timing of the slide.' },
       { name: '--slb-fade', fallback: '200ms', note: 'The crossfade under reduced motion.' },
       { name: '--slb-focus', fallback: 'var(--slb-accent)', note: 'Focus ring round the card.' },
+      { name: '--slb-image-fg', fallback: '#fff', note: 'variant="image": text over the photo and on its tinted back.' },
+      { name: '--slb-scrim', fallback: 'linear-gradient(to top, rgb(20 24 40 / 0.85), rgb(20 24 40 / 0.55) 60%, transparent)', note: 'variant="image": behind the front’s title, for 4.5:1 over the photo.' },
+      { name: '--slb-image-back-bg', fallback: 'rgb(20 24 40 / 0.86)', note: 'variant="image": the tint that slides in over the photo.' },
+      { name: '--slb-image-height', fallback: '16rem', note: 'variant="image": the card’s floor.' },
     ],
     a11y: [
       'The card is a real <button> named from the title, with aria-expanded saying whether the back is in and aria-controls pointing at the back. Enter or Space slides it in and out; Escape slides it out and returns focus to the button.',
@@ -1814,6 +1849,10 @@ import { analytics } from '../data/site';
     license:
       'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The card takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
     usedOn: [{ site: 'superherotech.ai', where: '/elements/slide-box/ (demo)' }],
+    reference: [
+      { module: 'interactive-banner-1', url: 'https://latlonguas.com/', note: 'Four photo banners (“Dazzling imagery”…) whose line rises on hover: variant="image".' },
+      { module: 'ihover', url: 'https://latlonguas.com/dc-frz/', note: 'The round “FRZ Waiver Request Form” tile: variant="image" shape="circle".' },
+    ],
     file: 'src/library/slide-box/SlideBox.astro',
     added: '2026-09-26',
   },
@@ -1897,7 +1936,7 @@ import { analytics } from '../data/site';
     id: 'content-toggle',
     category: 'conversion',
     name: 'Content toggle',
-    aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch'],
+    aka: ['UABB Content Toggle', 'PowerPack Content Toggle', 'pricing toggle', 'monthly / annual switch', 'content switcher', 'toggle switch', 'uabb-content-toggle'],
     summary:
       'Two labeled versions of one thing, a switch (role="switch") or two pressed buttons between them, and two panels in slots a and b. Optional badge on one label, a choice remembered for the session, and ?<param>= to preselect. Without JavaScript both panels show under their labels as headings.',
     pitch: 'Let visitors flip between two versions of the same thing — monthly or annual prices, homes or businesses — without leaving the page.',
@@ -1961,6 +2000,9 @@ import { analytics } from '../data/site';
 </ContentToggle>
 <!-- .ct { --ct-track: var(--brand); --ct-pressed-bg: var(--brand); } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/content-toggle/ (demo)' }],
+    reference: [
+      { module: 'uabb-content-toggle', url: 'https://latlonguas.com/', note: 'Home page; also /services/ and /our-story/.' },
+    ],
     file: 'src/library/content-toggle/ContentToggle.astro',
     added: '2026-09-26',
   },
@@ -1968,7 +2010,7 @@ import { analytics } from '../data/site';
     id: 'off-canvas',
     category: 'navigation',
     name: 'Off-canvas panel',
-    aka: ['UABB Off-Canvas', 'Elementor Off-Canvas', 'slide-out panel', 'side drawer', 'push menu', 'offcanvas', 'flyout panel', 'slide-in cart'],
+    aka: ['UABB Off-Canvas', 'Elementor Off-Canvas', 'slide-out panel', 'side drawer', 'push menu', 'offcanvas', 'flyout panel', 'slide-in cart', 'uabb-off-canvas'],
     summary:
       'A native <dialog> that slides in from the left, right, top or bottom when any data-offcanvas-open trigger asks. Modal by default (backdrop, focus kept in, Escape, scroll lock keeping the scrollbar width), or push: non-modal, publishing --ofc-push for the host to move its page over. Focus returns to the opener. Without JavaScript the panel renders inline where it sits, and its #<id> link jumps to it.',
     pitch: 'Keep the cart, the filters or the account menu one tap away, sliding in from the edge instead of crowding the page.',
@@ -2031,6 +2073,9 @@ import { analytics } from '../data/site';
   html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }
   @media (prefers-reduced-motion: reduce) { .site { transition: none; } } -->`,
     usedOn: [{ site: 'superherotech.ai', where: '/elements/off-canvas/ (demo)' }],
+    reference: [
+      { module: 'uabb-off-canvas', url: 'https://latlonguas.com/', note: 'On /, /dc-frz/, /services/ and /our-story/.' },
+    ],
     file: 'src/library/off-canvas/OffCanvas.astro',
     added: '2026-09-26',
   },
@@ -2038,7 +2083,7 @@ import { analytics } from '../data/site';
     id: 'video-gallery',
     category: 'media',
     name: 'Video gallery',
-    aka: ['UABB Video Gallery', 'PowerPack Video Gallery', 'Elementor Video Playlist', 'YouTube gallery', 'Vimeo gallery', 'video grid', 'filterable video gallery'],
+    aka: ['UABB Video Gallery', 'PowerPack Video Gallery', 'Elementor Video Playlist', 'YouTube gallery', 'Vimeo gallery', 'video grid', 'filterable video gallery', 'pp-video-gallery'],
     summary:
       'A grid of YouTube, Vimeo or self-hosted videos, each behind your own poster and a play button, with optional category filter chips. A click plays the video in one lightbox dialog or in the tile itself. Nothing is requested from YouTube or Vimeo until a tile is pressed.',
     pitch: 'All your videos on one page, sorted by topic, with your own thumbnails, and nothing loads from YouTube until someone picks one.',
@@ -2114,6 +2159,9 @@ import { analytics } from '../data/site';
     license:
       'The videos stay yours, or their owners’: the gallery plays them from YouTube, Vimeo or your own site, under those services’ terms, and adds nothing of its own. The films in our demo are the Blender Foundation’s open films Big Buck Bunny and Sintel, CC BY 3.0, credited under each one as that license asks.',
     usedOn: [{ site: 'superherotech.ai', where: '/elements/video-gallery/ (demo)' }],
+    reference: [
+      { module: 'pp-video-gallery', url: 'https://latlonguas.com/', note: 'Home page; also /services/ and /our-story/.' },
+    ],
     file: 'src/library/video-gallery/VideoGallery.astro',
     added: '2026-09-26',
   },
@@ -3266,6 +3314,325 @@ const { product, currency } = Astro.props;
     usedOn: [{ site: 'superherotech.ai', where: '/elements/product-page/ (demo)' }],
     file: 'src/library/product-page/ProductPage.astro',
     added: '2026-10-08',
+  },
+  {
+    id: 'counter',
+    category: 'content',
+    name: 'Counter',
+    aka: ['UABB Number Counter', 'UABB Numbers', 'uabb-numbers', 'PowerPack Counter', 'Elementor Counter', 'number counter', 'stats counter', 'animated numbers', 'countUp.js', 'counterUp', 'circle counter', 'progress ring'],
+    summary:
+      'A row of figures ("1,427 flights", "263 locations") that count up from zero the first time they scroll into view: plain, inside a ring that fills, or over a bar. The final figure is in the HTML and the count is a visual copy over it, so screen readers, search engines and visitors without JavaScript or with reduced motion get the real number, and the box never changes width.',
+    pitch: 'Put your best numbers on the page and let them count up as people reach them, without anyone ever seeing a zero.',
+    // Not measured: SE Ranking timed out on 2026-10-30. Measure the query and its variants before
+    // the superherotech.ai page goes live, and change it if another wins.
+    search: { query: 'animated number counter', alsoRanks: ['number counter', 'stats counter', 'counter animation'] },
+    replaces: ['UABB “Number Counter” module (Beaver Builder), counter, circle and bar styles', 'PowerPack Counter', 'Elementor Counter and Progress Bar widgets', 'countUp.js and jQuery counterUp'],
+    goodFor:
+      'Three or four figures that make the case at a glance: jobs done, years in business, places served, a satisfaction rate. Also places left on a course, as bars against the total.',
+    notFor:
+      'Figures that change daily (a count written into the page goes stale; say “1,400+”), money a visitor is about to pay, or more than four in a row. Never a number that is not true or that the client cannot stand behind.',
+    asks: [
+      { key: 'figures', label: 'The figures, and what each one counts', hint: 'For example: 1,427 flights, 263 locations. Up to four.', required: true },
+      { key: 'style', label: 'Plain numbers, rings that fill, or bars', hint: 'Rings or bars need the total each one is out of.' },
+    ],
+    props: [
+      { name: 'items', type: '{ value, label, prefix?, suffix?, max?, note? }[]', note: '`value` is the final figure; `label` what it counts (required: “1,427” alone says nothing); `prefix` / `suffix` sit either side (“$”, “%”, “+”); `max` is a full ring or bar (default `value`); `note` a line under the label.' },
+      { name: 'style', type: "'plain' | 'ring' | 'bar'", default: "'plain'", note: 'ring is UABB’s circle style; bar draws the figure’s share of `max`.' },
+      { name: 'from', type: 'number', default: '0', note: 'Where every count starts.' },
+      { name: 'duration', type: 'number (ms)', default: '1600', note: 'One count, eased out.' },
+      { name: 'stagger', type: 'number (ms)', default: '150', note: 'Between the starts of figures that arrive together.' },
+      { name: 'decimals', type: 'number', default: '0', note: 'Decimal places, for every figure in the row.' },
+      { name: 'grouping', type: 'boolean', default: 'true', note: 'Thousands separators.' },
+      { name: 'locale', type: 'string', default: "'en-US'", note: 'The number format, at build and while counting.' },
+      { name: 'label', type: 'string', note: 'Names the list for screen readers (“This year, so far”).' },
+      { name: 'align', type: "'start' | 'center'", default: "'center'", note: 'Figures and labels.' },
+      { name: 'class', type: 'string', note: 'Class on the list, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--cn-accent', fallback: '#5933d8', note: 'Ring and bar fill, and the figure.' },
+      { name: '--cn-track', fallback: '#e6e8ef', note: 'Ring and bar track.' },
+      { name: '--cn-fg', fallback: 'var(--cn-accent)', note: 'Figure colour; keep 4.5:1 on the background (3:1 at 2rem bold and up).' },
+      { name: '--cn-label', fallback: 'inherit', note: 'Label and note.' },
+      { name: '--cn-size', fallback: 'clamp(2rem, 5vw, 3rem)', note: 'Figure size (a little smaller inside a ring).' },
+      { name: '--cn-ring', fallback: '11rem', note: 'Ring diameter.' },
+      { name: '--cn-ring-width', fallback: '6', note: 'Ring thickness, in units of a 100-wide ring.' },
+      { name: '--cn-stroke', fallback: '6px', note: 'Bar thickness.' },
+      { name: '--cn-gap', fallback: '1.5rem', note: 'Between figures.' },
+      { name: '--cn-min', fallback: '10rem', note: 'A figure’s minimum width before the row wraps.' },
+    ],
+    a11y: [
+      'The figures are a list (role="list"), optionally named; nothing is a heading (UABB makes each figure an <h2>).',
+      'The final, formatted figure is in the HTML and is what a screen reader reads; the counting copy is aria-hidden. Nothing announces while it counts.',
+      'The final text and the counting copy share one grid cell with tabular figures: no layout shift.',
+      'Counts once per figure, at 40% visible. A timer finishes the count if animation frames stop (a background tab), so nobody is left on a half-counted number.',
+      'prefers-reduced-motion (tracked live), no JavaScript, and print: the final figures, rings and bars, still.',
+      'Rings and bars are decorative (aria-hidden); a bar’s meaning goes in its label or note (“of 20 places taken”).',
+    ],
+    usage: `<Counter
+  style="ring"
+  label="This year, so far"
+  items={[
+    { value: 1427, label: 'flights' },
+    { value: 263, label: 'locations' },
+    { value: 100, suffix: '%', label: 'licensed pilots' },
+  ]}
+/>
+<!-- global.css: .cn { --cn-accent: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/counter/ (demo)' }],
+    reference: [{ module: 'uabb-numbers', url: 'https://latlonguas.com/', note: 'Three circle counters (1,427 flights, 263 locations, 100); also /dc-frz/ and /our-story/.' }],
+    file: 'src/library/counter/Counter.astro',
+    added: '2026-10-30',
+  },
+  {
+    id: 'logo-grid',
+    category: 'media',
+    name: 'Logo grid',
+    aka: ['PowerPack Logo Grid', 'PowerPack Logos Carousel', 'pp-logos-grid', 'UABB logo carousel', 'Elementor logo carousel', 'client logos', 'partner logos', 'logo carousel', 'logo marquee', 'as featured in', 'trust badges'],
+    summary:
+      'Client, partner, certification or press logos in an even grid, each fitted into the same box so a wide wordmark and a square badge read as equals; or scrolling past in a slow marquee with a pause button. Optionally grey until pointed at. A named list; every logo’s alt is the organisation’s name.',
+    pitch: 'Show who already trusts you, in a tidy row of their logos.',
+    // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
+    search: { query: 'logo carousel', alsoRanks: ['logo grid', 'client logos', 'logo slider'] },
+    replaces: ['PowerPack “Logo Grid” and “Logos Carousel” (Beaver Builder)', 'UABB and Elementor logo carousels', 'client-logo slider plugins', 'a strip of logos baked into one image'],
+    goodFor: 'A band of four to twelve logos under the hero or above the footer: clients, partners, accreditations, “as featured in”.',
+    notFor:
+      'Logos the client has no permission to show, or more than about twelve (the strip becomes noise). Not for products or photos: those are product-list or photo-gallery. The marquee is not for a page that already has a moving hero or carousel.',
+    asks: [
+      { key: 'logos', label: 'Each logo, as SVG or a transparent PNG', hint: 'Only organisations that have agreed to be shown.', required: true },
+      { key: 'links', label: 'Where each logo should link, if anywhere' },
+      { key: 'heading', label: 'What the row is: clients, partners, accreditations, press', required: true },
+    ],
+    props: [
+      { name: 'logos', type: '{ src, alt, href?, width?, height? }[]', note: '`alt` is the organisation’s name, required (the build refuses a file name or URL, which is what PowerPack writes). `href` makes it a link named by that alt. width / height reserve the box.' },
+      { name: 'label', type: 'string', note: 'Required: names the list (“Clients we have flown for”).' },
+      { name: 'layout', type: "'grid' | 'marquee'", default: "'grid'", note: 'marquee scrolls one row on a loop, with a pause button; it is the grid under reduced motion, without JavaScript, or when the logos fit.' },
+      { name: 'columns', type: '{ base?, md?, lg? }', note: 'Fixed columns per breakpoint (md ≥ 48rem, lg ≥ 64rem). Default: as many as fit at --lg-min.' },
+      { name: 'grayscale', type: 'boolean', default: 'false', note: 'Grey and dimmed until hovered or focused.' },
+      { name: 'speed', type: 'number (px/s)', default: '40', note: 'Marquee speed.' },
+      { name: 'newTab', type: 'boolean', default: 'false', note: 'Open links in a new tab (rel="noopener").' },
+      { name: 'pauseLabel / playLabel', type: 'string', default: "'Pause the logos' / 'Play the logos'", note: 'The marquee button’s name, for what it will do.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--lg-height', fallback: '3.5rem', note: 'The box every logo is fitted into.' },
+      { name: '--lg-min', fallback: '9rem', note: 'Grid cell minimum width; a marquee item’s width.' },
+      { name: '--lg-gap', fallback: '2rem 2.5rem', note: 'Grid gap.' },
+      { name: '--lg-col-gap', fallback: '2.5rem', note: 'Space between marquee items.' },
+      { name: '--lg-tile-bg', fallback: 'transparent', note: 'Behind each logo.' },
+      { name: '--lg-tile-pad', fallback: '0.75rem', note: 'Inside each tile.' },
+      { name: '--lg-radius', fallback: '10px', note: 'Tile corners and focus ring.' },
+      { name: '--lg-border', fallback: 'none', note: 'Tile border (a whole border shorthand).' },
+      { name: '--lg-rest-opacity', fallback: '0.7', note: 'A grey logo’s opacity at rest.' },
+      { name: '--lg-focus', fallback: '#5933d8', note: 'Focus ring.' },
+      { name: '--lg-control-bg', fallback: '#fff', note: 'Pause button fill.' },
+      { name: '--lg-control-fg', fallback: '#1e283c', note: 'Pause button icon.' },
+      { name: '--lg-control-border', fallback: '#6b7280', note: 'Pause button edge (3:1 on white).' },
+      { name: '--lg-fade', fallback: '3rem', note: 'The marquee’s edge fade.' },
+    ],
+    a11y: [
+      'A <ul role="list"> named by `label`; each logo an <img> whose alt is the organisation’s name. A linked logo is one link, named by that alt.',
+      'Marquee, WCAG 2.2.2: a visible 44px Pause / Play button before the strip, named for what it will do. Hover and keyboard focus inside hold the strip; so do off screen and a hidden tab.',
+      'The marquee’s second copy, which closes the loop, is made by the script, aria-hidden and inert: logos are read and tabbed once.',
+      'prefers-reduced-motion (tracked live), no JavaScript, or logos that fit: the static grid, no button.',
+      'Grey logos regain colour on hover and on keyboard focus alike.',
+    ],
+    usage: `<LogoGrid
+  label="Clients we have flown for"
+  grayscale
+  logos={[
+    { src: '/logos/northwind.svg', alt: 'Northwind', href: 'https://example.com/', width: 360, height: 120 },
+    { src: '/logos/bluepeak.svg', alt: 'Bluepeak', width: 360, height: 120 },
+  ]}
+/>`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/logo-grid/ (demo)' }],
+    reference: [{ module: 'pp-logos-grid', url: 'https://latlonguas.com/', note: 'Client logos in its carousel layout; also /our-story/.' }],
+    file: 'src/library/logo-grid/LogoGrid.astro',
+    added: '2026-10-30',
+  },
+  {
+    id: 'photo-gallery',
+    category: 'media',
+    name: 'Photo gallery',
+    aka: ['UABB Photo Gallery', 'photo-gallery', 'Beaver Builder Gallery', 'PowerPack Image Gallery', 'Elementor Gallery', 'Envira Gallery', 'FooGallery', 'NextGEN Gallery', 'Modula', 'lightbox gallery', 'filterable gallery', 'Magnific Popup', 'Fancybox'],
+    summary:
+      'A grid of photos with optional category filter chips. A click opens the photo large in one native lightbox dialog with Previous / Next, the arrow keys, swipe, a “3 of 12” count and the caption, stepping only through what the filter shows. Without JavaScript every tile is a link to the large photo.',
+    pitch: 'Show off your work in a tidy grid that opens each photo full size, sorted the way your customers think.',
+    // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
+    search: { query: 'image gallery with lightbox', alsoRanks: ['filterable gallery', 'lightbox gallery', 'photo gallery website'] },
+    replaces: ['UABB “Photo Gallery” module (Beaver Builder), filterable grid and lightbox', 'Beaver Builder Gallery', 'PowerPack Image Gallery', 'Elementor Gallery', 'Envira, FooGallery, NextGEN and Modula', 'Magnific Popup and Fancybox lightboxes'],
+    goodFor: 'A portfolio of jobs (aerial work, kitchens, gardens, events) of eight to forty photos, sorted into a few categories a customer would choose between.',
+    notFor:
+      'One hero photo (an image), a before / after pair (before-after), videos (video-gallery), an Instagram feed (social-grid), or hundreds of photos (that is an album page with pagination). Not for photos the client has no rights to.',
+    asks: [
+      { key: 'photos', label: 'The photos, each with a line saying what it shows', hint: 'Full-size originals; we make the smaller copies. The line becomes the alt text.', required: true },
+      { key: 'categories', label: 'The categories to filter by, and which photos go in each', hint: 'Two to six, in the words your customers use. Leave it out for no filter.' },
+      { key: 'captions', label: 'Any captions to show under the photos' },
+    ],
+    props: [
+      { name: 'photos', type: '{ src, alt, width?, height?, full?, caption?, category? }[]', note: '`alt` required (“” only when `caption` says it all; the build refuses neither). `full` is the large file for the lightbox (default `src`). `category` one string or several; the chips are made from these.' },
+      { name: 'aspect', type: "'square' | '4/3' | '3/2' | '16/9' | 'natural'", default: "'4/3'", note: 'Tiles cropped to one shape (object-fit: cover), or each photo its own in columns (natural).' },
+      { name: 'filter', type: 'boolean', default: 'two or more categories', note: 'The category chips.' },
+      { name: 'allLabel / filterLabel', type: 'string', default: "'All' / 'Filter photos'", note: 'The first chip; the chip group’s name.' },
+      { name: 'captions', type: 'boolean', default: 'false', note: 'Captions under the tiles too; they always show in the lightbox.' },
+      { name: 'lightbox', type: 'boolean', default: 'true', note: 'Off: tiles are plain links to the large file.' },
+      { name: 'label', type: 'string', default: "'Photo gallery'", note: 'Names the list and the dialog.' },
+      { name: 'closeLabel / prevLabel / nextLabel', type: 'string', default: "'Close' / 'Previous photo' / 'Next photo'", note: 'Button names, for a non-English site.' },
+      { name: 'countLabel', type: 'string', default: "'Photo {n} of {total}'", note: 'The count, shown and announced.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--pg-min', fallback: '14rem', note: 'Tile minimum width (the column width for natural).' },
+      { name: '--pg-gap', fallback: '0.75rem', note: 'Between tiles.' },
+      { name: '--pg-radius', fallback: '10px', note: 'Tile corners.' },
+      { name: '--pg-tile-bg', fallback: '#e6e8ef', note: 'Behind a tile while it loads.' },
+      { name: '--pg-focus', fallback: '#5933d8', note: 'Focus ring on tiles and chips.' },
+      { name: '--pg-chip-bg', fallback: '#fff', note: 'Chip fill.' },
+      { name: '--pg-chip-fg', fallback: '#1e283c', note: 'Chip text.' },
+      { name: '--pg-chip-border', fallback: '#c9cedb', note: 'Chip edge.' },
+      { name: '--pg-chip-on-bg', fallback: '#1e283c', note: 'The pressed chip’s fill.' },
+      { name: '--pg-chip-on-fg', fallback: '#fff', note: 'The pressed chip’s text.' },
+      { name: '--pg-caption', fallback: 'inherit', note: 'Caption under a tile.' },
+      { name: '--pg-backdrop', fallback: 'rgb(0 0 0 / 0.9)', note: 'The lightbox behind the photo.' },
+      { name: '--pg-ui-bg', fallback: 'rgb(255 255 255 / 0.15)', note: 'Lightbox buttons.' },
+      { name: '--pg-ui-fg', fallback: '#fff', note: 'Lightbox text, icons and focus ring.' },
+    ],
+    a11y: [
+      'A <ul role="list"> of figures; every image has alt text (the build refuses a photo nothing names), width and height, and loads lazily.',
+      'Filter chips are a named group of aria-pressed buttons, “All” first; a polite status says how many show (“Scenic: 2 photos.”).',
+      'Each tile is a real link to the large photo (aria-haspopup="dialog" once the lightbox works); Cmd/Ctrl-click still opens the file.',
+      'Lightbox: a native modal <dialog> named by `label`: focus trapped, Escape closes, the page inert and not scrolling. Focus starts on the 44px close button and returns to the tile.',
+      'Previous / Next are named 44px buttons; ← → step (mirrored right to left) and wrap; a polite status says “Photo 3 of 12” and the alt text. Swipe sideways steps, swipe down closes.',
+      'Reduced motion: no fade, no hover zoom. Without JavaScript: every photo shows and links to its file.',
+    ],
+    usage: `<PhotoGallery
+  label="Recent aerial work"
+  photos={[
+    { src: '/work/roofs-800.webp', full: '/work/roofs-2000.webp', width: 800, height: 533,
+      alt: 'Rooftops of the town centre from above', category: 'Buildings', caption: 'Roof survey' },
+    { src: '/work/pylons-800.webp', full: '/work/pylons-2000.webp', width: 800, height: 533,
+      alt: 'Power lines crossing fields between three pylons', category: 'Power lines' },
+  ]}
+/>`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/photo-gallery/ (demo)' }],
+    reference: [{ module: 'photo-gallery', url: 'https://latlonguas.com/', note: 'Filterable grid (Buildings, Structures / Mining, Power Lines, Scenic) with a lightbox; also /services/ and /our-story/.' }],
+    file: 'src/library/photo-gallery/PhotoGallery.astro',
+    added: '2026-10-30',
+  },
+  {
+    id: 'separator',
+    category: 'controls',
+    name: 'Separator',
+    aka: ['UABB Advanced Separator', 'advanced-separator', 'Beaver Builder Separator', 'Elementor Divider', 'divider', 'divider with text', 'divider with icon', 'section divider', 'hr', 'horizontal rule', 'accent bar'],
+    summary:
+      'A line between sections, plain or with a short text or an icon in the middle: solid, dashed, dotted or double, full width or a short accent bar, aligned to the start, centre or end. Decorative (aria-hidden) unless asked to be a real thematic break; text in the middle is real text and can be a heading. Optionally grows into view once.',
+    pitch: 'Tidy breaks between your sections, with a word or an icon in the middle when you want one.',
+    // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
+    search: { query: 'divider with text', alsoRanks: ['section divider', 'css divider', 'divider line'] },
+    replaces: ['UABB “Advanced Separator” module (Beaver Builder), line, icon and text styles', 'Beaver Builder Separator', 'Elementor Divider widget', 'theme-styled <hr> rules'],
+    goodFor: 'A short accent bar under a heading, a line between two halves of a page, “or” between two choices, a heading set between two lines.',
+    notFor: 'Space alone (that is margin), shaped section edges (waves and slants are the section’s own background), or a separator after every block, which flattens the page instead of dividing it.',
+    props: [
+      { name: 'text', type: 'string', note: 'Short text in the middle (“or”, “Our services”). Real text.' },
+      { name: 'as', type: "'span' | 'p' | 'h2' … 'h6'", default: "'span'", note: 'Element for the text: a heading keeps it in the outline.' },
+      { name: 'icon', type: 'string', note: 'Inline SVG in the middle, decorative unless `iconLabel`. Ignored with `text`.' },
+      { name: 'iconLabel', type: 'string', note: 'Makes the icon meaningful (role="img").' },
+      { name: 'line', type: "'solid' | 'dashed' | 'dotted' | 'double'", default: "'solid'", note: 'The line’s style.' },
+      { name: 'width', type: 'CSS length', default: "'100%'", note: 'The whole separator; a short width with nothing in the middle is a 3px accent bar.' },
+      { name: 'align', type: "'start' | 'center' | 'end'", default: "'center'", note: 'Where a short separator sits, and where the text or icon sits in a long one.' },
+      { name: 'semantic', type: 'boolean', default: 'false', note: 'A plain line as a real thematic break (<hr>), announced as a separator.' },
+      { name: 'reveal', type: 'boolean', default: 'false', note: 'Grows into view the first time it scrolls into view. Only the script hides it.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--sep-color', fallback: '#c9cedb', note: 'The line. Decorative, so no contrast floor; keep it visible on the background.' },
+      { name: '--sep-accent', fallback: 'currentColor', note: 'Text and icon; keep 4.5:1 for text.' },
+      { name: '--sep-thickness', fallback: '1px (3px for an accent bar)', note: 'Line thickness.' },
+      { name: '--sep-gap', fallback: '1rem', note: 'Between the lines and the text or icon.' },
+      { name: '--sep-space', fallback: '2rem', note: 'Margin above and below.' },
+      { name: '--sep-icon-size', fallback: '1.5rem', note: 'Icon size.' },
+      { name: '--sep-duration', fallback: '700ms', note: 'The reveal.' },
+    ],
+    a11y: [
+      'A plain line is aria-hidden decoration, so a screen reader does not hear “separator” between every block; `semantic` makes it an <hr> for a real thematic break.',
+      'Text in the middle is real text and the lines either side are aria-hidden; `as="h2"` makes it a heading in the outline.',
+      'An icon is aria-hidden unless `iconLabel` gives it a name.',
+      '`reveal`: only the script hides the line, so without JavaScript, under prefers-reduced-motion (tracked live) and in print it is simply there. Forced colours: the line is CanvasText.',
+    ],
+    usage: `<h2>Our services</h2>
+<Separator width="6rem" align="start" reveal />
+
+<Separator text="or" line="dashed" />
+<Separator text="What our clients say" as="h2" />
+<!-- global.css: .sep { --sep-color: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/separator/ (demo)' }],
+    reference: [{ module: 'advanced-separator', url: 'https://latlonguas.com/', note: 'Short accent bars that slide in above headings, on all five main pages.' }],
+    file: 'src/library/separator/Separator.astro',
+    added: '2026-10-30',
+  },
+  {
+    id: 'call-to-action',
+    category: 'conversion',
+    name: 'Call to action',
+    aka: ['UABB Call to Action', 'uabb-call-to-action', 'Beaver Builder Call to Action', 'cta', 'Elementor Call to Action', 'PowerPack CTA box', 'CTA band', 'CTA banner', 'call to action section'],
+    summary:
+      'A band that asks for the next step: a heading, a line or two, and one or two buttons. Stacked and centred, or inline with the buttons beside the text from 40rem of its own width. Accent, dark or light, all clearing 4.5:1. A <section> named by its heading; real links, so a tel: button is a phone link.',
+    pitch: 'End each page with one clear next step, so visitors who are ready know exactly what to do.',
+    // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
+    search: { query: 'call to action section', alsoRanks: ['cta banner', 'cta section', 'call to action banner'] },
+    replaces: ['UABB “Call to Action” module (Beaver Builder)', 'Beaver Builder “Call to Action” (cta)', 'Elementor Call to Action widget', 'PowerPack CTA box'],
+    goodFor: 'The end of a service page or the home page: “Get a quote”, “Book a visit”, “Call us”. One per page, or one per long section.',
+    notFor:
+      'Interrupting the visitor (modal), a message across the top of the site (announcement-bar), a band over a photo (parallax-band holds the same content over an image), or three or more equal choices (a card grid).',
+    asks: [
+      { key: 'wording', label: 'The heading and the line under it', required: true },
+      { key: 'buttons', label: 'The button wording, and where each one goes', hint: 'One or two. A phone number works as a button.', required: true },
+    ],
+    props: [
+      { name: 'title', type: 'string', note: 'Required: the heading, and the band’s name.' },
+      { name: 'text', type: 'string', note: 'A line or two under the title. Or the default slot, for links (a tel: number).' },
+      { name: 'buttons', type: '{ text, href }[]', note: 'One or two (the build refuses three); the first is the filled primary.' },
+      { name: 'layout', type: "'stacked' | 'inline'", default: "'stacked'", note: 'inline: buttons beside the text from 40rem of the band’s own width (container query); stacked below that.' },
+      { name: 'align', type: "'center' | 'start'", default: "'center'", note: 'For stacked, and inline while it is stacked.' },
+      { name: 'tone', type: "'accent' | 'dark' | 'light'", default: "'accent'", note: 'Background and text pair.' },
+      { name: 'headingLevel', type: '2 | 3 | 4', default: '2', note: 'UABB renders an <h1>; match the page outline instead.' },
+      { name: 'landmark', type: 'boolean', default: 'true', note: 'A <section> region named by the title. Turn off when a page has several.' },
+      { name: 'class', type: 'string', note: 'Class on the root, for the host to theme it.' },
+    ],
+    theming: [
+      { name: '--cta-accent-bg', fallback: '#5933d8', note: 'tone="accent" background.' },
+      { name: '--cta-accent-fg', fallback: '#fff', note: 'tone="accent" text (7.27:1).' },
+      { name: '--cta-dark-bg', fallback: '#1e283c', note: 'tone="dark" background.' },
+      { name: '--cta-dark-fg', fallback: '#fff', note: 'tone="dark" text (14.75:1).' },
+      { name: '--cta-light-bg', fallback: '#f4f1fe', note: 'tone="light" background.' },
+      { name: '--cta-light-fg', fallback: '#1e283c', note: 'tone="light" text.' },
+      { name: '--cta-btn-bg', fallback: 'the tone’s text colour', note: 'Primary button fill (and both buttons’ edge).' },
+      { name: '--cta-btn-fg', fallback: 'the tone’s background', note: 'Primary button text.' },
+      { name: '--cta-radius', fallback: '16px', note: 'Band corners; 0 for a full-bleed band.' },
+      { name: '--cta-padding', fallback: 'clamp(1.75rem, 5cqi, 3rem) clamp(1.25rem, 5cqi, 3rem)', note: 'Inside the band.' },
+      { name: '--cta-gap', fallback: '1.25rem 2rem', note: 'Between text and buttons.' },
+      { name: '--cta-max', fallback: '40rem', note: 'The text’s measure.' },
+      { name: '--cta-title-size', fallback: 'clamp(1.4rem, 1rem + 2.5cqi, 2rem)', note: 'Heading size.' },
+      { name: '--cta-focus', fallback: 'the tone’s text colour', note: 'Focus ring.' },
+    ],
+    a11y: [
+      'A <section> named by its heading (a region landmark), or a plain <div> with landmark={false}. The heading is at `headingLevel`, never a second <h1>.',
+      'Buttons are real links, at least 44px tall, with a 3px focus ring in the tone’s text colour; a tel: href is a phone link.',
+      'The three tones’ fallbacks clear 4.5:1 for the text and for both buttons; keep that when mapping them to brand colours.',
+      'No motion. Forced colours: a border round the band and link-coloured button edges.',
+    ],
+    usage: `<CallToAction
+  title="Looking for pricing, or just exploring?"
+  text="Either way, it takes a minute to get in touch."
+  buttons={[{ text: 'Drop us a line', href: '/contact/' }, { text: 'Call (555) 555-0123', href: 'tel:+15555550123' }]}
+/>
+<!-- global.css: .cta { --cta-accent-bg: var(--brand); } -->`,
+    usedOn: [{ site: 'superherotech.ai', where: '/elements/call-to-action/ (demo)' }],
+    reference: [
+      { module: 'uabb-call-to-action', url: 'https://latlonguas.com/', note: '“Looking for pricing or just exploring options?”: stacked and centred, one button.' },
+      { module: 'cta', url: 'https://latlonguas.com/dc-frz/', note: 'Beaver Builder’s own module, inline: “Ready to find out more?” with a phone link and Request a Call Back.' },
+    ],
+    file: 'src/library/call-to-action/CallToAction.astro',
+    added: '2026-10-30',
   },
   {
     id: 'image-effects',

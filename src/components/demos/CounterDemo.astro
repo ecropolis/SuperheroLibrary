@@ -1,0 +1,61 @@
+---
+/**
+ * Demo for `counter`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so every host token has a fallback. It uses no assets.
+ *
+ * Three rows: rings (the UABB "circle" look latlonguas.com uses), plain figures with a prefix
+ * and a suffix, and bars against a stated maximum. Each counts once as it scrolls into view;
+ * under reduced motion the final figures simply show.
+ */
+import Counter from '../../library/counter/Counter.astro';
+---
+<div class="demo-cn">
+  <section>
+    <h2 class="demo-cn__h">This year, so far</h2>
+    <Counter
+      style="ring"
+      label="This year, so far"
+      items={[
+        { value: 1427, label: 'flights' },
+        { value: 263, label: 'locations' },
+        { value: 100, suffix: '%', label: 'licensed pilots' },
+      ]}
+    />
+  </section>
+  <section>
+    <h2 class="demo-cn__h">The workshop in numbers</h2>
+    <Counter
+      label="The workshop in numbers"
+      items={[
+        { value: 12, suffix: '+', label: 'years in business' },
+        { value: 380, label: 'five-star reviews' },
+        { value: 48, prefix: '$', suffix: 'k', label: 'raised for the food bank' },
+      ]}
+      class="demo-cn__plain"
+    />
+  </section>
+  <section>
+    <h2 class="demo-cn__h">Spring course places</h2>
+    <Counter
+      style="bar"
+      align="start"
+      label="Spring course places taken"
+      items={[
+        { value: 18, max: 20, label: 'Beginners', note: 'of 20 places taken' },
+        { value: 9, max: 16, label: 'Improvers', note: 'of 16 places taken' },
+      ]}
+    />
+  </section>
+</div>
+<style>
+  .demo-cn {
+    --cn-accent: var(--purple, #5933d8);
+    display: grid;
+    gap: 2.75rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-cn__h {
+    margin: 0 0 1.25rem;
+    font-size: 1.35rem;
+  }
+</style>

@@ -1,0 +1,49 @@
+---
+/**
+ * Demo for `logo-grid`. The website renders this too (see README, "Consumed by
+ * superherotech.ai"), so assets go through `asset()` and every host token has a fallback.
+ *
+ * The logos are made-up wordmarks in public/demo/logo-*.svg, never a client's. Two instances:
+ * a grid that greys the logos until pointed at (two of them linked), and a marquee with its
+ * pause button, which is the grid again under reduced motion or when the logos fit.
+ */
+import LogoGrid from '../../library/logo-grid/LogoGrid.astro';
+
+interface Props {
+  /** Where public/demo/ is served. The gallery uses /demo/; the website passes /elements-demo/. */
+  assetBase?: string;
+}
+const { assetBase = '/demo/' } = Astro.props;
+const asset = (name: string) => assetBase + name;
+
+const logos = [
+  { src: asset('logo-northwind.svg'), alt: 'Northwind', width: 360, height: 120, href: '#logo-grid-demo' },
+  { src: asset('logo-bluepeak.svg'), alt: 'Bluepeak', width: 360, height: 120 },
+  { src: asset('logo-cedar.svg'), alt: 'Cedar & Co', width: 360, height: 120, href: '#logo-grid-demo' },
+  { src: asset('logo-orbit.svg'), alt: 'Orbit Labs', width: 360, height: 120 },
+  { src: asset('logo-harbor.svg'), alt: 'Harbor', width: 360, height: 120 },
+  { src: asset('logo-summit.svg'), alt: 'Summit Air', width: 360, height: 120 },
+];
+---
+<div class="demo-lg" id="logo-grid-demo">
+  <section>
+    <h2 class="demo-lg__h">Trusted by</h2>
+    <LogoGrid logos={logos} label="Clients we have worked with" grayscale />
+  </section>
+  <section>
+    <h2 class="demo-lg__h">As a marquee</h2>
+    <LogoGrid logos={[...logos, ...logos.map((l) => ({ ...l, href: undefined }))].slice(0, 9)} label="More of our clients" layout="marquee" />
+  </section>
+</div>
+<style>
+  .demo-lg {
+    --lg-focus: var(--purple, #5933d8);
+    display: grid;
+    gap: 2.75rem;
+    color: var(--ink, #16192a);
+  }
+  .demo-lg__h {
+    margin: 0 0 1.25rem;
+    font-size: 1.35rem;
+  }
+</style>

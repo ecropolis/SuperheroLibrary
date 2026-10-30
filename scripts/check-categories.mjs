@@ -61,6 +61,7 @@ const GOLDEN = {
   'business-hours': 'content',
   map: 'content',
   'responsive-table': 'content',
+  counter: 'content',
 
   'before-after': 'media',
   'video-player': 'media',
@@ -69,6 +70,8 @@ const GOLDEN = {
   'card-slider': 'media',
   'testimonial-carousel': 'media',
   icon: 'media',
+  'logo-grid': 'media',
+  'photo-gallery': 'media',
   'image-effects': 'media',
 
   countdown: 'conversion',
@@ -80,6 +83,7 @@ const GOLDEN = {
   cart: 'conversion',
   'product-list': 'conversion',
   'product-page': 'conversion',
+  'call-to-action': 'conversion',
 
   notice: 'feedback',
   toast: 'feedback',
@@ -92,6 +96,7 @@ const GOLDEN = {
   tags: 'controls',
   'link-effects': 'controls',
   'cookie-consent': 'controls',
+  separator: 'controls',
 };
 
 const MIN_PER_CATEGORY = 3;
