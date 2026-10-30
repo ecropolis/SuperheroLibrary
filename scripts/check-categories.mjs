@@ -69,6 +69,7 @@ const GOLDEN = {
   'card-slider': 'media',
   'testimonial-carousel': 'media',
   icon: 'media',
+  'image-effects': 'media',
 
   countdown: 'conversion',
   'announcement-bar': 'conversion',
