@@ -28,6 +28,10 @@
  * (with JavaScript; without it the panels stack as rounded boxes): UABB's iHover. Keep a
  * circle's back to about 20 words; it clips what does not fit.
  *
+ * The image variant's scrim. Measure `--slb-scrim` for each photo and set it on that tile; never
+ * reuse one dark value. The fallback (0.45 at the foot) is only a starting point: on
+ * latlonguas.com four real photos needed 0.19–0.33, and 0.85 buried them.
+ *
  * Sizing. Both panels share one grid cell, so the card is as tall as the taller panel and
  * neither is cut off; there is no fixed height. The host's grid sets the width.
  *
@@ -487,7 +491,7 @@ locals.__slideBoxScript = true;
   .slb--image .slb__front .slb__body {
     position: relative;
     padding-top: 4rem;
-    background: var(--slb-scrim, linear-gradient(to top, rgb(20 24 40 / 0.85), rgb(20 24 40 / 0.55) 60%, transparent));
+    background: var(--slb-scrim, linear-gradient(to top, rgb(20 24 40 / 0.45), rgb(20 24 40 / 0.3) 60%, transparent));
   }
   .slb--image .slb__front .slb__hint {
     color: var(--slb-image-fg, #fff);
