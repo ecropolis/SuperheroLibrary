@@ -396,7 +396,10 @@ export const catalog: Element[] = [
   <a class="button" href="/about/">Our story</a>
 </ParallaxBand>
 <!-- :root { --pb-overlay: var(--navy); --pb-fg: var(--white); } -->`,
-    usedOn: [{ site: 'stbeautybar', where: 'Home, the “Confidence” band (speed 0.15, position top); ecropolis/stbeautybar-astro#2' }],
+    usedOn: [
+      { site: 'stbeautybar', where: 'Home, the “Confidence” band (speed 0.15, position top); ecropolis/stbeautybar-astro#2' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its Band.astro wrapper: the photo bands on every page but /drone-selfie/, each with a measured scrim' },
+    ],
     file: 'src/library/parallax-band/ParallaxBand.astro',
     added: '2026-09-23',
   },
@@ -833,6 +836,7 @@ const faqs: AccordionItem[] = [
     usedOn: [
       { site: 'jwalktours.com', where: '/faqs/ and the tour pages: its own FaqList.astro (<details>, FAQPage JSON-LD from the same array); moves to this element on its next FAQ request' },
       { site: 'stbeautybar.com', where: '/about-us/ FAQ: its own Faqs.astro (exclusive, first open, rotating icon, FAQPage JSON-LD); moves to this element on its next FAQ request' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: '/dc-frz/, the FRZ questions (boxed, FAQPage JSON-LD)' },
     ],
     reference: [
       { module: 'pp-advanced-accordion', url: 'https://latlonguas.com/dc-frz/', note: 'The FRZ questions at the foot of the page.' },
@@ -1823,7 +1827,7 @@ import { analytics } from '../data/site';
       { name: '--slb-fade', fallback: '200ms', note: 'The crossfade under reduced motion.' },
       { name: '--slb-focus', fallback: 'var(--slb-accent)', note: 'Focus ring round the card.' },
       { name: '--slb-image-fg', fallback: '#fff', note: 'variant="image": text over the photo and on its tinted back.' },
-      { name: '--slb-scrim', fallback: 'linear-gradient(to top, rgb(20 24 40 / 0.85), rgb(20 24 40 / 0.55) 60%, transparent)', note: 'variant="image": behind the front’s title, for 4.5:1 over the photo.' },
+      { name: '--slb-scrim', fallback: 'linear-gradient(to top, rgb(20 24 40 / 0.45), rgb(20 24 40 / 0.3) 60%, transparent)', note: 'variant="image": behind the front’s title, for 4.5:1 over the photo. Measure it per image and set it on each tile; the fallback is a starting point, not an answer (latlonguas.com’s four photos needed 0.19–0.33).' },
       { name: '--slb-image-back-bg', fallback: 'rgb(20 24 40 / 0.86)', note: 'variant="image": the tint that slides in over the photo.' },
       { name: '--slb-image-height', fallback: '16rem', note: 'variant="image": the card’s floor.' },
     ],
@@ -1848,7 +1852,10 @@ import { analytics } from '../data/site';
 <!-- global.css: .slb { --slb-accent: var(--brand); --slb-radius: var(--radius); } -->`,
     license:
       'The icons in this demo are Font Awesome Free (CC BY 4.0), each carrying Font Awesome’s own attribution comment. The card takes any SVG you give it: your own icons, or a Font Awesome Pro one we have licensed for your site.',
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/slide-box/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/slide-box/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Home, the image tiles under “From the strictly functional…” (a measured --slb-scrim per tile); /dc-frz/, the circle that opens the waiver form' },
+    ],
     reference: [
       { module: 'interactive-banner-1', url: 'https://latlonguas.com/', note: 'Four photo banners (“Dazzling imagery”…) whose line rises on hover: variant="image".' },
       { module: 'ihover', url: 'https://latlonguas.com/dc-frz/', note: 'The round “FRZ Waiver Request Form” tile: variant="image" shape="circle".' },
@@ -1999,7 +2006,10 @@ import { analytics } from '../data/site';
   <div slot="b">…</div>
 </ContentToggle>
 <!-- .ct { --ct-track: var(--brand); --ct-pressed-bg: var(--brand); } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/content-toggle/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/content-toggle/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its Portfolio.astro, “Our works”: Photography / Videography (home, /services/, /our-story/)' },
+    ],
     reference: [
       { module: 'uabb-content-toggle', url: 'https://latlonguas.com/', note: 'Home page; also /services/ and /our-story/.' },
     ],
@@ -2072,7 +2082,10 @@ import { analytics } from '../data/site';
   .site { transition: translate 0.28s; }
   html[data-ofc-push="left"] .site { translate: var(--ofc-push) 0; }
   @media (prefers-reduced-motion: reduce) { .site { transition: none; } } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/off-canvas/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/off-canvas/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: '/dc-frz/, the FRZ waiver request form from the right' },
+    ],
     reference: [
       { module: 'uabb-off-canvas', url: 'https://latlonguas.com/', note: 'On /, /dc-frz/, /services/ and /our-story/.' },
     ],
@@ -3378,7 +3391,10 @@ const { product, currency } = Astro.props;
   ]}
 />
 <!-- global.css: .cn { --cn-accent: var(--brand); } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/counter/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/counter/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its SafetyRecord.astro (home, /our-story/) and /dc-frz/ “Inside the FRZ, so far”, ring style' },
+    ],
     reference: [{ module: 'uabb-numbers', url: 'https://latlonguas.com/', note: 'Three circle counters (1,427 flights, 263 locations, 100); also /dc-frz/ and /our-story/.' }],
     file: 'src/library/counter/Counter.astro',
     added: '2026-10-30',
@@ -3444,7 +3460,10 @@ const { product, currency } = Astro.props;
     { src: '/logos/bluepeak.svg', alt: 'Bluepeak', width: 360, height: 120 },
   ]}
 />`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/logo-grid/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/logo-grid/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its NotableClients.astro (home, /our-story/)' },
+    ],
     reference: [{ module: 'pp-logos-grid', url: 'https://latlonguas.com/', note: 'Client logos in its carousel layout; also /our-story/.' }],
     file: 'src/library/logo-grid/LogoGrid.astro',
     added: '2026-10-30',
@@ -3513,7 +3532,10 @@ const { product, currency } = Astro.props;
       alt: 'Power lines crossing fields between three pylons', category: 'Power lines' },
   ]}
 />`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/photo-gallery/ (demo)' }],
+    usedOn: [
+      { site: 'superherotech.ai', where: '/elements/photo-gallery/ (demo)' },
+      { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its Portfolio.astro, the Photography panel (filtered, 3/2)' },
+    ],
     reference: [{ module: 'photo-gallery', url: 'https://latlonguas.com/', note: 'Filterable grid (Buildings, Structures / Mining, Power Lines, Scenic) with a lightbox; also /services/ and /our-story/.' }],
     file: 'src/library/photo-gallery/PhotoGallery.astro',
     added: '2026-10-30',
