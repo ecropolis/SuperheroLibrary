@@ -314,6 +314,9 @@ const uid = 'pg-' + Math.random().toString(36).slice(2, 8);
 <style>
   .pg {
     display: grid;
+    /* An auto track grows to the filter row's max-content width and pushes
+       the page sideways on phones; pin it to the container. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
   }
   .pg__filters {
