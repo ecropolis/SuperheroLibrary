@@ -30,7 +30,10 @@
  *
  * The image variant's scrim. Measure `--slb-scrim` for each photo and set it on that tile; never
  * reuse one dark value. The fallback (0.45 at the foot) is only a starting point: on
- * latlonguas.com four real photos needed 0.19–0.33, and 0.85 buried them.
+ * latlonguas.com four real photos needed 0.19–0.33, and 0.85 buried them. A circle's text sits
+ * in the middle of the disc, so its scrim fills the disc instead (the fallback is a radial
+ * tint, darkest under the text); `--slb-scrim` overrides it there too, as a radial gradient or a
+ * flat colour, not a foot gradient.
  *
  * Sizing. Both panels share one grid cell, so the card is as tall as the taller panel and
  * neither is cut off; there is no fixed height. The host's grid sets the width.
@@ -530,11 +533,13 @@ locals.__slideBoxScript = true;
   .slb--circle[data-ready].slb--image .slb__front {
     align-content: center;
   }
+  /* The circle's scrim fills the disc, darkest under the centred text. --slb-scrim overrides it
+     here as well; a circle wants a radial or a flat value, not the foot gradient. */
   .slb--circle[data-ready].slb--image .slb__front::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: rgb(20 24 40 / 0.35);
+    background: var(--slb-scrim, radial-gradient(closest-side, rgb(20 24 40 / 0.62) 55%, rgb(20 24 40 / 0.38)));
   }
   .slb--circle[data-ready] .slb__front .slb__body {
     position: relative;
