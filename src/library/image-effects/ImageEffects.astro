@@ -11,7 +11,7 @@
  *                 for the MLP Technologies rebuild (2026-10-29), step for step.
  *   zoom          the photo pushes in slowly inside its frame
  *   grayscale     black and white at rest, colour on hover
- *   duotone       two brand colours at rest (--ie-duo-dark, --ie-duo-light), the photo on hover
+ *   duotone       two brand colors at rest (--ie-duo-dark, --ie-duo-light), the photo on hover
  *   tilt          the frame leans toward the pointer in 3D with a soft glare (fine pointers only)
  *   shine         a band of light sweeps across once
  *   caption       the caption slides up over the photo; always shown where nothing can hover
@@ -176,7 +176,7 @@ const words = {
   play: labels.play ?? 'Play slideshow',
   slide: labels.slide ?? '{n} of {total}',
 };
-const Heading = `h${headingLevel}`;
+const Heading = `h${headingLevel}` as 'h1' | 'h2' | 'h3';
 const frameRatio = ratio ?? (width && height ? `${width} / ${height}` : undefined);
 const Frame = href ? 'a' : 'div';
 // gallery-open: positions in the strip, outermost first; the centre is separate.
