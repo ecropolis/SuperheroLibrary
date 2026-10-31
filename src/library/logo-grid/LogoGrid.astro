@@ -2,12 +2,12 @@
 /**
  * LogoGrid — the logos of clients, partners, certifications or press, in an even grid (each
  * logo fitted into the same box, so a wide wordmark and a square badge read as equals), or
- * scrolling past in a slow marquee with a pause button. Optionally grey until pointed at.
+ * scrolling past in a slow marquee with a pause button. Optionally gray until pointed at.
  * Replaces PowerPack's Logo Grid and Logos Carousel, UABB's and Elementor's logo carousels,
  * and "client logos" sliders.
  *
  * Semantics. A list (<ul role="list">) named by `label` ("Some of the clients we have flown
- * for"). Each logo is an <img> whose alt is the organisation's name, required: PowerPack sets
+ * for"). Each logo is an <img> whose alt is the organization's name, required: PowerPack sets
  * the image URL as alt, so a screen reader reads a file path. A logo with `href` is a link
  * named by that alt. Links open in the same tab unless `newTab`.
  *
@@ -31,7 +31,7 @@
  */
 export interface Logo {
   src: string;
-  /** The organisation's name. Required: it is what a screen reader says. */
+  /** The organization's name. Required: it is what a screen reader says. */
   alt: string;
   href?: string;
   /** Intrinsic size, so the box is reserved before the image loads. */
@@ -71,7 +71,7 @@ if (!Array.isArray(logos) || logos.length === 0) throw new Error(`LogoGrid "${la
 for (const [i, l] of logos.entries()) {
   if (!l?.src) throw new Error(`LogoGrid "${label}": logo #${i + 1} has no \`src\`.`);
   if (typeof l.alt !== 'string' || !l.alt.trim() || /^(https?:)?\/\/|\.(png|jpe?g|webp|svg|gif|avif)$/i.test(l.alt.trim())) {
-    throw new Error(`LogoGrid "${label}": logo #${i + 1} (${l.src}) needs \`alt\`, the organisation's name, not a file name or URL.`);
+    throw new Error(`LogoGrid "${label}": logo #${i + 1} (${l.src}) needs \`alt\`, the organization's name, not a file name or URL.`);
   }
 }
 if (!['grid', 'marquee'].includes(layout)) throw new Error(`LogoGrid "${label}": \`layout\` is grid or marquee; got "${layout}".`);

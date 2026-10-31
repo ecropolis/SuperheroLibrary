@@ -978,7 +978,7 @@ const faqs: AccordionItem[] = [
     // vertical timeline 500/mo, difficulty 21 (rising); icon list 660/45; timeline design website
     // 170/25 (SE Ranking US, 2026-09-23).
     search: { query: 'vertical timeline', alsoRanks: ['icon list', 'timeline design website'] },
-    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists', 'UABB and PowerPack “Info Box” modules (boxed and centred)'],
+    replaces: ['PowerPack “Info List” module (Beaver Builder)', 'UABB “Info List”', 'Elementor Icon List widget', 'hand-written icon lists', 'UABB and PowerPack “Info Box” modules (boxed and centered)'],
     goodFor: 'Services, “how it works”, process steps, milestones and feature lists.',
     notFor: 'Navigation (that is a menu) and long prose (write paragraphs).',
     asks: [
@@ -3389,7 +3389,7 @@ const { product, currency } = Astro.props;
     name: 'Logo grid',
     aka: ['PowerPack Logo Grid', 'PowerPack Logos Carousel', 'pp-logos-grid', 'UABB logo carousel', 'Elementor logo carousel', 'client logos', 'partner logos', 'logo carousel', 'logo marquee', 'as featured in', 'trust badges'],
     summary:
-      'Client, partner, certification or press logos in an even grid, each fitted into the same box so a wide wordmark and a square badge read as equals; or scrolling past in a slow marquee with a pause button. Optionally grey until pointed at. A named list; every logo’s alt is the organisation’s name.',
+      'Client, partner, certification or press logos in an even grid, each fitted into the same box so a wide wordmark and a square badge read as equals; or scrolling past in a slow marquee with a pause button. Optionally gray until pointed at. A named list; every logo’s alt is the organization’s name.',
     pitch: 'Show who already trusts you, in a tidy row of their logos.',
     // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
     search: { query: 'logo carousel', alsoRanks: ['logo grid', 'client logos', 'logo slider'] },
@@ -3398,12 +3398,12 @@ const { product, currency } = Astro.props;
     notFor:
       'Logos the client has no permission to show, or more than about twelve (the strip becomes noise). Not for products or photos: those are product-list or photo-gallery. The marquee is not for a page that already has a moving hero or carousel.',
     asks: [
-      { key: 'logos', label: 'Each logo, as SVG or a transparent PNG', hint: 'Only organisations that have agreed to be shown.', required: true },
+      { key: 'logos', label: 'Each logo, as SVG or a transparent PNG', hint: 'Only organizations that have agreed to be shown.', required: true },
       { key: 'links', label: 'Where each logo should link, if anywhere' },
       { key: 'heading', label: 'What the row is: clients, partners, accreditations, press', required: true },
     ],
     props: [
-      { name: 'logos', type: '{ src, alt, href?, width?, height? }[]', note: '`alt` is the organisation’s name, required (the build refuses a file name or URL, which is what PowerPack writes). `href` makes it a link named by that alt. width / height reserve the box.' },
+      { name: 'logos', type: '{ src, alt, href?, width?, height? }[]', note: '`alt` is the organization’s name, required (the build refuses a file name or URL, which is what PowerPack writes). `href` makes it a link named by that alt. width / height reserve the box.' },
       { name: 'label', type: 'string', note: 'Required: names the list (“Clients we have flown for”).' },
       { name: 'layout', type: "'grid' | 'marquee'", default: "'grid'", note: 'marquee scrolls one row on a loop, with a pause button; it is the grid under reduced motion, without JavaScript, or when the logos fit.' },
       { name: 'columns', type: '{ base?, md?, lg? }', note: 'Fixed columns per breakpoint (md ≥ 48rem, lg ≥ 64rem). Default: as many as fit at --lg-min.' },
@@ -3430,11 +3430,11 @@ const { product, currency } = Astro.props;
       { name: '--lg-fade', fallback: '3rem', note: 'The marquee’s edge fade.' },
     ],
     a11y: [
-      'A <ul role="list"> named by `label`; each logo an <img> whose alt is the organisation’s name. A linked logo is one link, named by that alt.',
+      'A <ul role="list"> named by `label`; each logo an <img> whose alt is the organization’s name. A linked logo is one link, named by that alt.',
       'Marquee, WCAG 2.2.2: a visible 44px Pause / Play button before the strip, named for what it will do. Hover and keyboard focus inside hold the strip; so do off screen and a hidden tab.',
       'The marquee’s second copy, which closes the loop, is made by the script, aria-hidden and inert: logos are read and tabbed once.',
       'prefers-reduced-motion (tracked live), no JavaScript, or logos that fit: the static grid, no button.',
-      'Grey logos regain colour on hover and on keyboard focus alike.',
+      'Gray logos regain color on hover and on keyboard focus alike.',
     ],
     usage: `<LogoGrid
   label="Clients we have flown for"
@@ -3508,7 +3508,7 @@ const { product, currency } = Astro.props;
   label="Recent aerial work"
   photos={[
     { src: '/work/roofs-800.webp', full: '/work/roofs-2000.webp', width: 800, height: 533,
-      alt: 'Rooftops of the town centre from above', category: 'Buildings', caption: 'Roof survey' },
+      alt: 'Rooftops of the town center from above', category: 'Buildings', caption: 'Roof survey' },
     { src: '/work/pylons-800.webp', full: '/work/pylons-2000.webp', width: 800, height: 533,
       alt: 'Power lines crossing fields between three pylons', category: 'Power lines' },
   ]}
@@ -3524,7 +3524,7 @@ const { product, currency } = Astro.props;
     name: 'Separator',
     aka: ['UABB Advanced Separator', 'advanced-separator', 'Beaver Builder Separator', 'Elementor Divider', 'divider', 'divider with text', 'divider with icon', 'section divider', 'hr', 'horizontal rule', 'accent bar'],
     summary:
-      'A line between sections, plain or with a short text or an icon in the middle: solid, dashed, dotted or double, full width or a short accent bar, aligned to the start, centre or end. Decorative (aria-hidden) unless asked to be a real thematic break; text in the middle is real text and can be a heading. Optionally grows into view once.',
+      'A line between sections, plain or with a short text or an icon in the middle: solid, dashed, dotted or double, full width or a short accent bar, aligned to the start, center or end. Decorative (aria-hidden) unless asked to be a real thematic break; text in the middle is real text and can be a heading. Optionally grows into view once.',
     pitch: 'Tidy breaks between your sections, with a word or an icon in the middle when you want one.',
     // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
     search: { query: 'divider with text', alsoRanks: ['section divider', 'css divider', 'divider line'] },
@@ -3556,7 +3556,7 @@ const { product, currency } = Astro.props;
       'A plain line is aria-hidden decoration, so a screen reader does not hear “separator” between every block; `semantic` makes it an <hr> for a real thematic break.',
       'Text in the middle is real text and the lines either side are aria-hidden; `as="h2"` makes it a heading in the outline.',
       'An icon is aria-hidden unless `iconLabel` gives it a name.',
-      '`reveal`: only the script hides the line, so without JavaScript, under prefers-reduced-motion (tracked live) and in print it is simply there. Forced colours: the line is CanvasText.',
+      '`reveal`: only the script hides the line, so without JavaScript, under prefers-reduced-motion (tracked live) and in print it is simply there. Forced colors: the line is CanvasText.',
     ],
     usage: `<h2>Our services</h2>
 <Separator width="6rem" align="start" reveal />
@@ -3575,7 +3575,7 @@ const { product, currency } = Astro.props;
     name: 'Call to action',
     aka: ['UABB Call to Action', 'uabb-call-to-action', 'Beaver Builder Call to Action', 'cta', 'Elementor Call to Action', 'PowerPack CTA box', 'CTA band', 'CTA banner', 'call to action section'],
     summary:
-      'A band that asks for the next step: a heading, a line or two, and one or two buttons. Stacked and centred, or inline with the buttons beside the text from 40rem of its own width. Accent, dark or light, all clearing 4.5:1. A <section> named by its heading; real links, so a tel: button is a phone link.',
+      'A band that asks for the next step: a heading, a line or two, and one or two buttons. Stacked and centered, or inline with the buttons beside the text from 40rem of its own width. Accent, dark or light, all clearing 4.5:1. A <section> named by its heading; real links, so a tel: button is a phone link.',
     pitch: 'End each page with one clear next step, so visitors who are ready know exactly what to do.',
     // Not measured: SE Ranking timed out on 2026-10-30. Measure before the page goes live.
     search: { query: 'call to action section', alsoRanks: ['cta banner', 'cta section', 'call to action banner'] },
@@ -3605,20 +3605,20 @@ const { product, currency } = Astro.props;
       { name: '--cta-dark-fg', fallback: '#fff', note: 'tone="dark" text (14.75:1).' },
       { name: '--cta-light-bg', fallback: '#f4f1fe', note: 'tone="light" background.' },
       { name: '--cta-light-fg', fallback: '#1e283c', note: 'tone="light" text.' },
-      { name: '--cta-btn-bg', fallback: 'the tone’s text colour', note: 'Primary button fill (and both buttons’ edge).' },
+      { name: '--cta-btn-bg', fallback: 'the tone’s text color', note: 'Primary button fill (and both buttons’ edge).' },
       { name: '--cta-btn-fg', fallback: 'the tone’s background', note: 'Primary button text.' },
       { name: '--cta-radius', fallback: '16px', note: 'Band corners; 0 for a full-bleed band.' },
       { name: '--cta-padding', fallback: 'clamp(1.75rem, 5cqi, 3rem) clamp(1.25rem, 5cqi, 3rem)', note: 'Inside the band.' },
       { name: '--cta-gap', fallback: '1.25rem 2rem', note: 'Between text and buttons.' },
       { name: '--cta-max', fallback: '40rem', note: 'The text’s measure.' },
       { name: '--cta-title-size', fallback: 'clamp(1.4rem, 1rem + 2.5cqi, 2rem)', note: 'Heading size.' },
-      { name: '--cta-focus', fallback: 'the tone’s text colour', note: 'Focus ring.' },
+      { name: '--cta-focus', fallback: 'the tone’s text color', note: 'Focus ring.' },
     ],
     a11y: [
       'A <section> named by its heading (a region landmark), or a plain <div> with landmark={false}. The heading is at `headingLevel`, never a second <h1>.',
-      'Buttons are real links, at least 44px tall, with a 3px focus ring in the tone’s text colour; a tel: href is a phone link.',
-      'The three tones’ fallbacks clear 4.5:1 for the text and for both buttons; keep that when mapping them to brand colours.',
-      'No motion. Forced colours: a border round the band and link-coloured button edges.',
+      'Buttons are real links, at least 44px tall, with a 3px focus ring in the tone’s text color; a tel: href is a phone link.',
+      'The three tones’ fallbacks clear 4.5:1 for the text and for both buttons; keep that when mapping them to brand colors.',
+      'No motion. Forced colors: a border round the band and link-colored button edges.',
     ],
     usage: `<CallToAction
   title="Looking for pricing, or just exploring?"
