@@ -1827,7 +1827,7 @@ import { analytics } from '../data/site';
       { name: '--slb-fade', fallback: '200ms', note: 'The crossfade under reduced motion.' },
       { name: '--slb-focus', fallback: 'var(--slb-accent)', note: 'Focus ring round the card.' },
       { name: '--slb-image-fg', fallback: '#fff', note: 'variant="image": text over the photo and on its tinted back.' },
-      { name: '--slb-scrim', fallback: 'linear-gradient(to top, rgb(20 24 40 / 0.45), rgb(20 24 40 / 0.3) 60%, transparent)', note: 'variant="image": behind the front’s title, for 4.5:1 over the photo. Measure it per image and set it on each tile; the fallback is a starting point, not an answer (latlonguas.com’s four photos needed 0.19–0.33).' },
+      { name: '--slb-scrim', fallback: 'linear-gradient(to top, rgb(20 24 40 / 0.45), rgb(20 24 40 / 0.3) 60%, transparent)', note: 'variant="image": behind the front’s title, for 4.5:1 over the photo. Measure it per image and set it on each tile; the fallback is a starting point, not an answer (latlonguas.com’s four photos needed 0.19–0.33). On shape="circle" it fills the disc instead, with its own fallback (a radial tint, 0.62 under the centred text, 0.38 at the rim); set a radial gradient or a flat colour there, not a foot gradient.' },
       { name: '--slb-image-back-bg', fallback: 'rgb(20 24 40 / 0.86)', note: 'variant="image": the tint that slides in over the photo.' },
       { name: '--slb-image-height', fallback: '16rem', note: 'variant="image": the card’s floor.' },
     ],
