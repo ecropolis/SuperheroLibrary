@@ -447,7 +447,8 @@ export const catalog: Element[] = [
   <blockquote>…</blockquote>
 </ScrollReveal>
 <!-- :root { --sr-duration: 500ms; } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/scroll-reveal/ (demo)' }],
+    usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'Card grids and split-section figures on home, About, Marketing and Training' },{ site: 'superherotech.ai', where: '/elements/scroll-reveal/ (demo)' }],
     file: 'src/library/scroll-reveal/ScrollReveal.astro',
     added: '2026-09-23',
   },
@@ -1188,6 +1189,7 @@ import { testimonials } from '../data/testimonials';   // [{ quote, name, meta }
 </section>
 <!-- .reviews { --tc-accent: var(--teal); --tc-quote-font: var(--font-display); --tc-focus: var(--teal-deep); } -->`,
     usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'Home, coaching, course and training pages: her 19 Success Stories, autoplay with an 8 s dwell' },
       { site: 'nicolelawton.com', where: 'Home, "In their words" (her own copy, pre-launch on nicolelawton.gohero.us); the reading-time dwell was built for it' },
       { site: 'jwalktours.com', where: 'Home and tour pages, as ReviewScroller: the earlier version, with a fixed 5 s interval' },
     ],
@@ -2312,7 +2314,8 @@ import Link from '../components/LinkEffects.astro';   // the same file, as a wra
 <a class="lk-arrow" href="/book/">Book a visit</a>   <!-- or just the class -->
 <!-- .site { --lk-accent: var(--brand); --lk-bg: var(--page); } -->`,
     license: 'Our own CSS and our own drawings (the swash and the ring). Nothing licensed from anyone else: no font, no icon set, no script.',
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/link-effects/ (demo)' }],
+    usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'Header nav, underline-slide' },{ site: 'superherotech.ai', where: '/elements/link-effects/ (demo)' }],
     file: 'src/library/link-effects/LinkEffects.astro',
     added: '2026-09-26',
   },
@@ -3533,6 +3536,7 @@ const { product, currency } = Astro.props;
   ]}
 />`,
     usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'Portfolio: her four sections as filter chips, one lightbox' },
       { site: 'superherotech.ai', where: '/elements/photo-gallery/ (demo)' },
       { site: 'LatLong UAS (rebuild at latlonguas.gohero.us, cutting over to latlonguas.com)', where: 'Its Portfolio.astro, the Photography panel (filtered, 3/2)' },
     ],
@@ -3586,7 +3590,8 @@ const { product, currency } = Astro.props;
 <Separator text="or" line="dashed" />
 <Separator text="What our clients say" as="h2" />
 <!-- global.css: .sep { --sep-color: var(--brand); } -->`,
-    usedOn: [{ site: 'superherotech.ai', where: '/elements/separator/ (demo)' }],
+    usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'The short teal bar under section headings, reveal' },{ site: 'superherotech.ai', where: '/elements/separator/ (demo)' }],
     reference: [{ module: 'advanced-separator', url: 'https://latlonguas.com/', note: 'Short accent bars that slide in above headings, on all five main pages.' }],
     file: 'src/library/separator/Separator.astro',
     added: '2026-10-30',
@@ -3746,6 +3751,7 @@ const { product, currency } = Astro.props;
     license:
       'Our own code. pixelate, tiles and gallery-open were rebuilt by hand for the MLP Technologies site from what its theme and Slider Revolution did on the page, no code copied. tilt follows the pattern of vanilla-tilt.js (micku7zu, MIT) and caption, zoom and shine that of imagehover.css (ciar4n, MIT); both reimplemented, no code copied. The demo’s scenes are our own drawings.',
     usedOn: [
+      { site: 'Aliya Hammond Consulting (pitch, aliyahammond.gohero.us)', where: 'Home Recent Work tiles and every post card (zoom)' },
       { site: 'superherotech.ai', where: '/elements/image-effects/ (demo)' },
       { site: 'MLP Technologies (pitch, mlptechnologies.gohero.us)', where: 'Home hero (tiles), photo strip (gallery-open), slideshow and marquee photos (pixelate); the site’s own copies predate this element' },
     ],
